@@ -1,4 +1,11 @@
+# Temporary files
 *.swp
+*.ropeproject
 
+# Data files
+*.json
+
+# Data directories
 data/VisualGenome
 data/GloVe
+
