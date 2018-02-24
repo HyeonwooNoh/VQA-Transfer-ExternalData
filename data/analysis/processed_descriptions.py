@@ -9,7 +9,7 @@ ANNO_DIR = 'VisualGenome/annotations'
 ANNO_FILE = {
     'objects': 'objects.json',
     'attributes': 'attributes.json',
-    'region_descriptions': 'region_descriptions',
+    'region_descriptions': 'region_descriptions.json',
 }
 VOCAB_PATH = 'preprocessed/vocab.json'
 
