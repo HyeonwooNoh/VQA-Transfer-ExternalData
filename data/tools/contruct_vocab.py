@@ -33,4 +33,5 @@ f = h5py.File(PARAM_PATH, 'w')
 f['param'] = glove_vector
 f.close()
 
+vocab = {'vocab': vocab, 'dict': {v: i for i, v in enumerate(vocab)}}
 json.dump(vocab, open(VOCAB_PATH, 'w'))

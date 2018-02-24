@@ -1,6 +1,7 @@
 # Temporary files
 *.swp
 *.ropeproject
+*.pyc
 
 # Data files
 *.json
