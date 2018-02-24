@@ -5,6 +5,11 @@ def clean_description(string):
     string = string.replace('.', ' .')  # '  ' to ' ' should follow this.
     string = string.replace('   ', ' ')
     string = string.replace('  ', ' ')
+    if string == '':
+        return string
+    if string == ' ':
+        string = ''
+        return string
     if string[-1] == ' ':
         string = string[:-1]
     if string[0] == ' ':
