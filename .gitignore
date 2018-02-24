@@ -4,6 +4,7 @@
 
 # Data files
 *.json
+*.hdf5
 
 # Data directories
 data/VisualGenome
