@@ -68,10 +68,9 @@ def name2intseq(name):
 attributes = []
 for entry in tqdm(anno['attributes'], desc='attributes'):
     for attr in entry['attributes']:
-        if 'name' in attr: check_and_add(attr['name'], attributes)
-        if 'names' in attr:
-            for name in attr['names']:
-                check_and_add(name, attributes)
+        if 'attributes' in attr:
+            for attr_name in attr['attributes']:
+                check_and_add(attr_name, attributes)
 
 attribute_count = Counter(attributes)
 thr_attributes_set = set([o for o in list(set(attributes))
@@ -88,10 +87,9 @@ for entry in tqdm(anno['attributes'], desc='attributes'):
     image_grp = f.create_group(str(image_id))
     for attr in entry['attributes']:
         names = []
-        if 'name' in attr:
-            names.append(attr['name'])
-        if 'names' in attr:
-            names.extend(attr['names'])
+        if 'attributes' in attr:
+            for attr_name in attr['attributes']:
+                names.append(attr_name)
 
         name_len = []
         names_intseq = []
