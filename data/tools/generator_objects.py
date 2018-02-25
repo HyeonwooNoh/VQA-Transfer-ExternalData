@@ -85,6 +85,7 @@ max_name_length = 0
 max_num_names = 0
 for entry in tqdm(anno['objects'], desc='objects'):
     image_id = entry['image_id']
+    image_grp = f.create_group(str(image_id))
     for obj in entry['objects']:
         names = []
         if 'name' in obj:
@@ -116,7 +117,7 @@ for entry in tqdm(anno['objects'], desc='objects'):
         id = 'objects{:08d}_imageid{}_numname{}_maxnamelen{}'.format(
             cnt, image_id, names.shape[0], names.shape[1])
 
-        grp = f.create_group(id)
+        grp = image_grp.create_group(id)
         grp['image_id'] = image_id
         grp['names'] = names
         grp['name_len'] = name_len
@@ -124,7 +125,7 @@ for entry in tqdm(anno['objects'], desc='objects'):
         grp['y'], grp['x'] = obj['y'], obj['x']
         grp['object_id'] = obj['object_id']
 
-        id_file.write(id + '\n')
+        id_file.write(str(image_id) + ' ' + id + '\n')
         cnt += 1
 
 thr_object_set_intseq = np.zeros([len(thr_objects_set), max_name_length],
