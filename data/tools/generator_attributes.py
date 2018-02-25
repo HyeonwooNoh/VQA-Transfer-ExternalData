@@ -1,5 +1,5 @@
 """
-Generator for attibutes
+Generator for attributes
 
 Generate attribute data for training vlmap.
 """
