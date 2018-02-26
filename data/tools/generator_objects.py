@@ -20,6 +20,8 @@ ANNO_FILE = {
 }
 VOCAB_PATH = 'preprocessed/vocab.json'
 
+IMAGE_SPLIT_FILE = 'preprocessed/image_split.json'
+
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--dir_name', type=str, default='objects')
@@ -82,18 +84,23 @@ thr_objects_set_idx_dict = {o: i for i, o in enumerate(thr_objects_set_list)}
 f = h5py.File(args.hdf5_file, 'w')
 id_file = open(args.ids_file, 'w')
 
-num_train_image = 80000
-num_test_image = 18077
-num_val_image = 10000
+image_split = json.load(open(IMAGE_SPLIT_FILE, 'r'))
+train_image_set = set(image_split['train'])
+test_image_set = set(image_split['test'])
+val_image_set = set(image_split['val'])
 
-num_train = 0
-num_test = 0
-num_val = 0
+num_train_image = len(image_split['train'])
+num_test_image = len(image_split['test'])
+num_val_image = len(image_split['val'])
+
+train_ids = []
+test_ids = []
+val_ids = []
 
 cnt = 0
 max_name_length = 0
 max_num_names = 0
-for image_cnt, entry in enumerate(tqdm(anno['objects'], desc='objects')):
+for entry in tqdm(anno['objects'], desc='objects'):
     image_id = entry['image_id']
     image_grp = f.create_group(str(image_id))
     for obj in entry['objects']:
@@ -139,14 +146,18 @@ for image_cnt, entry in enumerate(tqdm(anno['objects'], desc='objects')):
         grp['y'], grp['x'] = obj['y'], obj['x']
         grp['object_id'] = obj['object_id']
 
-        id_file.write(str(image_id) + ' ' + id + '\n')
+        id_str = str(image_id) + ' ' + id + '\n'
+        if image_id in train_image_set: train_ids.append(id_str)
+        elif image_id in test_image_set: test_ids.append(id_str)
+        elif image_id in val_image_set: val_ids.append(id_str)
+        else: raise ValueError('Unknown image_id')
         cnt += 1
-        if image_cnt < num_train_image:
-            num_train = cnt
-        elif image_cnt < num_train_image + num_test_image:
-            num_test = cnt - num_train
-        else:
-            num_val = cnt - num_train - num_test
+
+num_train = len(train_ids)
+num_test = len(test_ids)
+num_val = len(val_ids)
+for id_str in train_ids + test_ids + val_ids:
+    id_file.write(id_str)
 
 thr_object_set_intseq = np.zeros([len(thr_objects_set), max_name_length],
                                  dtype=np.int32)
