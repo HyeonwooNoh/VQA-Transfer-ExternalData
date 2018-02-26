@@ -3,4 +3,4 @@ tensorflow-tensorboard==1.5.1
 editdistance==0.4
 tqdm==4.19.5
 h5py==2.7.1
-
+Pillow==5.0.0
