@@ -7,6 +7,10 @@
 *.json
 *.hdf5
 
+# Ipython notebook
+.ipynb_checkpoints
+*.ipynb
+
 # Data directories
 data/VisualGenome
 data/GloVe
