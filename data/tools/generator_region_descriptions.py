@@ -150,7 +150,7 @@ stat_file.close()
 
 descriptions_file = open(args.descriptions_file, 'w')
 for name in set_descriptions:
-    descriptions_file.write(name + '\n')
+    descriptions_file.write(name.encode('utf-8') + '\n')
 descriptions_file.close()
 
 print('description dataset is created: {}'.format(args.dir_name))
