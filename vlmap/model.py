@@ -76,8 +76,11 @@ class Model(object):
         with tf.variable_scope('Classifier') as scope:
             log.warning(scope.name)
             map_I = layers.fully_connected(
-                enc_I, L_DIM, activation_fn=None, biases_initializer=None,
-                reuse=None, trainable=True, scope='map_I')
+                enc_I, L_DIM, activation_fn=tf.nn.relu,
+                reuse=None, trainable=True, scope='map_I_1')
+            map_I = layers.fully_connected(
+                map_I, L_DIM, activation_fn=None, biases_initializer=None,
+                reuse=None, trainable=True, scope='map_I_2')
             tiled_map_I = tf.tile(tf.expand_dims(map_I, axis=1),
                                   [1, self.object_num_k, 1])
             bias = tf.get_variable(name='bias', shape=(),
