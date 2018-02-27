@@ -106,7 +106,8 @@ class Model(object):
                 pred_image = tf.clip_by_value(
                     tf.concat([prob_image, label_image, dummy], axis=-1),
                     0, 1)
-                pred_image = tf.tile(pred_image, [10, 1, 1])
+                pred_image = tf.reshape(
+                    tf.tile(pred_image, [1, 10, 1]), [-1, self.object_num_k, 3])
                 return tf.expand_dims(pred_image, axis=0)
             pred_image = visualize_prediction(logits, labels)
 
