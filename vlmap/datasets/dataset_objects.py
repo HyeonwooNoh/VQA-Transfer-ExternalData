@@ -35,6 +35,14 @@ class Dataset(object):
         log.info('Reading Done {}'.format(file_name))
 
     def get_data(self, id):
+        """
+        Returns:
+            image: [height, width, channel]
+            sampled_objects: [num_k, max_name_len]  (first is positive object)
+            sampled_objects_len: [num_k]
+            ground_truth: [num_k]  (one-hot vector with 1 as the first entry)
+
+        """
         image_id, id = id.split()
         entry = self.data[image_id][id]
 
@@ -55,10 +63,19 @@ class Dataset(object):
         image_path = os.path.join(self.image_dir, '{}.jpg'.format(image_id))
         image = np.array(
             Image.open(image_path).crop([x, y, x + w, y + h])
-            .resize([self.width, self.height]), dtype=np.float32
+            .resize([self.width, self.height]).convert('RGB'), dtype=np.float32
         ) / 128.0 - 1.0  # normalize to [-1, 1]
 
         return image, sampled_objects, sampled_objects_len, ground_truth
+
+    def get_data_shapes(self):
+        data_shapes = {
+            'image': [self.height, self.width, 3],
+            'sampled_objects': [self.num_k, self.max_name_len],
+            'sampled_objects_len': [self.num_k],
+            'ground_truth': [self.num_k],
+        }
+        return data_shapes
 
     @property
     def ids(self):
