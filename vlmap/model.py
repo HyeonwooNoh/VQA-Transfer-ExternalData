@@ -42,13 +42,11 @@ class Model(object):
             self.batches['object']['objects'],
             scope='glove_embedding', reuse=False)
         enc_L_flat = modules.language_encoder(
-            tf.reshape(embed_seq, [self.batch_size * self.object_num_k,
-                                   self.object_max_name_len, 300]),
-            tf.reshape(self.batches['object']['objects_len'],
-                       [self.batch_size * self.object_num_k]),
+            tf.reshape(embed_seq, [-1, self.object_max_name_len, 300]),
+            tf.reshape(self.batches['object']['objects_len'], [-1]),
             L_DIM, scope='language_encoder', reuse=False)
         enc_L = tf.reshape(enc_L_flat,
-                           [self.batch_size, self.object_num_k, L_DIM])
+                           [-1, self.object_num_k, L_DIM])
 
         with tf.variable_scope('Classifier') as scope:
             log.warning(scope.name)
