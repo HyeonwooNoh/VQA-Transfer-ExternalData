@@ -1,4 +1,5 @@
 import h5py
+import json
 import os
 import numpy as np
 
@@ -11,7 +12,7 @@ RANDOM_STATE = np.random.RandomState(123)
 
 class Dataset(object):
 
-    def __init__(self, ids, dataset_path, image_dir, num_k,
+    def __init__(self, ids, dataset_path, image_dir, vocab_path, num_k,
                  width=224, height=224, name='default', is_train=True):
         self._ids = list(ids)
         self.image_dir = image_dir
@@ -31,6 +32,8 @@ class Dataset(object):
         self.num_objects = int(self.data_info['num_unique_objects'].value)
         self.objects_ids = list(range(self.num_objects))
         self.max_name_len = int(self.data_info['max_name_length'].value)
+
+        self.vocab = json.load(open(vocab_path, 'r'))
 
         log.info('Reading Done {}'.format(file_name))
 
@@ -54,6 +57,11 @@ class Dataset(object):
         sampled_objects = np.take(self.objects_intseq, sampled_ids, axis=0)
         sampled_objects_len = np.take(
             self.objects_intseq_len, sampled_ids, axis=0)
+        sampled_objects_name = []
+        for obj, obj_len in zip(sampled_objects, sampled_objects_len):
+            sampled_objects_name.append(
+                ' '.join([self.vocab['vocab'][i] for i in obj[:obj_len]]))
+        sampled_objects_name = np.array(sampled_objects_name)
         num_pos, num_neg = len(name_ids), self.num_k - len(name_ids)
         ground_truth = np.array([1] * num_pos + [0] * num_neg, dtype=np.float32)
 
@@ -66,7 +74,8 @@ class Dataset(object):
             .resize([self.width, self.height]).convert('RGB'), dtype=np.float32
         )
 
-        return image, sampled_objects, sampled_objects_len, ground_truth
+        return image, sampled_objects, sampled_objects_len, ground_truth,\
+            sampled_objects_name
 
     def get_data_shapes(self):
         data_shapes = {
@@ -74,6 +83,7 @@ class Dataset(object):
             'sampled_objects': [self.num_k, self.max_name_len],
             'sampled_objects_len': [self.num_k],
             'ground_truth': [self.num_k],
+            'sampled_objects_name': [self.num_k],
         }
         return data_shapes
 
@@ -88,21 +98,22 @@ class Dataset(object):
         return 'Dataset ({}, {} examples)'.format(self.name, len(self))
 
 
-def create_default_splits(dataset_path, image_dir, num_k, is_train=True):
+def create_default_splits(dataset_path, image_dir, vocab_path,
+                          num_k, is_train=True):
     """
     Args:
         num_k: number positive + negative object names sampled for training
     """
     ids_train, ids_test, ids_val = all_ids(dataset_path, is_train=is_train)
 
-    dataset_train = Dataset(ids_train, dataset_path, image_dir, num_k,
-                            width=224, height=224,
+    dataset_train = Dataset(ids_train, dataset_path, image_dir, vocab_path,
+                            num_k, width=224, height=224,
                             name='train', is_train=is_train)
-    dataset_test = Dataset(ids_test, dataset_path, image_dir, num_k,
-                           width=224, height=224,
+    dataset_test = Dataset(ids_test, dataset_path, image_dir, vocab_path,
+                           num_k, width=224, height=224,
                            name='test', is_train=is_train)
-    dataset_val = Dataset(ids_val, dataset_path, image_dir, num_k,
-                          width=224, height=224,
+    dataset_val = Dataset(ids_val, dataset_path, image_dir, vocab_path,
+                          num_k, width=224, height=224,
                           name='val', is_train=is_train)
     return {
         'train': dataset_train,

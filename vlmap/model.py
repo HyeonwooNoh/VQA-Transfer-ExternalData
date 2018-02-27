@@ -6,6 +6,7 @@ import tensorflow.contrib.slim.nets as nets
 from util import log
 from vlmap import modules
 
+TOP_K = 5
 L_DIM = 384  # Language dimension
 ENC_I_PARAM_PATH = 'data/nets/resnet_v1_50.ckpt'
 ENC_I_R_MEAN = 123.68
@@ -111,6 +112,19 @@ class Model(object):
                 return tf.expand_dims(pred_image, axis=0)
             pred_image = visualize_prediction(logits, labels)
 
+            label_name = tf.gather(self.batches['object']['objects_name'],
+                                   label_token, axis=-1)
+            _, top_k_pred = tf.nn.top_k(logits, k=5)
+            top_k_name = tf.gather(self.batches['object']['objects_name'],
+                                   top_k_pred, axis=-1)
+            pred_names =tf.split(axis=-1, num_or_size_splits=5,
+                                 value=top_k_name)
+            string_list = ['gt: ', label_name]
+            for i in range(5):
+                string_list.extend([', pred({}): '.format(i),
+                                    tf.squeeze(pred_names[i], axis=-1)])
+            pred_string = tf.string_join(string_list)
+
         tf.summary.scalar('train/loss', self.loss, collections=['train'])
         tf.summary.scalar('val/loss', self.loss, collections=['val'])
 
@@ -123,3 +137,5 @@ class Model(object):
         tf.summary.image('val_image', image, collections=['val'])
         tf.summary.image('val_prediction_image', pred_image,
                          collections=['val'])
+        tf.summary.text('train_pred_string', pred_string, collections=['train'])
+        tf.summary.text('val_pred_string', pred_string, collections=['val'])

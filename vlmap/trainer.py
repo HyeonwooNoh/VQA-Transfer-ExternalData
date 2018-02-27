@@ -199,6 +199,8 @@ def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     # paths
+    parser.add_argument('--vocab_path', type=str,
+                        default='data/preprocessed/vocab.json', help='')
     parser.add_argument('--image_dir', type=str,
                         default='data/VisualGenome/VG_100K', help='')
     parser.add_argument('--object_dataset_path', type=str,
@@ -218,8 +220,8 @@ def main():
     config = parser.parse_args()
 
     object_datasets = dataset_objects.create_default_splits(
-        config.object_dataset_path, config.image_dir, config.object_num_k,
-        is_train=True)
+        config.object_dataset_path, config.image_dir, config.vocab_path,
+        config.object_num_k, is_train=True)
     config.object_data_shapes = object_datasets['train'].get_data_shapes()
     config.object_max_name_len = object_datasets['train'].max_name_len
 

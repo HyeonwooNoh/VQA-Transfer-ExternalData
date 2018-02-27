@@ -18,21 +18,24 @@ def create(dataset,
             tf.convert_to_tensor(ids))
 
         def load_fn(id):
-            image, sampled_objects, sampled_objects_len, ground_truth = \
-                dataset.get_data(id)
-            return (id, image, sampled_objects, sampled_objects_len, ground_truth)
+            image, sampled_objects, sampled_objects_len, ground_truth, \
+                sampled_objects_name = dataset.get_data(id)
+            return (id, image, sampled_objects, sampled_objects_len,
+                    ground_truth, sampled_objects_name)
 
         def load_py_func(id):
             py_func_out = tf.py_func(
                 load_fn, inp=[id],
-                Tout=[tf.string, tf.float32, tf.int32, tf.int32, tf.float32],
+                Tout=[tf.string, tf.float32, tf.int32, tf.int32,
+                      tf.float32, tf.string],
                 name='input_py_func')
             return {
                 'id': py_func_out[0],
                 'image': py_func_out[1],
                 'objects': py_func_out[2],
                 'objects_len': py_func_out[3],
-                'ground_truth': py_func_out[4]
+                'ground_truth': py_func_out[4],
+                'objects_name': py_func_out[5],
             }
         tf_dataset = tf_dataset.map(load_py_func)
 
@@ -44,6 +47,7 @@ def create(dataset,
             entry['objects'].set_shape(data_shapes['sampled_objects'])
             entry['objects_len'].set_shape(data_shapes['sampled_objects_len'])
             entry['ground_truth'].set_shape(data_shapes['ground_truth'])
+            entry['objects_name'].set_shape(data_shapes['sampled_objects_name'])
             return entry
         tf_dataset = tf_dataset.map(set_shape)
 
