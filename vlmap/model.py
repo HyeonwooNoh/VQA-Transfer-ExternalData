@@ -89,5 +89,33 @@ class Model(object):
                 labels=tf.stop_gradient(labels), logits=logits)
             self.loss = tf.reduce_mean(cross_entropy)
 
+        with tf.name_scope('Accuracy'):
+            label_token = tf.argmax(labels, axis=-1)
+            logit_token = tf.argmax(logits, axis=-1)
+            acc = tf.reduce_mean(tf.to_float(
+                tf.equal(label_token, logit_token)))
+
+        with tf.name_scope('Summary'):
+            image = self.batches['object']['image'] / 255.0
+
+            def visualize_prediction(logit, label):
+                prob = tf.nn.softmax(logit, dim=-1)
+                prob_image = tf.expand_dims(prob, axis=-1)
+                label_image = tf.expand_dims(label, axis=-1)
+                dummy = tf.zeros_like(label_image)
+                return tf.clip_by_value(
+                    tf.concat([prob_image, label_image, dummy], axis=-1), 0, 1)
+            pred_image = visualize_prediction(logits, labels)
+
         tf.summary.scalar('train/loss', self.loss, collections=['train'])
         tf.summary.scalar('val/loss', self.loss, collections=['val'])
+
+        tf.summary.scalar('train/accuracy', acc, collections=['train'])
+        tf.summary.scalar('val/accuracy', acc, collections=['val'])
+
+        tf.summary.image('train_image', image, collections=['train'])
+        tf.summary.image('train_prediction_image', pred_image,
+                         collections=['train'])
+        tf.summary.image('val_image', image, collections=['val'])
+        tf.summary.image('val_prediction_image', pred_image,
+                         collections=['val'])
