@@ -67,6 +67,5 @@ class Model(object):
                 labels=tf.stop_gradient(labels), logits=logits)
             self.loss = tf.reduce_mean(cross_entropy)
 
-        with tf.name_scope('summary'):
-            tf.summary.scalar('train/loss', self.loss, collections=['train'])
-            tf.summary.scalar('val/loss', self.loss, collections=['val'])
+        tf.summary.scalar('train/loss', self.loss, collections=['train'])
+        tf.summary.scalar('val/loss', self.loss, collections=['val'])
