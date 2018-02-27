@@ -52,7 +52,7 @@ def create(dataset,
         tf_dataset = tf_dataset.map(set_shape)
 
     if shuffle:
-        tf_dataset = tf_dataset.shuffle(buffer_size=10000)
+        tf_dataset = tf_dataset.shuffle(buffer_size=3000)
     tf_dataset = tf_dataset.batch(batch_size)
     tf_dataset = tf_dataset.repeat(1000)  # repeat 1000 epoch
 
