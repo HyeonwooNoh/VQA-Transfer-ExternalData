@@ -20,6 +20,7 @@ ANNO_FILE = {
 VOCAB_PATH = 'preprocessed/vocab.json'
 
 IMAGE_SPLIT_FILE = 'preprocessed/image_split.json'
+MIN_CROP_SIZE = 32
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -81,8 +82,10 @@ max_length = 0
 descriptions = []
 for entry in tqdm(anno['region_descriptions'], desc='region_descriptions'):
     for region in entry['regions']:
-        phrase = region['phrase']
+        if region['height'] < MIN_CROP_SIZE or region['width'] < MIN_CROP_SIZE:
+            continue
 
+        phrase = region['phrase']
         phrase = clean_phrase(phrase)
         if phrase == '': continue
         descriptions.append(phrase)

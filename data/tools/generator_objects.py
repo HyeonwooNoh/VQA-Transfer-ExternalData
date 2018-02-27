@@ -21,6 +21,7 @@ ANNO_FILE = {
 VOCAB_PATH = 'preprocessed/vocab.json'
 
 IMAGE_SPLIT_FILE = 'preprocessed/image_split.json'
+MIN_CROP_SIZE = 32
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -123,6 +124,9 @@ for entry in tqdm(anno['objects'], desc='objects'):
             name_ids.append(thr_objects_set_idx_dict[name])
 
         if len(names_intseq) == 0:
+            continue
+
+        if obj['h'] < MIN_CROP_SIZE or obj['w'] < MIN_CROP_SIZE:
             continue
 
         names = np.zeros([len(names_intseq), max(name_len)], dtype=np.int32)

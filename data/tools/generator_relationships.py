@@ -21,6 +21,7 @@ ANNO_FILE = {
 VOCAB_PATH = 'preprocessed/vocab.json'
 
 IMAGE_SPLIT_FILE = 'preprocessed/image_split.json'
+MIN_CROP_SIZE = 32
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -122,6 +123,17 @@ for entry in tqdm(anno['relationships'], desc='relationships'):
         if len(names_intseq) == 0:
             continue
 
+        o_x1, o_y1 = rel['object']['x'], rel['object']['y']
+        o_x2, o_y2 = o_x1 + rel['object']['w'], o_y1 + rel['object']['h']
+        s_x1, s_y1 = rel['subject']['x'], rel['subject']['y']
+        s_x2, s_y2 = s_x1 + rel['subject']['w'], s_y1 + rel['subject']['h']
+
+        x1, y1 = min(o_x1, s_x1), min(o_y1, s_y1)
+        x2, y2 = max(o_x2, s_x2), max(o_y2, s_y2)
+
+        if (y2 - y1) < MIN_CROP_SIZE or (x2 - x1) < MIN_CROP_SIZE:
+            continue
+
         names = np.zeros([len(names_intseq), max(name_len)], dtype=np.int32)
         for i, intseq in enumerate(names_intseq):
             names[i][:len(intseq)] = intseq
@@ -133,14 +145,6 @@ for entry in tqdm(anno['relationships'], desc='relationships'):
 
         id = 'relationships{:08d}_imageid{}_numname{}_maxnamelen{}'.format(
             cnt, image_id, names.shape[0], names.shape[1])
-
-        o_x1, o_y1 = rel['object']['x'], rel['object']['y']
-        o_x2, o_y2 = o_x1 + rel['object']['w'], o_y1 + rel['object']['h']
-        s_x1, s_y1 = rel['subject']['x'], rel['subject']['y']
-        s_x2, s_y2 = s_x1 + rel['subject']['w'], s_y1 + rel['subject']['h']
-
-        x1, y1 = min(o_x1, s_x1), min(o_y1, s_y1)
-        x2, y2 = max(o_x2, s_x2), max(o_y2, s_y2)
 
         grp = image_grp.create_group(id)
         grp['image_id'] = image_id
