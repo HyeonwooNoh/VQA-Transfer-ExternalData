@@ -64,7 +64,7 @@ class Dataset(object):
         image = np.array(
             Image.open(image_path).crop([x, y, x + w, y + h])
             .resize([self.width, self.height]).convert('RGB'), dtype=np.float32
-        ) / 128.0 - 1.0  # normalize to [-1, 1]
+        )
 
         return image, sampled_objects, sampled_objects_len, ground_truth
 

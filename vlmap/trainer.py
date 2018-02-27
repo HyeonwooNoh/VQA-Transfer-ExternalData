@@ -72,8 +72,9 @@ class Trainer(object):
 
         # Checkpoint and monitoring
         all_vars = tf.trainable_variables()
+        enc_I_vars, learn_vars = self.model.filter_vars(all_vars)
         log.warn('Trainable variables:')
-        tf.contrib.slim.model_analyzer.analyze_vars(all_vars, print_info=True)
+        tf.contrib.slim.model_analyzer.analyze_vars(learn_vars, print_info=True)
 
         self.optimizer = tf.contrib.layers.optimize_loss(
             loss=self.model.loss,
@@ -88,8 +89,9 @@ class Trainer(object):
             'val': tf.summary.merge_all(key='val')
         }
 
-        self.saver = tf.train.Saver(max_to_keep=100)
-        self.pretrain_saver = tf.train.Saver(var_list=all_vars, max_to_keep=1)
+        self.saver = tf.train.Saver(var_list=learn_vars, max_to_keep=100)
+        self.enc_I_saver = tf.train.Saver(var_list=enc_I_vars, max_to_keep=1)
+        self.pretrain_saver = tf.train.Saver(var_list=learn_vars, max_to_keep=1)
         self.summary_writer = tf.summary.FileWriter(self.train_dir)
         self.log_step = self.config.log_step
         self.val_sample_step = self.config.val_sample_step
@@ -113,6 +115,12 @@ class Trainer(object):
 
         self.session = self.supervisor.prepare_or_wait_for_session(
             config=session_config)
+
+        enc_I_param_path = self.model.get_enc_I_param_path()
+        if enc_I_param_path is not None:
+            log.info('Enc_I parameter path: {}'.format(enc_I_param_path))
+            self.enc_I_saver.restore(self.session, enc_I_param_path)
+            log.info('Loaded pretrained Enc_I parameters')
 
         self.ckpt_path = config.checkpoint
         if self.ckpt_path is not None:

@@ -7,6 +7,10 @@ from util import log
 from vlmap import modules
 
 L_DIM = 384  # Language dimension
+ENC_I_PARAM_PATH = 'data/nets/resnet_v1_50.ckpt'
+ENC_I_R_MEAN = 123.68
+ENC_I_G_MEAN = 116.78
+ENC_I_B_MEAN = 103.94
 
 
 class Model(object):
@@ -22,21 +26,41 @@ class Model(object):
 
         self.build(is_train=is_train)
 
+    def filter_vars(self, all_vars):
+        enc_I_vars = []
+        learn_vars = []
+        for var in all_vars:
+            if var.name.split('/')[0] == 'resnet_v1_50':
+                enc_I_vars.append(var)
+            else:
+                learn_vars.append(var)
+        return enc_I_vars, learn_vars
+
+    def get_enc_I_param_path(self):
+        return ENC_I_PARAM_PATH
+
     def build(self, is_train=True):
 
         """
         Pre-trained model parameter is available here:
         https://github.com/tensorflow/models/tree/master/research/slim#Pretrained
         """
+        with tf.name_scope('enc_I_preprocess'):
+            channels = tf.split(axis=3, num_or_size_splits=3,
+                                value=self.batches['object']['image'])
+            for i, mean in enumerate([ENC_I_R_MEAN, ENC_I_G_MEAN, ENC_I_B_MEAN]):
+                channels[i] -= mean
+            processed_I = tf.concat(axis=3, values=channels)
 
-        enc_I, _ = nets.resnet_v1.resnet_v1_50(
-            self.batches['object']['image'],
-            is_training=False,
-            global_pool=True,
-            output_stride=None,
-            reuse=None,
-            scope='resnet_v1_50')
-        enc_I = tf.stop_gradient(tf.squeeze(enc_I, axis=[1, 2]))
+        with slim.arg_scope(nets.resnet_v1.resnet_arg_scope()):
+            enc_I, _ = nets.resnet_v1.resnet_v1_50(
+                processed_I,
+                is_training=False,
+                global_pool=True,
+                output_stride=None,
+                reuse=None,
+                scope='resnet_v1_50')
+            enc_I = tf.stop_gradient(tf.squeeze(enc_I, axis=[1, 2]))
 
         embed_seq = modules.glove_embedding(
             self.batches['object']['objects'],
