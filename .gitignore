@@ -6,6 +6,7 @@
 # Data files
 *.json
 *.hdf5
+*.ckpt
 
 # Ipython notebook
 .ipynb_checkpoints

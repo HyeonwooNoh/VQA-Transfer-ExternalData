@@ -93,7 +93,7 @@ def create_default_splits(dataset_path, image_dir, num_k, is_train=True):
     Args:
         num_k: number positive + negative object names sampled for training
     """
-    ids_train, ids_test, ids_val = all_ids(dataset_path)
+    ids_train, ids_test, ids_val = all_ids(dataset_path, is_train=is_train)
 
     dataset_train = Dataset(ids_train, dataset_path, image_dir, num_k,
                             width=224, height=224,
@@ -104,10 +104,14 @@ def create_default_splits(dataset_path, image_dir, num_k, is_train=True):
     dataset_val = Dataset(ids_val, dataset_path, image_dir, num_k,
                           width=224, height=224,
                           name='val', is_train=is_train)
-    return dataset_train, dataset_test, dataset_val
+    return {
+        'train': dataset_train,
+        'test': dataset_test,
+        'val': dataset_val
+    }
 
 
-def all_ids(dataset_path):
+def all_ids(dataset_path, is_train=True):
     with h5py.File(os.path.join(dataset_path, 'data.hdf5'), 'r') as f:
         num_train = int(f['data_info']['num_train'].value)
         num_test = int(f['data_info']['num_test'].value)
@@ -120,8 +124,9 @@ def all_ids(dataset_path):
     ids_test = ids_total[num_train: num_train + num_test]
     ids_val = ids_total[num_train + num_test: num_train + num_test + num_val]
 
-    RANDOM_STATE.shuffle(ids_train)
-    RANDOM_STATE.shuffle(ids_test)
-    RANDOM_STATE.shuffle(ids_val)
+    if is_train:
+        RANDOM_STATE.shuffle(ids_train)
+        RANDOM_STATE.shuffle(ids_test)
+        RANDOM_STATE.shuffle(ids_val)
 
     return ids_train, ids_test, ids_val
