@@ -17,3 +17,5 @@ data/VisualGenome
 data/GloVe
 data/preprocessed
 
+# Training results
+train_dir
