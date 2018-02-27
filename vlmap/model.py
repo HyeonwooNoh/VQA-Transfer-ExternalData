@@ -76,8 +76,11 @@ class Model(object):
         with tf.variable_scope('Classifier') as scope:
             log.warning(scope.name)
             map_I = layers.fully_connected(
-                enc_I, L_DIM, activation_fn=tf.nn.relu,
+                enc_I, L_DIM, activation_fn=None, biases_initializer=None,
                 reuse=None, trainable=True, scope='map_I_1')
+            map_I = layers.batch_norm(map_I, center=True, scale=True, decay=0.9,
+                                      is_training=True, updates_collections=None)
+            map_I = tf.nn.relu(map_I)
             map_I = layers.fully_connected(
                 map_I, L_DIM, activation_fn=None, biases_initializer=None,
                 reuse=None, trainable=True, scope='map_I_2')
@@ -120,8 +123,8 @@ class Model(object):
             _, top_k_pred = tf.nn.top_k(logits, k=5)
             top_k_name = tf.gather(self.batches['object']['objects_name'],
                                    top_k_pred, axis=-1)
-            pred_names =tf.split(axis=-1, num_or_size_splits=5,
-                                 value=top_k_name)
+            pred_names = tf.split(axis=-1, num_or_size_splits=5,
+                                  value=top_k_name)
             string_list = ['gt: ', label_name]
             for i in range(5):
                 string_list.extend([', pred({}): '.format(i),
