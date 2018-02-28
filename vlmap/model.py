@@ -97,14 +97,15 @@ class Model(object):
             self.loss = tf.reduce_mean(cross_entropy)
 
         with tf.name_scope('Accuracy'):
-            label_token = tf.argmax(labels, axis=-1)
-            logit_token = tf.argmax(logits, axis=-1)
+            label_token = tf.cast(tf.argmax(labels, axis=-1), tf.int32)
+            logit_token = tf.cast(tf.argmax(logits, axis=-1), tf.int32)
             acc = tf.reduce_mean(tf.to_float(
                 tf.equal(label_token, logit_token)))
 
         with tf.name_scope('Summary'):
             image = self.batches['object']['image'] / 255.0
 
+            # Visualize prediction as image
             def visualize_prediction(logit, label):
                 prob = tf.nn.softmax(logit, dim=-1)
                 prob_image = tf.expand_dims(prob, axis=-1)
@@ -118,17 +119,25 @@ class Model(object):
                 return tf.expand_dims(pred_image, axis=0)
             pred_image = visualize_prediction(logits, labels)
 
-            label_name = tf.gather(self.batches['object']['objects_name'],
-                                   label_token, axis=-1)
+            # Visualize prediction as texts
+            batch_range = tf.expand_dims(
+                tf.range(0, tf.shape(label_token)[0], delta=1), axis=1)
+            range_label_token = tf.concat(
+                [batch_range, tf.expand_dims(label_token, axis=1)], axis=1)
+            label_name = tf.gather_nd(
+                self.batches['object']['objects_name'], range_label_token)
             _, top_k_pred = tf.nn.top_k(logits, k=5)
-            top_k_name = tf.gather(self.batches['object']['objects_name'],
-                                   top_k_pred, axis=-1)
-            pred_names = tf.split(axis=-1, num_or_size_splits=5,
-                                  value=top_k_name)
+            top_k_preds = tf.split(axis=-1, num_or_size_splits=5,
+                                   value=top_k_pred)
+            pred_names = []
+            for i in range(5):
+                range_top_k_pred = tf.concat(
+                    [batch_range, top_k_preds[i]], axis=1)
+                pred_names.append(tf.gather_nd(
+                    self.batches['object']['objects_name'], range_top_k_pred))
             string_list = ['gt: ', label_name]
             for i in range(5):
-                string_list.extend([', pred({}): '.format(i),
-                                    tf.squeeze(pred_names[i], axis=-1)])
+                string_list.extend([', pred({}): '.format(i), pred_names[i]])
             pred_string = tf.string_join(string_list)
 
         tf.summary.scalar('train/loss', self.loss, collections=['train'])
