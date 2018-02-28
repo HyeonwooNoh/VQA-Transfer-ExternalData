@@ -32,7 +32,7 @@ class Evaler(object):
         with tf.name_scope('datasets/object_batch'):
             self.batches['object'] = input_ops_objects.create(
                 object_datasets[self.split], self.batch_size,
-                is_training=False, scope='input_ops', shuffle=False)
+                is_train=False, scope='input_ops', shuffle=False)
 
         # Model
         Model = self.get_model_class()

@@ -39,10 +39,10 @@ class Trainer(object):
         with tf.name_scope('datasets/object_batch'):
             object_batches = {
                 'train': input_ops_objects.create(
-                    object_datasets['train'], self.batch_size, is_training=True,
+                    object_datasets['train'], self.batch_size, is_train=True,
                     scope='train_ops', shuffle=True),
                 'val': input_ops_objects.create(
-                    object_datasets['val'], self.batch_size, is_training=True,
+                    object_datasets['val'], self.batch_size, is_train=True,
                     scope='val_ops', shuffle=False)}
             self.batches['object'] = tf.case(
                 {tf.equal(self.target_split, 'train'): lambda: object_batches['train'],

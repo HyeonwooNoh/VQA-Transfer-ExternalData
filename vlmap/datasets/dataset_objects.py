@@ -21,6 +21,8 @@ class Dataset(object):
         self.name = name
         self.is_train = is_train
 
+        self.vocab = json.load(open(vocab_path, 'r'))
+
         file_name = os.path.join(dataset_path, 'data.hdf5')
         log.info('Reading {} ...'.format(file_name))
 
@@ -40,8 +42,6 @@ class Dataset(object):
         if is_train:
             self.num_k = num_k  # number of positive + negative objects
         else: self.num_k = self.num_objects
-
-        self.vocab = json.load(open(vocab_path, 'r'))
 
         log.info('Reading Done {}'.format(file_name))
 

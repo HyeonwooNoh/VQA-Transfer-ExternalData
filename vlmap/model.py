@@ -171,5 +171,5 @@ class Model(object):
         }
         self.output = {
             'image': image,
-            'prediction_string': prediction_string
+            'prediction_string': pred_string
         }
