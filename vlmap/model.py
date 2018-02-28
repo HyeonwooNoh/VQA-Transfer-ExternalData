@@ -73,7 +73,11 @@ class Model(object):
         with tf.variable_scope('I2V') as scope:
             log.warning(scope.name)
             feat_V = modules.fc_layer(
-                enc_I, MAP_DIM, use_bias=False, use_bn=False,
+                enc_I, MAP_DIM, use_bias=False, use_bn=True,
+                activation_fn=tf.nn.relu, is_training=is_train,
+                scope='fc_1', reuse=False)
+            feat_V = modules.fc_layer(
+                feat_V, MAP_DIM, use_bias=True, use_bn=False,
                 activation_fn=None, is_training=is_train,
                 scope='Linear', reuse=False)
 
@@ -92,15 +96,15 @@ class Model(object):
         with tf.variable_scope('L2V') as scope:
             log.warning(scope.name)
             map_V = modules.fc_layer(
-                enc_L, MAP_DIM, use_bias=False, use_bn=True,
+                enc_L, MAP_DIM, use_bias=True, use_bn=False,
                 activation_fn=tf.nn.relu, is_training=is_train,
                 scope='fc_1', reuse=False)
             map_V = modules.fc_layer(
-                map_V, MAP_DIM, use_bias=False, use_bn=True,
+                map_V, MAP_DIM, use_bias=True, use_bn=False,
                 activation_fn=tf.nn.relu, is_training=is_train,
                 scope='fc_2', reuse=False)
             map_V = modules.fc_layer(
-                map_V, MAP_DIM, use_bias=False, use_bn=False,
+                map_V, MAP_DIM, use_bias=True, use_bn=False,
                 activation_fn=None, is_training=is_train,
                 scope='Linear', reuse=False)
 
