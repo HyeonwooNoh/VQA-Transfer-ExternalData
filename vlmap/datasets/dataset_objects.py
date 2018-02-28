@@ -16,7 +16,6 @@ class Dataset(object):
                  width=224, height=224, name='default', is_train=True):
         self._ids = list(ids)
         self.image_dir = image_dir
-        self.num_k = num_k  # number of positive + negative objects
         self.width = width
         self.height = height
         self.name = name
@@ -29,9 +28,18 @@ class Dataset(object):
         self.data_info = self.data['data_info']
         self.objects_intseq = self.data_info['objects_intseq'].value
         self.objects_intseq_len = self.data_info['objects_intseq_len'].value
+        self.objects_name = []
+        for obj, obj_len in zip(self.objects_intseq, self.objects_intseq_len):
+            self.objects_name.append(
+                ' '.join([self.vocab['vocab'][i] for i in obj[:obj_len]]))
+        self.objects_name = np.array(self.objects_name)
         self.num_objects = int(self.data_info['num_unique_objects'].value)
         self.objects_ids = list(range(self.num_objects))
         self.max_name_len = int(self.data_info['max_name_length'].value)
+
+        if is_train:
+            self.num_k = num_k  # number of positive + negative objects
+        else: self.num_k = self.num_objects
 
         self.vocab = json.load(open(vocab_path, 'r'))
 
@@ -49,21 +57,30 @@ class Dataset(object):
         image_id, id = id.split()
         entry = self.data[image_id][id]
 
-        name_ids = list(entry['name_ids'].value)
-        negative_ids = list(set(self.objects_ids) - set(name_ids))
-        RANDOM_STATE.shuffle(negative_ids)
+        if self.is_train:
+            name_ids = list(entry['name_ids'].value)
+            negative_ids = list(set(self.objects_ids) - set(name_ids))
+            RANDOM_STATE.shuffle(negative_ids)
 
-        sampled_ids = (name_ids + negative_ids)[:self.num_k]
-        sampled_objects = np.take(self.objects_intseq, sampled_ids, axis=0)
-        sampled_objects_len = np.take(
-            self.objects_intseq_len, sampled_ids, axis=0)
-        sampled_objects_name = []
-        for obj, obj_len in zip(sampled_objects, sampled_objects_len):
-            sampled_objects_name.append(
-                ' '.join([self.vocab['vocab'][i] for i in obj[:obj_len]]))
-        sampled_objects_name = np.array(sampled_objects_name)
-        num_pos, num_neg = len(name_ids), self.num_k - len(name_ids)
-        ground_truth = np.array([1] * num_pos + [0] * num_neg, dtype=np.float32)
+            sampled_ids = (name_ids + negative_ids)[:self.num_k]
+            sampled_objects = np.take(self.objects_intseq, sampled_ids, axis=0)
+            sampled_objects_len = np.take(
+                self.objects_intseq_len, sampled_ids, axis=0)
+            sampled_objects_name = []
+            for obj, obj_len in zip(sampled_objects, sampled_objects_len):
+                sampled_objects_name.append(
+                    ' '.join([self.vocab['vocab'][i] for i in obj[:obj_len]]))
+            sampled_objects_name = np.array(sampled_objects_name)
+            num_pos, num_neg = len(name_ids), self.num_k - len(name_ids)
+            ground_truth = np.array([1] * num_pos + [0] * num_neg, dtype=np.float32)
+        else:
+            name_ids = list(entry['name_ids'].value)
+            sampled_objects = self.objects_intseq
+            sampled_objects_len = self.objects_intseq_len
+            sampled_objects_name = self.objects_name
+            ground_truth = np.zeros([self.num_objects], dtype=np.float32)
+            for name_id in name_ids:
+                ground_truth[name_id] = 1.0
 
         x, y = entry['x'].value, entry['y'].value
         w, h = entry['w'].value, entry['h'].value

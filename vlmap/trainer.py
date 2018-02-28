@@ -3,8 +3,6 @@ import os
 import time
 import tensorflow as tf
 
-from pprint import pprint
-
 from util import log
 from vlmap.datasets import dataset_objects, input_ops_objects
 
@@ -51,15 +49,13 @@ class Trainer(object):
                  tf.equal(self.target_split, 'val'): lambda: object_batches['val']},
                 default=lambda: object_batches['train'], exclusive=True)
 
-        # Optimizer
-        self.global_step = tf.train.get_or_create_global_step(graph=None)
-
         # Model
         Model = self.get_model_class()
         log.infov('using model class: {}'.format(Model))
-        self.model = Model(self.batches, config, global_step=self.global_step,
-                           is_train=True)
+        self.model = Model(self.batches, config, is_train=True)
 
+        # Optimizer
+        self.global_step = tf.train.get_or_create_global_step(graph=None)
         self.learning_rate = config.learning_rate
         if config.lr_weight_decay:
             self.learning_rate = tf.train.exponential_decay(
@@ -89,7 +85,7 @@ class Trainer(object):
             'val': tf.summary.merge_all(key='val')
         }
 
-        self.saver = tf.train.Saver(var_list=learn_vars, max_to_keep=100)
+        self.saver = tf.train.Saver(max_to_keep=100)
         self.enc_I_saver = tf.train.Saver(var_list=enc_I_vars, max_to_keep=1)
         self.pretrain_saver = tf.train.Saver(var_list=learn_vars, max_to_keep=1)
         self.summary_writer = tf.summary.FileWriter(self.train_dir)
@@ -134,7 +130,7 @@ class Trainer(object):
         max_steps = 1000000
         ckpt_save_steps = 5000
 
-        for s in xrange(max_steps):
+        for s in range(max_steps):
             step, train_summary, loss, step_time = \
                 self.run_train_step()
             if s % self.log_step == 0:
@@ -179,7 +175,6 @@ class Trainer(object):
         _end_time = time.time()
         return step, summary, loss, (_end_time - _start_time)
 
-
     def log_step_message(self, step, loss, step_time, is_train=True):
         if step_time == 0: step_time = 0.001
         log_fn = (is_train and log.info or log.infov)
@@ -194,6 +189,7 @@ class Trainer(object):
                          instance_per_sec=self.batch_size / step_time
                          )
                )
+
 
 def main():
     parser = argparse.ArgumentParser(

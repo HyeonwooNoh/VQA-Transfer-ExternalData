@@ -5,7 +5,7 @@ from util import log
 
 def create(dataset,
            batch_size,
-           is_training=False,
+           is_train=False,
            scope='objects_input',
            shuffle=True):
 
@@ -51,10 +51,13 @@ def create(dataset,
             return entry
         tf_dataset = tf_dataset.map(set_shape)
 
-    if shuffle:
+    if is_train and shuffle:
         tf_dataset = tf_dataset.shuffle(buffer_size=3000)
+
     tf_dataset = tf_dataset.batch(batch_size)
-    tf_dataset = tf_dataset.repeat(1000)  # repeat 1000 epoch
+
+    if is_train:
+        tf_dataset = tf_dataset.repeat(1000)  # repeat 1000 epoch
 
     iterator = tf_dataset.make_one_shot_iterator()
     batch_ops = iterator.get_next()

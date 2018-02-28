@@ -15,10 +15,9 @@ ENC_I_B_MEAN = 103.94
 
 class Model(object):
 
-    def __init__(self, batches, config, global_step=None, is_train=True):
+    def __init__(self, batches, config, is_train=True):
         self.batches = batches
         self.config = config
-        self.global_step = global_step
 
         self.batch_size = config.batch_size
         self.object_num_k = config.object_num_k
@@ -76,15 +75,15 @@ class Model(object):
             log.warning(scope.name)
             map_I = modules.fc_layer(
                 enc_I, L_DIM, use_bias=False, use_bn=True,
-                activation_fn=tf.nn.relu, is_training=True,
+                activation_fn=tf.nn.relu, is_training=is_train,
                 scope='map_I_1', reuse=False)
             map_I = modules.fc_layer(
                 map_I, L_DIM, use_bias=False, use_bn=True,
-                activation_fn=tf.nn.relu, is_training=True,
+                activation_fn=tf.nn.relu, is_training=is_train,
                 scope='map_I_2', reuse=False)
             map_I = modules.fc_layer(
                 map_I, L_DIM, use_bias=False, use_bn=False,
-                activation_fn=None, is_training=True,
+                activation_fn=None, is_training=is_train,
                 scope='map_I_3', reuse=False)
 
         with tf.variable_scope('Classifier') as scope:
@@ -168,3 +167,13 @@ class Model(object):
                          collections=['val'])
         tf.summary.text('train_pred_string', pred_string, collections=['train'])
         tf.summary.text('val_pred_string', pred_string, collections=['val'])
+
+        self.report = {
+            'loss': self.loss,
+            'accuracy': acc,
+            'top_{}_acc'.format(TOP_K): top_k_acc
+        }
+        self.output = {
+            'image': image,
+            'prediction_string': prediction_string
+        }
