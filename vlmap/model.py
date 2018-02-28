@@ -8,6 +8,7 @@ from vlmap import modules
 TOP_K = 5
 L_DIM = 384  # Language dimension
 MAP_DIM = 384
+V_DIM = 384
 ENC_I_PARAM_PATH = 'data/nets/resnet_v1_50.ckpt'
 ENC_I_R_MEAN = 123.68
 ENC_I_G_MEAN = 116.78
@@ -77,7 +78,7 @@ class Model(object):
                 activation_fn=tf.nn.relu, is_training=is_train,
                 scope='fc_1', reuse=False)
             feat_V = modules.fc_layer(
-                feat_V, MAP_DIM, use_bias=True, use_bn=False,
+                feat_V, V_DIM, use_bias=True, use_bn=False,
                 activation_fn=None, is_training=is_train,
                 scope='Linear', reuse=False)
 
@@ -104,7 +105,7 @@ class Model(object):
                 activation_fn=tf.nn.relu, is_training=is_train,
                 scope='fc_2', reuse=False)
             map_V = modules.fc_layer(
-                map_V, MAP_DIM, use_bias=True, use_bn=False,
+                map_V, V_DIM, use_bias=True, use_bn=False,
                 activation_fn=None, is_training=is_train,
                 scope='Linear', reuse=False)
 
