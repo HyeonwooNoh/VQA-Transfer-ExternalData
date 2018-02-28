@@ -78,13 +78,9 @@ class Model(object):
                 activation_fn=tf.nn.relu, is_training=is_train,
                 scope='map_I_1', reuse=False)
             map_I = modules.fc_layer(
-                map_I, L_DIM, use_bias=False, use_bn=True,
-                activation_fn=tf.nn.relu, is_training=is_train,
-                scope='map_I_2', reuse=False)
-            map_I = modules.fc_layer(
                 map_I, L_DIM, use_bias=False, use_bn=False,
                 activation_fn=None, is_training=is_train,
-                scope='map_I_3', reuse=False)
+                scope='map_I_2', reuse=False)
 
         with tf.variable_scope('Classifier') as scope:
             log.warning(scope.name)
