@@ -1,5 +1,4 @@
 import tensorflow as tf
-import tensorflow.contrib.layers as layers
 import tensorflow.contrib.slim as slim
 import tensorflow.contrib.slim.nets as nets
 
@@ -73,17 +72,23 @@ class Model(object):
         enc_L = tf.reshape(enc_L_flat,
                            [-1, self.object_num_k, L_DIM])
 
+        with tf.variable_scope('V2L') as scope:
+            log.warning(scope.name)
+            map_I = modules.fc_layer(
+                enc_I, L_DIM, use_bias=False, use_bn=True,
+                activation_fn=tf.nn.relu, is_training=True,
+                scope='map_I_1', reuse=False)
+            map_I = modules.fc_layer(
+                map_I, L_DIM, use_bias=False, use_bn=True,
+                activation_fn=tf.nn.relu, is_training=True,
+                scope='map_I_2', reuse=False)
+            map_I = modules.fc_layer(
+                map_I, L_DIM, use_bias=False, use_bn=False,
+                activation_fn=None, is_training=True,
+                scope='map_I_3', reuse=False)
+
         with tf.variable_scope('Classifier') as scope:
             log.warning(scope.name)
-            map_I = layers.fully_connected(
-                enc_I, L_DIM, activation_fn=None, biases_initializer=None,
-                reuse=None, trainable=True, scope='map_I_1')
-            map_I = layers.batch_norm(map_I, center=True, scale=True, decay=0.9,
-                                      is_training=True, updates_collections=None)
-            map_I = tf.nn.relu(map_I)
-            map_I = layers.fully_connected(
-                map_I, L_DIM, activation_fn=None, biases_initializer=None,
-                reuse=None, trainable=True, scope='map_I_2')
             tiled_map_I = tf.tile(tf.expand_dims(map_I, axis=1),
                                   [1, self.object_num_k, 1])
             bias = tf.get_variable(name='bias', shape=(),

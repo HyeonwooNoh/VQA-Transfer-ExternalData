@@ -1,5 +1,6 @@
 import h5py
 import tensorflow as tf
+import tensorflow.contrib.layers as layers
 import tensorflow.contrib.rnn as rnn
 
 from util import log
@@ -29,3 +30,24 @@ def glove_embedding(seq, scope='glove_embedding', reuse=False):
         embed_map = tf.concat([fixed, learn], axis=0)
         embed = tf.nn.embedding_lookup(embed_map, seq)
         return embed
+
+
+def fc_layer(input, dim, use_bias=False, use_bn=False, activation_fn=None,
+             is_training=True, scope='fc_layer', reuse=False):
+    with tf.variable_scope(scope, reuse=reuse) as scope:
+        if not reuse: log.warning(scope.name)
+        if use_bias:
+            out = layers.fully_connected(
+                input, dim, activation_fn=None, reuse=reuse,
+                trainable=is_training, scope='fc')
+        else:
+            out = layers.fully_connected(
+                input, dim, activation_fn=None, biases_initializer=None,
+                reuse=reuse, trainable=is_training, scope='fc')
+        if use_bn:
+            out = layers.batch_norm(out, center=True, scale=True, decay=0.9,
+                                    is_training=is_training,
+                                    updates_collections=None)
+        if activation_fn is not None:
+            out = activation_fn(out)
+        return out
