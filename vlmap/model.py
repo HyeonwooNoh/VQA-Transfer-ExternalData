@@ -7,6 +7,7 @@ from vlmap import modules
 
 TOP_K = 5
 L_DIM = 384  # Language dimension
+MAP_DIM = 384
 ENC_I_PARAM_PATH = 'data/nets/resnet_v1_50.ckpt'
 ENC_I_R_MEAN = 123.68
 ENC_I_G_MEAN = 116.78
@@ -69,6 +70,13 @@ class Model(object):
             if not self.finetune_enc_I:
                 enc_I = tf.stop_gradient(enc_I)
 
+        with tf.variable_scope('I2V') as scope:
+            log.warning(scope.name)
+            feat_V = modules.fc_layer(
+                enc_I, MAP_DIM, use_bias=False, use_bn=False,
+                activation_fn=None, is_training=is_train,
+                scope='Linear', reuse=False)
+
         embed_seq = modules.glove_embedding(
             self.batches['object']['objects'],
             scope='glove_embedding', reuse=False)
@@ -81,24 +89,28 @@ class Model(object):
         if self.no_finetune_enc_L:
             enc_L = tf.stop_gradient(enc_L)
 
-        with tf.variable_scope('V2L') as scope:
+        with tf.variable_scope('L2V') as scope:
             log.warning(scope.name)
-            map_I = modules.fc_layer(
-                enc_I, L_DIM, use_bias=False, use_bn=True,
+            map_V = modules.fc_layer(
+                enc_L, MAP_DIM, use_bias=False, use_bn=True,
                 activation_fn=tf.nn.relu, is_training=is_train,
-                scope='map_I_1', reuse=False)
-            map_I = modules.fc_layer(
-                map_I, L_DIM, use_bias=False, use_bn=False,
+                scope='fc_1', reuse=False)
+            map_V = modules.fc_layer(
+                map_V, MAP_DIM, use_bias=False, use_bn=True,
+                activation_fn=tf.nn.relu, is_training=is_train,
+                scope='fc_2', reuse=False)
+            map_V = modules.fc_layer(
+                map_V, MAP_DIM, use_bias=False, use_bn=False,
                 activation_fn=None, is_training=is_train,
-                scope='map_I_2', reuse=False)
+                scope='Linear', reuse=False)
 
         with tf.variable_scope('Classifier') as scope:
             log.warning(scope.name)
-            tiled_map_I = tf.tile(tf.expand_dims(map_I, axis=1),
+            tiled_feat_V = tf.tile(tf.expand_dims(feat_V, axis=1),
                                   [1, self.object_num_k, 1])
             bias = tf.get_variable(name='bias', shape=(),
                                    initializer=tf.zeros_initializer())
-            logits = tf.reduce_sum(tiled_map_I * enc_L, axis=-1) + bias
+            logits = tf.reduce_sum(tiled_feat_V * map_V, axis=-1) + bias
 
         with tf.name_scope('Loss'):
             labels = self.batches['object']['ground_truth']
