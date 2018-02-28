@@ -19,4 +19,4 @@ data/preprocessed
 
 # Training results
 train_dir
-old_train_dir
+experiments
