@@ -106,6 +106,11 @@ class Model(object):
             logit_token = tf.cast(tf.argmax(logits, axis=-1), tf.int32)
             acc = tf.reduce_mean(tf.to_float(
                 tf.equal(label_token, logit_token)))
+            _, top_k_pred = tf.nn.top_k(logits, k=TOP_K)
+            k_label_token = tf.tile(
+                tf.expand_dims(label_token, axis=1), [1, TOP_K])
+            top_k_acc = tf.reduce_mean(tf.to_float(tf.reduce_any(
+                tf.equal(k_label_token, top_k_pred), axis=1)))
 
         with tf.name_scope('Summary'):
             image = self.batches['object']['image'] / 255.0
@@ -131,17 +136,16 @@ class Model(object):
                 [batch_range, tf.expand_dims(label_token, axis=1)], axis=1)
             label_name = tf.gather_nd(
                 self.batches['object']['objects_name'], range_label_token)
-            _, top_k_pred = tf.nn.top_k(logits, k=5)
-            top_k_preds = tf.split(axis=-1, num_or_size_splits=5,
+            top_k_preds = tf.split(axis=-1, num_or_size_splits=TOP_K,
                                    value=top_k_pred)
             pred_names = []
-            for i in range(5):
+            for i in range(TOP_K):
                 range_top_k_pred = tf.concat(
                     [batch_range, top_k_preds[i]], axis=1)
                 pred_names.append(tf.gather_nd(
                     self.batches['object']['objects_name'], range_top_k_pred))
             string_list = ['gt: ', label_name]
-            for i in range(5):
+            for i in range(TOP_K):
                 string_list.extend([', pred({}): '.format(i), pred_names[i]])
             pred_string = tf.string_join(string_list)
 
@@ -150,6 +154,11 @@ class Model(object):
 
         tf.summary.scalar('train/accuracy', acc, collections=['train'])
         tf.summary.scalar('val/accuracy', acc, collections=['val'])
+
+        tf.summary.scalar('train/top_{}_acc'.format(TOP_K),
+                          top_k_acc, collections=['train'])
+        tf.summary.scalar('val/top_{}_acc'.format(TOP_K),
+                          top_k_acc, collections=['val'])
 
         tf.summary.image('train_image', image, collections=['train'])
         tf.summary.image('train_prediction_image', pred_image,
