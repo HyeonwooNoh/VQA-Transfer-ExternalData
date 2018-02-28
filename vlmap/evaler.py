@@ -172,6 +172,9 @@ def main():
     parser.add_argument('--max_steps', type=int, default=-1,
                         help='-1 for single epoch')
     parser.add_argument('--save_output', action='store_true', default=False)
+    # model parameters
+    parser.add_argument('--finetune_enc_I', action='store_true', default=False)
+    parser.add_argument('--no_finetune_enc_L', action='store_true', default=False)
 
     config = parser.parse_args()
 

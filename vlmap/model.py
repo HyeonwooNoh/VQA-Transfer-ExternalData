@@ -23,6 +23,10 @@ class Model(object):
         self.object_num_k = config.object_num_k
         self.object_max_name_len = config.object_max_name_len
 
+        # model parameters
+        self.finetune_enc_I = config.finetune_enc_I
+        self.no_finetune_enc_L = config.no_finetune_enc_L
+
         self.build(is_train=is_train)
 
     def filter_vars(self, all_vars):
@@ -31,6 +35,8 @@ class Model(object):
         for var in all_vars:
             if var.name.split('/')[0] == 'resnet_v1_50':
                 enc_I_vars.append(var)
+                if self.finetune_enc_I:
+                    learn_vars.append(var)
             else:
                 learn_vars.append(var)
         return enc_I_vars, learn_vars
@@ -54,12 +60,14 @@ class Model(object):
         with slim.arg_scope(nets.resnet_v1.resnet_arg_scope()):
             enc_I, _ = nets.resnet_v1.resnet_v1_50(
                 processed_I,
-                is_training=False,
+                is_training=self.finetune_enc_I,
                 global_pool=True,
                 output_stride=None,
                 reuse=None,
                 scope='resnet_v1_50')
-            enc_I = tf.stop_gradient(tf.squeeze(enc_I, axis=[1, 2]))
+            enc_I = tf.squeeze(enc_I, axis=[1, 2])
+            if not self.finetune_enc_I:
+                enc_I = tf.stop_gradient(enc_I)
 
         embed_seq = modules.glove_embedding(
             self.batches['object']['objects'],
@@ -70,6 +78,8 @@ class Model(object):
             L_DIM, scope='language_encoder', reuse=False)
         enc_L = tf.reshape(enc_L_flat,
                            [-1, self.object_num_k, L_DIM])
+        if self.no_finetune_enc_L:
+            enc_L = tf.stop_gradient(enc_L)
 
         with tf.variable_scope('V2L') as scope:
             log.warning(scope.name)

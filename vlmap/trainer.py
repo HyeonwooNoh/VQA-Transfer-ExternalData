@@ -25,6 +25,11 @@ class Trainer(object):
         hyper_parameter_str = 'bs_{}_lr_{}'.format(
             config.batch_size, config.learning_rate)
 
+        if config.finetune_enc_I:
+            hyper_parameter_str += '_ft_enc_I'
+        if config.no_finetune_enc_L:
+            hyper_parameter_str += '_no_ft_enc_L'
+
         self.train_dir = './train_dir/{}_{}_{}_{}'.format(
             dataset_str, config.prefix, hyper_parameter_str,
             time.strftime("%Y%m%d-%H%M%S"))
@@ -87,7 +92,7 @@ class Trainer(object):
 
         self.saver = tf.train.Saver(max_to_keep=100)
         self.enc_I_saver = tf.train.Saver(var_list=enc_I_vars, max_to_keep=1)
-        self.pretrain_saver = tf.train.Saver(var_list=learn_vars, max_to_keep=1)
+        self.pretrain_saver = tf.train.Saver(max_to_keep=1)
         self.summary_writer = tf.summary.FileWriter(self.train_dir)
         self.log_step = self.config.log_step
         self.val_sample_step = self.config.val_sample_step
@@ -212,6 +217,9 @@ def main():
     parser.add_argument('--checkpoint', type=str, default=None)
     parser.add_argument('--learning_rate', type=float, default=0.001, help=" ")
     parser.add_argument('--lr_weight_decay', action='store_true', default=False)
+    # model parameters
+    parser.add_argument('--finetune_enc_I', action='store_true', default=False)
+    parser.add_argument('--no_finetune_enc_L', action='store_true', default=False)
 
     config = parser.parse_args()
 
