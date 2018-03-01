@@ -51,8 +51,8 @@ class Dataset(object):
             image: [height, width, channel]
             sampled_objects: [num_k, max_name_len]  (first is positive object)
             sampled_objects_len: [num_k]
-            ground_truth: [num_k]  (one-hot vector with 1 as the first entry)
-
+            ground_truth: [num_k]  (one-hot vector with 1 as the first entry
+            sampled_objects_name: [num_k]
         """
         image_id, id = id.split()
         entry = self.data[image_id][id]

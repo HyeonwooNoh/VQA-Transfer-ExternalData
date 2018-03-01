@@ -1,3 +1,4 @@
+import h5py
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import tensorflow.contrib.slim.nets as nets
@@ -10,9 +11,6 @@ L_DIM = 384  # Language dimension
 MAP_DIM = 384
 V_DIM = 384
 ENC_I_PARAM_PATH = 'data/nets/resnet_v1_50.ckpt'
-ENC_I_R_MEAN = 123.68
-ENC_I_G_MEAN = 116.78
-ENC_I_B_MEAN = 103.94
 
 
 class Model(object):
@@ -21,9 +19,14 @@ class Model(object):
         self.batches = batches
         self.config = config
 
+        self.report = {}
+        self.output = {}
+
         self.batch_size = config.batch_size
         self.object_num_k = config.object_num_k
         self.object_max_name_len = config.object_max_name_len
+
+        self.used_wordset_path = config.used_wordset_path
 
         # model parameters
         self.finetune_enc_I = config.finetune_enc_I
@@ -46,42 +49,91 @@ class Model(object):
     def get_enc_I_param_path(self):
         return ENC_I_PARAM_PATH
 
-    def build(self, is_train=True):
+    def visualize_word_prediction(self, logit, label):
+        prob = tf.nn.softmax(logit, dim=-1)
+        prob_image = tf.expand_dims(prob, axis=-1)
+        label_image = tf.expand_dims(label, axis=-1)
+        dummy = tf.zeros_like(label_image)
+        pred_image = tf.clip_by_value(
+            tf.concat([prob_image, label_image, dummy], axis=-1),
+            0, 1)
+        pred_image = tf.reshape(
+            tf.tile(pred_image, [1, 10, 1]), [-1, self.object_num_k, 3])
+        return tf.expand_dims(pred_image, axis=0)
 
-        """
-        Pre-trained model parameter is available here:
-        https://github.com/tensorflow/models/tree/master/research/slim#Pretrained
-        """
-        with tf.name_scope('enc_I_preprocess'):
-            channels = tf.split(axis=3, num_or_size_splits=3,
-                                value=self.batches['object']['image'])
-            for i, mean in enumerate([ENC_I_R_MEAN, ENC_I_G_MEAN, ENC_I_B_MEAN]):
-                channels[i] -= mean
-            processed_I = tf.concat(axis=3, values=channels)
+    def visualize_word_prediction_text(self, logits, labels, names):
+        label_token = tf.cast(tf.argmax(labels, axis=-1), tf.int32)
+        _, top_k_pred = tf.nn.top_k(logits, k=TOP_K)
+        batch_range = tf.expand_dims(
+            tf.range(0, tf.shape(label_token)[0], delta=1), axis=1)
+        range_label_token = tf.concat(
+            [batch_range, tf.expand_dims(label_token, axis=1)], axis=1)
+        label_name = tf.gather_nd(names, range_label_token)
+        top_k_preds = tf.split(axis=-1, num_or_size_splits=TOP_K,
+                               value=top_k_pred)
+        pred_names = []
+        for i in range(TOP_K):
+            range_top_k_pred = tf.concat(
+                [batch_range, top_k_preds[i]], axis=1)
+            pred_names.append(tf.gather_nd(names, range_top_k_pred))
+        string_list = ['gt: ', label_name]
+        for i in range(TOP_K):
+            string_list.extend([', pred({}): '.format(i), pred_names[i]])
+        pred_string = tf.string_join(string_list)
+        return pred_string
 
-        with slim.arg_scope(nets.resnet_v1.resnet_arg_scope()):
-            enc_I, _ = nets.resnet_v1.resnet_v1_50(
-                processed_I,
-                is_training=self.finetune_enc_I,
-                global_pool=True,
-                output_stride=None,
-                reuse=None,
-                scope='resnet_v1_50')
-            enc_I = tf.squeeze(enc_I, axis=[1, 2])
-            if not self.finetune_enc_I:
-                enc_I = tf.stop_gradient(enc_I)
+    def word_prediction_loss(self, logits, labels):
+        cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(
+            labels=tf.stop_gradient(labels), logits=logits)
+        loss = tf.reduce_mean(cross_entropy)
+        # Accuracy
+        label_token = tf.cast(tf.argmax(labels, axis=-1), tf.int32)
+        logit_token = tf.cast(tf.argmax(logits, axis=-1), tf.int32)
+        acc = tf.reduce_mean(tf.to_float(
+            tf.equal(label_token, logit_token)))
+        _, top_k_pred = tf.nn.top_k(logits, k=TOP_K)
+        k_label_token = tf.tile(
+            tf.expand_dims(label_token, axis=1), [1, TOP_K])
+        top_k_acc = tf.reduce_mean(tf.to_float(tf.reduce_any(
+            tf.equal(k_label_token, top_k_pred), axis=1)))
+        return loss, acc, top_k_acc
 
-        with tf.variable_scope('I2V') as scope:
-            log.warning(scope.name)
-            feat_V = modules.fc_layer(
-                enc_I, MAP_DIM, use_bias=False, use_bn=True,
-                activation_fn=tf.nn.relu, is_training=is_train,
-                scope='fc_1', reuse=False)
-            feat_V = modules.fc_layer(
-                feat_V, V_DIM, use_bias=True, use_bn=False,
-                activation_fn=None, is_training=is_train,
-                scope='Linear', reuse=False)
+    def add_classification_summary(self, loss, acc, top_k_acc, image,
+                                   pred_image, pred_string, name='default'):
+        tf.summary.scalar('train-{}/loss'.format(name),
+                          loss, collections=['train'])
+        tf.summary.scalar('val-{}/loss'.format(name), loss, collections=['val'])
 
+        tf.summary.scalar('train-{}/accuracy'.format(name),
+                          acc, collections=['train'])
+        tf.summary.scalar('val-{}/accuracy'.format(name),
+                          acc, collections=['val'])
+
+        tf.summary.scalar('train-{}/top_{}_acc'.format(name, TOP_K),
+                          top_k_acc, collections=['train'])
+        tf.summary.scalar('val-{}/top_{}_acc'.format(name, TOP_K),
+                          top_k_acc, collections=['val'])
+        tf.summary.image('train-{}_image'.format(name),
+                         image, collections=['train'])
+        tf.summary.image('train-{}_prediction_image'.format(name), pred_image,
+                         collections=['train'])
+        tf.summary.image('val-{}_image'.format(name),
+                         image, collections=['val'])
+        tf.summary.image('val-{}_prediction_image'.format(name), pred_image,
+                         collections=['val'])
+        tf.summary.text('train-{}_pred_string'.format(name),
+                        pred_string, collections=['train'])
+        tf.summary.text('val-{}_pred_string'.format(name),
+                        pred_string, collections=['val'])
+
+    def build_object(self, is_train=True, add_summary=True):
+        # Object class encoder
+        enc_I = modules.encode_I(self.batches['object']['image'],
+                                 is_train=self.finetune_enc_I,
+                                 reuse=False)
+        if not self.finetune_enc_I: enc_I = tf.stop_gradient(enc_I)
+        feat_V = modules.I2V(enc_I, MAP_DIM, V_DIM, scope='I2V',
+                             is_train=is_train, reuse=False)
         embed_seq = modules.glove_embedding(
             self.batches['object']['objects'],
             scope='glove_embedding', reuse=False)
@@ -91,112 +143,40 @@ class Model(object):
             L_DIM, scope='language_encoder', reuse=False)
         enc_L = tf.reshape(enc_L_flat,
                            [-1, self.object_num_k, L_DIM])
-        if self.no_finetune_enc_L:
-            enc_L = tf.stop_gradient(enc_L)
+        if self.no_finetune_enc_L: enc_L = tf.stop_gradient(enc_L)
+        map_V = modules.L2V(enc_L, MAP_DIM, V_DIM, is_train=is_train,
+                            scope='L2V', reuse=False)
+        logits = modules.batch_word_classifier(
+            feat_V, map_V, scope='object_classifier', reuse=False)
 
-        with tf.variable_scope('L2V') as scope:
-            log.warning(scope.name)
-            map_V = modules.fc_layer(
-                enc_L, MAP_DIM, use_bias=True, use_bn=False,
-                activation_fn=tf.nn.relu, is_training=is_train,
-                scope='fc_1', reuse=False)
-            map_V = modules.fc_layer(
-                map_V, MAP_DIM, use_bias=True, use_bn=False,
-                activation_fn=tf.nn.relu, is_training=is_train,
-                scope='fc_2', reuse=False)
-            map_V = modules.fc_layer(
-                map_V, V_DIM, use_bias=True, use_bn=False,
-                activation_fn=None, is_training=is_train,
-                scope='Linear', reuse=False)
-
-        with tf.variable_scope('Classifier') as scope:
-            log.warning(scope.name)
-            tiled_feat_V = tf.tile(tf.expand_dims(feat_V, axis=1),
-                                  [1, self.object_num_k, 1])
-            bias = tf.get_variable(name='bias', shape=(),
-                                   initializer=tf.zeros_initializer())
-            logits = tf.reduce_sum(tiled_feat_V * map_V, axis=-1) + bias
-
-        with tf.name_scope('Loss'):
+        with tf.name_scope('ObjectClassLoss'):
             labels = self.batches['object']['ground_truth']
-            cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(
-                labels=tf.stop_gradient(labels), logits=logits)
-            self.loss = tf.reduce_mean(cross_entropy)
-
-        with tf.name_scope('Accuracy'):
-            label_token = tf.cast(tf.argmax(labels, axis=-1), tf.int32)
-            logit_token = tf.cast(tf.argmax(logits, axis=-1), tf.int32)
-            acc = tf.reduce_mean(tf.to_float(
-                tf.equal(label_token, logit_token)))
-            _, top_k_pred = tf.nn.top_k(logits, k=TOP_K)
-            k_label_token = tf.tile(
-                tf.expand_dims(label_token, axis=1), [1, TOP_K])
-            top_k_acc = tf.reduce_mean(tf.to_float(tf.reduce_any(
-                tf.equal(k_label_token, top_k_pred), axis=1)))
+            loss, acc, top_k_acc = self.word_prediction_loss(
+                logits, labels)
+            self.report.update({'object-loss': loss, 'object-acc': acc,
+                                'object-top_{}_acc'.format(TOP_K): top_k_acc})
 
         with tf.name_scope('Summary'):
             image = self.batches['object']['image'] / 255.0
+            pred_image = self.visualize_word_prediction(logits, labels)
+            pred_string = self.visualize_word_prediction_text(
+                logits, labels, self.batches['object']['objects_name'])
+            self.output.update({'object-image': image,
+                                'object-prediction_string': pred_string})
 
-            # Visualize prediction as image
-            def visualize_prediction(logit, label):
-                prob = tf.nn.softmax(logit, dim=-1)
-                prob_image = tf.expand_dims(prob, axis=-1)
-                label_image = tf.expand_dims(label, axis=-1)
-                dummy = tf.zeros_like(label_image)
-                pred_image = tf.clip_by_value(
-                    tf.concat([prob_image, label_image, dummy], axis=-1),
-                    0, 1)
-                pred_image = tf.reshape(
-                    tf.tile(pred_image, [1, 10, 1]), [-1, self.object_num_k, 3])
-                return tf.expand_dims(pred_image, axis=0)
-            pred_image = visualize_prediction(logits, labels)
+        if add_summary:
+            self.add_classification_summary(loss, acc, top_k_acc, image,
+                                            pred_image, pred_string,
+                                            name='object')
+        return loss
 
-            # Visualize prediction as texts
-            batch_range = tf.expand_dims(
-                tf.range(0, tf.shape(label_token)[0], delta=1), axis=1)
-            range_label_token = tf.concat(
-                [batch_range, tf.expand_dims(label_token, axis=1)], axis=1)
-            label_name = tf.gather_nd(
-                self.batches['object']['objects_name'], range_label_token)
-            top_k_preds = tf.split(axis=-1, num_or_size_splits=TOP_K,
-                                   value=top_k_pred)
-            pred_names = []
-            for i in range(TOP_K):
-                range_top_k_pred = tf.concat(
-                    [batch_range, top_k_preds[i]], axis=1)
-                pred_names.append(tf.gather_nd(
-                    self.batches['object']['objects_name'], range_top_k_pred))
-            string_list = ['gt: ', label_name]
-            for i in range(TOP_K):
-                string_list.extend([', pred({}): '.format(i), pred_names[i]])
-            pred_string = tf.string_join(string_list)
+    def build(self, is_train=True):
+        object_loss = self.build_object(is_train=is_train, add_summary=True)
+
+        self.loss = 0
+        self.loss += object_loss
 
         tf.summary.scalar('train/loss', self.loss, collections=['train'])
         tf.summary.scalar('val/loss', self.loss, collections=['val'])
 
-        tf.summary.scalar('train/accuracy', acc, collections=['train'])
-        tf.summary.scalar('val/accuracy', acc, collections=['val'])
-
-        tf.summary.scalar('train/top_{}_acc'.format(TOP_K),
-                          top_k_acc, collections=['train'])
-        tf.summary.scalar('val/top_{}_acc'.format(TOP_K),
-                          top_k_acc, collections=['val'])
-
-        tf.summary.image('train_image', image, collections=['train'])
-        tf.summary.image('train_prediction_image', pred_image,
-                         collections=['train'])
-        tf.summary.image('val_image', image, collections=['val'])
-        tf.summary.image('val_prediction_image', pred_image,
-                         collections=['val'])
-        tf.summary.text('train_pred_string', pred_string, collections=['train'])
-        tf.summary.text('val_pred_string', pred_string, collections=['val'])
-
-        self.report = {
-            'loss': self.loss,
-            'accuracy': acc,
-            'top_{}_acc'.format(TOP_K): top_k_acc
-        }
-        self.output = {
-            'image': image,
-            'prediction_string': pred_string
-        }
+        self.report['loss'] = self.loss

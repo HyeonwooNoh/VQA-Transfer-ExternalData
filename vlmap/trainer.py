@@ -5,6 +5,8 @@ import tensorflow as tf
 
 from util import log
 from vlmap.datasets import dataset_objects, input_ops_objects
+from vlmap.datasets import dataset_region_descriptions, \
+    input_ops_region_descriptions
 
 
 class Trainer(object):
@@ -15,11 +17,13 @@ class Trainer(object):
             from model import Model
         return Model
 
-    def __init__(self, config, object_datasets):
+    def __init__(self, config, datasets):
         self.config = config
 
         dataset_str = ''
         dataset_str += '_'.join(config.object_dataset_path.replace(
+            'data/preprocessed/', '').split('/'))
+        dataset_str += '_' + '_'.join(config.region_dataset_path.replace(
             'data/preprocessed/', '').split('/'))
 
         hyper_parameter_str = 'bs_{}_lr_{}'.format(
@@ -44,15 +48,28 @@ class Trainer(object):
         with tf.name_scope('datasets/object_batch'):
             object_batches = {
                 'train': input_ops_objects.create(
-                    object_datasets['train'], self.batch_size, is_train=True,
+                    datasets['object']['train'], self.batch_size, is_train=True,
                     scope='train_ops', shuffle=True),
                 'val': input_ops_objects.create(
-                    object_datasets['val'], self.batch_size, is_train=True,
+                    datasets['object']['val'], self.batch_size, is_train=True,
                     scope='val_ops', shuffle=False)}
             self.batches['object'] = tf.case(
                 {tf.equal(self.target_split, 'train'): lambda: object_batches['train'],
                  tf.equal(self.target_split, 'val'): lambda: object_batches['val']},
                 default=lambda: object_batches['train'], exclusive=True)
+
+        with tf.name_scope('datasets/region_batch'):
+            region_batches = {
+                'train': input_ops_region_descriptions.create(
+                    datasets['region']['train'], self.batch_size, is_train=True,
+                    scope='train_ops', shuffle=True),
+                'val': input_ops_region_descriptions.create(
+                    datasets['region']['val'], self.batch_size, is_train=True,
+                    scope='val_ops', shuffle=False)}
+            self.batches['region'] = tf.case(
+                {tf.equal(self.target_split, 'train'): lambda: region_batches['train'],
+                 tf.equal(self.target_split, 'val'): lambda: region_batches['val']},
+                default=lambda: region_batches['train'], exclusive=True)
 
         # Model
         Model = self.get_model_class()
@@ -206,6 +223,10 @@ def main():
                         default='data/VisualGenome/VG_100K', help='')
     parser.add_argument('--object_dataset_path', type=str,
                         default='data/preprocessed/objects_min_occ20', help='')
+    parser.add_argument('--region_dataset_path', type=str,
+                        default='data/preprocessed/region_descriptions', help='')
+    parser.add_argument('--used_wordset_path', type=str,
+                        default='data/preprocessed/used_wordset.hdf5', help='')
     # log
     parser.add_argument('--log_step', type=int, default=10)
     parser.add_argument('--val_sample_step', type=int, default=100)
@@ -223,13 +244,20 @@ def main():
 
     config = parser.parse_args()
 
-    object_datasets = dataset_objects.create_default_splits(
+    datasets = {}
+    datasets['object'] = dataset_objects.create_default_splits(
         config.object_dataset_path, config.image_dir, config.vocab_path,
         config.object_num_k, is_train=True)
-    config.object_data_shapes = object_datasets['train'].get_data_shapes()
-    config.object_max_name_len = object_datasets['train'].max_name_len
+    config.object_data_shapes = datasets['object']['train'].get_data_shapes()
+    config.object_max_name_len = datasets['object']['train'].max_name_len
 
-    trainer = Trainer(config, object_datasets)
+    datasets['region'] = dataset_region_descriptions.create_default_splits(
+        config.region_dataset_path, config.image_dir, config.vocab_path,
+        is_train=True)
+    config.region_data_shapes = datasets['region']['train'].get_data_shapes()
+    config.region_max_len = datasets['region']['train'].max_len
+
+    trainer = Trainer(config, datasets)
     trainer.train()
 
 if __name__ == '__main__':
