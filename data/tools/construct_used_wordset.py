@@ -9,17 +9,21 @@ from tqdm import tqdm
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--object_dataset_path', type=str,
-                    default='preprocessed/objects_min_occ20', help='')
+                    default='preprocessed/objects_vocab50_min_occ20',
+                    help='')
 parser.add_argument('--attribute_dataset_path', type=str,
-                    default='preprocessed/attributes_min_occ20', help='')
+                    default='preprocessed/attributes_vocab50_min_occ20',
+                    help='')
 parser.add_argument('--relationship_dataset_path', type=str,
-                    default='preprocessed/relationships_min_occ20', help='')
+                    default='preprocessed/relationships_vocab50_min_occ20',
+                    help='')
 parser.add_argument('--region_dataset_path', type=str,
-                    default='preprocessed/region_descriptions', help='')
+                    default='preprocessed/region_descriptions_vocab50',
+                    help='')
 parser.add_argument('--vocab_path', type=str,
-                    default='preprocessed/vocab.json', help='')
+                    default='preprocessed/vocab50.json', help='')
 parser.add_argument('--save_used_wordset_path', type=str,
-                    default='preprocessed/used_wordset.hdf5', help='')
+                    default='preprocessed/vocab50_used_wordset.hdf5', help='')
 config = parser.parse_args()
 
 vocab = json.load(open(config.vocab_path, 'r'))

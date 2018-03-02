@@ -18,7 +18,6 @@ ANNO_DIR = 'VisualGenome/annotations'
 ANNO_FILE = {
     'attributes': 'attributes.json',
 }
-VOCAB_PATH = 'preprocessed/vocab.json'
 
 IMAGE_SPLIT_FILE = 'preprocessed/image_split.json'
 MIN_CROP_SIZE = 32
@@ -27,10 +26,13 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--dir_name', type=str, default='attributes')
 parser.add_argument('--min_occurrence', type=int, default=20)
+parser.add_argument('--vocab_path', type=str, default='preprocessed/vocab.json')
 args = parser.parse_args()
 
 args.dir_name = os.path.join('preprocessed', args.dir_name)
-args.dir_name += '_min_occ{}'.format(args.min_occurrence)
+args.dir_name += '_{}_min_occ{}'.format(
+    args.vocab_path.replace('preprocessed/', '').replace('.json', ''),
+    args.min_occurrence)
 
 if not os.path.exists(args.dir_name):
     os.makedirs(args.dir_name)
@@ -48,7 +50,7 @@ anno = {}
 anno['attributes'] = json.load(open(os.path.join(ANNO_DIR, ANNO_FILE['attributes']), 'r'))
 print('Done.')
 
-vocab = json.load(open(VOCAB_PATH, 'r'))
+vocab = json.load(open(args.vocab_path, 'r'))
 vocab_set = set(vocab['vocab'])
 
 

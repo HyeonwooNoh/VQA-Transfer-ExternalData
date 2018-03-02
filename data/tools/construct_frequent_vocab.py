@@ -8,17 +8,15 @@ from tqdm import tqdm
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--object_dataset_path', type=str,
-                    default='preprocessed/objects_min_occ20', help='')
+                    default='preprocessed/objects_vocab_min_occ20', help='')
 parser.add_argument('--attribute_dataset_path', type=str,
-                    default='preprocessed/attributes_min_occ20', help='')
+                    default='preprocessed/attributes_vocab_min_occ20', help='')
 parser.add_argument('--relationship_dataset_path', type=str,
-                    default='preprocessed/relationships_min_occ20', help='')
+                    default='preprocessed/relationships_vocab_min_occ20', help='')
 parser.add_argument('--region_dataset_path', type=str,
-                    default='preprocessed/region_descriptions', help='')
+                    default='preprocessed/region_descriptions_vocab', help='')
 parser.add_argument('--vocab_path', type=str,
                     default='preprocessed/vocab.json', help='')
-parser.add_argument('--save_frequent_vocab_path', type=str,
-                    default='preprocessed/frequent_vocab.json', help='')
 parser.add_argument('--min_word_occurrence', type=int, default=50)
 config = parser.parse_args()
 
@@ -33,7 +31,7 @@ with h5py.File(os.path.join(config.object_dataset_path, 'data.hdf5'), 'r') as f:
     for intseq, intseq_len in zip(intseqs, intseq_lens):
         for i in intseq[:intseq_len]:
             w = vocab['vocab'][i]
-            word_count = word_count.get(w, 0) + 1
+            word_count[w] = word_count.get(w, 0) + 1
 
 # attributes
 with h5py.File(os.path.join(config.attribute_dataset_path, 'data.hdf5'), 'r') as f:
@@ -42,7 +40,7 @@ with h5py.File(os.path.join(config.attribute_dataset_path, 'data.hdf5'), 'r') as
     for intseq, intseq_len in zip(intseqs, intseq_lens):
         for i in intseq[:intseq_len]:
             w = vocab['vocab'][i]
-            word_count = word_count.get(w, 0) + 1
+            word_count[w] = word_count.get(w, 0) + 1
 
 # relationships
 with h5py.File(os.path.join(config.relationship_dataset_path, 'data.hdf5'), 'r') as f:
@@ -51,7 +49,7 @@ with h5py.File(os.path.join(config.relationship_dataset_path, 'data.hdf5'), 'r')
     for intseq, intseq_len in zip(intseqs, intseq_lens):
         for i in intseq[:intseq_len]:
             w = vocab['vocab'][i]
-            word_count = word_count.get(w, 0) + 1
+            word_count[w] = word_count.get(w, 0) + 1
 
 # region_descriptions
 with h5py.File(os.path.join(config.region_dataset_path, 'data.hdf5'), 'r') as f:
@@ -62,7 +60,7 @@ with h5py.File(os.path.join(config.region_dataset_path, 'data.hdf5'), 'r') as f:
         entry = f[image_id][id]
         for i in entry['description'].value:
             w = vocab['vocab'][i]
-            word_count = word_count.get(w, 0) + 1
+            word_count[w] = word_count.get(w, 0) + 1
 
 vocab = []
 for w, c in word_count.items():
@@ -75,8 +73,8 @@ if '<e>' not in vocab: vocab.append('<e>')
 if '<unk>' not in vocab: vocab.append('<unk>')
 
 vocab = {'vocab': vocab, 'dict': {v: i for i, v in enumerate(vocab)}}
-vocab_path = 'preprocessed/vocab_min_occur{}.json'.format(
+save_vocab_path = 'preprocessed/vocab{}.json'.format(
     config.min_word_occurrence)
-json.dump(vocab, open(vocab_path, 'w'))
+json.dump(vocab, open(save_vocab_path, 'w'))
 print('vocabulary with {} words are constructed: {}'.format(
-    len(vocab['vocab']), vocab_path))
+    len(vocab['vocab']), save_vocab_path))
