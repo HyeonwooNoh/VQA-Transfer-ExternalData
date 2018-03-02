@@ -120,6 +120,7 @@ class Trainer(object):
             learning_rate=self.learning_rate,
             optimizer=tf.train.AdamOptimizer,
             clip_gradients=20.0,
+            increment_global_step=True,
             name='v_optimizer')
 
         self.l_optimizer = tf.contrib.layers.optimize_loss(
@@ -128,6 +129,7 @@ class Trainer(object):
             learning_rate=self.learning_rate,
             optimizer=tf.train.AdamOptimizer,
             clip_gradients=20.0,
+            increment_global_step=False,
             name='l_optimizer')
 
         self.summary_ops = {
