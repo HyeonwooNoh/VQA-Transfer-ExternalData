@@ -13,6 +13,7 @@ RANDOM_STATE = np.random.RandomState(123)
 class Dataset(object):
 
     def __init__(self, ids, dataset_path, image_dir, vocab_path,
+                 used_wordset_path,
                  width=224, height=224, name='default', is_train=True):
         self._ids = list(ids)
         self.image_dir = image_dir
@@ -22,6 +23,9 @@ class Dataset(object):
         self.is_train = is_train
 
         self.vocab = json.load(open(vocab_path, 'r'))
+        with h5py.File(used_wordset_path, 'r') as f:
+            self.wordset = list(f['used_wordset'].value)
+            self.wordset_dict = {w: i for i, w in enumerate(self.wordset)}
 
         file_name = os.path.join(dataset_path, 'data.hdf5')
         log.info('Reading {} ...'.format(file_name))
@@ -37,17 +41,19 @@ class Dataset(object):
         """
         Returns:
             image: [height, width, channel]
-            region_description: [max_len + 1]  (including <e>)
+            region_description: [None]  (including <e>)
             region_description_len: () (length not including <e>)
+            wordset_region_description: [None]  (including <e>)
         """
         image_id, id = id.split()
         entry = self.data[image_id][id]
 
-        desc = entry['description'].value
-        padded_desc = np.zeros([self.max_len + 1], dtype=np.int32)
-        desc_len = np.array(len(desc), dtype=np.int32)
-        padded_desc[:desc_len] = desc
-        padded_desc[desc_len] = self.vocab['dict']['<e>']  # end token
+        end_token = np.array([self.vocab['dict']['<e>']], dtype=np.int32)
+
+        desc = np.concatenate([entry['description'].value, end_token], axis=0)
+        desc_len = np.array(len(desc) - 1, dtype=np.int32)
+        wordset_desc = np.array([self.wordset_dict[i] for i in desc],
+                                dtype=np.int32)
 
         x, y = entry['x'].value, entry['y'].value
         w, h = entry['w'].value, entry['h'].value
@@ -58,13 +64,14 @@ class Dataset(object):
             .resize([self.width, self.height]).convert('RGB'), dtype=np.float32
         )
 
-        return image, padded_desc, desc_len
+        return image, desc, desc_len, wordset_desc
 
     def get_data_shapes(self):
         data_shapes = {
             'image': [self.height, self.width, 3],
-            'region_description': [self.max_len + 1],
+            'region_description': [None],
             'region_description_len': [],
+            'wordset_region_description': [None],
         }
         return data_shapes
 
@@ -79,17 +86,18 @@ class Dataset(object):
         return 'Dataset ({}, {} examples)'.format(self.name, len(self))
 
 
-def create_default_splits(dataset_path, image_dir, vocab_path, is_train=True):
+def create_default_splits(dataset_path, image_dir, vocab_path,
+                          used_wordset_path, is_train=True):
     ids_train, ids_test, ids_val = all_ids(dataset_path, is_train=is_train)
 
     dataset_train = Dataset(ids_train, dataset_path, image_dir, vocab_path,
-                            width=224, height=224,
+                            used_wordset_path, width=224, height=224,
                             name='train', is_train=is_train)
     dataset_test = Dataset(ids_test, dataset_path, image_dir, vocab_path,
-                           width=224, height=224,
+                           used_wordset_path, width=224, height=224,
                            name='test', is_train=is_train)
     dataset_val = Dataset(ids_val, dataset_path, image_dir, vocab_path,
-                          width=224, height=224,
+                          used_wordset_path, width=224, height=224,
                           name='val', is_train=is_train)
     return {
         'train': dataset_train,

@@ -285,7 +285,7 @@ def main():
 
     datasets['region'] = dataset_region_descriptions.create_default_splits(
         config.region_dataset_path, config.image_dir, config.vocab_path,
-        is_train=True)
+        config.used_wordset_path, is_train=True)
     config.region_data_shapes = datasets['region']['train'].get_data_shapes()
     config.region_max_len = datasets['region']['train'].max_len
 

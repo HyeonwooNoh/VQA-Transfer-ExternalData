@@ -18,20 +18,22 @@ def create(dataset,
             tf.convert_to_tensor(ids))
 
         def load_fn(id):
-            image, region_description, region_description_len = \
-                dataset.get_data(id)
-            return (id, image, region_description, region_description_len)
+            image, region_description, region_description_len, \
+                wordset_region_description = dataset.get_data(id)
+            return (id, image, region_description,
+                    region_description_len, wordset_region_description)
 
         def load_py_func(id):
             py_func_out = tf.py_func(
                 load_fn, inp=[id],
-                Tout=[tf.string, tf.float32, tf.int32, tf.int32],
+                Tout=[tf.string, tf.float32, tf.int32, tf.int32, tf.int32],
                 name='input_py_func')
             return {
                 'id': py_func_out[0],
                 'image': py_func_out[1],
                 'region_description': py_func_out[2],
                 'region_description_len': py_func_out[3],
+                'wordset_region_description': py_func_out[4],
             }
         tf_dataset = tf_dataset.map(load_py_func)
 
@@ -44,13 +46,20 @@ def create(dataset,
                 data_shapes['region_description'])
             entry['region_description_len'].set_shape(
                 data_shapes['region_description_len'])
+            entry['wordset_region_description'].set_shape(
+                data_shapes['wordset_region_description'])
             return entry
         tf_dataset = tf_dataset.map(set_shape)
 
     if is_train and shuffle:
         tf_dataset = tf_dataset.shuffle(buffer_size=3000)
-
-    tf_dataset = tf_dataset.batch(batch_size)
+    tf_dataset = tf_dataset.padded_batch(
+        batch_size,
+        {'id': (),
+         'image': data_shapes['image'],
+         'region_description': data_shapes['region_description'],
+         'region_description_len': data_shapes['region_description_len'],
+         'wordset_region_description': data_shapes['wordset_region_description']})
 
     if is_train:
         tf_dataset = tf_dataset.repeat(1000)  # repeat 1000 epoch

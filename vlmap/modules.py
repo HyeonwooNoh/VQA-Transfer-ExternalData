@@ -161,21 +161,9 @@ def language_decoder(inputs, embed_seq, seq_len, embedding_lookup,
         outputs, _, pred_length = seq2seq.dynamic_decode(
             decoder, maximum_iterations=max_seq_len,
             scope='dynamic_decoder')
-        # Dynamically pad outputs
-        output = outputs.rnn_output
-        sz = tf.shape(output)
-        dynamic_pad = tf.zeros(
-            [sz[0], max_seq_len - sz[1], sz[2]], dtype=output.dtype)
-        output = tf.concat([output, dynamic_pad], axis=1)
-        sz = output.get_shape().as_list()
-        output.set_shape([sz[0], max_seq_len, sz[2]])  # [bs, len, n]
 
+        output = outputs.rnn_output
         pred = outputs.sample_id
-        sz = tf.shape(pred)
-        dynamic_pad = tf.zeros([sz[0], max_seq_len - sz[1]], dtype=pred.dtype)
-        pred = tf.concat([pred, dynamic_pad], axis=1)
-        sz = pred.get_shape().as_list()
-        pred.set_shape([sz[0], max_seq_len])  # [bs, len]
 
         return output, pred, pred_length
 

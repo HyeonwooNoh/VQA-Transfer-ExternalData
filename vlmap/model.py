@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import tensorflow.contrib.slim.nets as nets
+import tensorflow.contrib.seq2seq as seq2seq
 
 from util import log
 from vlmap import modules
@@ -134,13 +135,25 @@ class Model(object):
             tf.equal(k_label_token, top_k_pred), axis=1)))
         return loss, acc, top_k_acc
 
-    def sequence_accuracy(self, pred, pred_len, seq, seq_len, max_len):
-        mask = tf.sequence_mask(seq_len, max_len,
+    def sequence_accuracy(self, pred, pred_len, seq, seq_len):
+        max_len = tf.reduce_max(tf.concat([pred_len, seq_len], axis=0))
+        # Dynamic padding
+        p_sz = tf.shape(pred)
+        p_pad = tf.zeros([p_sz[0], max_len - p_sz[1]], dtype=pred.dtype)
+        s_sz = tf.shape(seq)
+        s_pad = tf.zeros([s_sz[0], max_len - s_sz[1]], dtype=seq.dtype)
+        pred = tf.concat([pred, p_pad], axis=1)
+        seq = tf.concat([seq, s_pad], axis=1)
+        # Mask construction
+        mask = tf.sequence_mask(seq_len, maxlen=max_len,
                                 dtype=tf.float32, name='mask')
         min_mask = tf.sequence_mask(tf.minimum(pred_len, seq_len),
-                                    max_len, dtype=tf.float32, name='min_mask')
+                                    maxlen=max_len,
+                                    dtype=tf.float32, name='min_mask')
         max_mask = tf.sequence_mask(tf.maximum(pred_len, seq_len),
-                                    max_len, dtype=tf.float32, name='max_mask')
+                                    maxlen=max_len,
+                                    dtype=tf.float32, name='max_mask')
+        # Accuracy
         token_acc = tf.reduce_sum(tf.to_float(tf.equal(
             pred, seq)) * min_mask) / tf.reduce_sum(max_mask, axis=[0, 1])
         seq_acc = tf.reduce_mean(tf.to_float(tf.logical_and(
@@ -246,6 +259,7 @@ class Model(object):
         # Language inputs
         seq = self.batches['region']['region_description']
         seq_len = self.batches['region']['region_description_len']
+        wordset_seq = self.batches['region']['wordset_region_description']
         # enc_L: "enc" in language enc-dec [bs, L_DIM]
         embed_seq = tf.nn.embedding_lookup(self.glove_all, seq)
         enc_L = modules.language_encoder(
@@ -274,31 +288,21 @@ class Model(object):
             I2_logits, recon_logits = tf.split(logits, 2, axis=0)
             I2_pred, recon_pred = tf.split(pred, 2, axis=0)
             I2_pred_len, recon_pred_len = tf.split(pred_len, 2, axis=0)
-            labels = tf.to_float(tf.equal(  # [bs, len, token_dim]
-                tf.expand_dims(tf.expand_dims(self.wordset, axis=0), axis=1),
-                tf.expand_dims(seq, axis=2)))
-            labels_token = tf.cast(tf.argmax(labels, axis=-1), tf.int32)
-            seq_mask = tf.sequence_mask(seq_len + 1, self.region_max_len + 1,
-                                        dtype=tf.float32, name='mask')
-            seq_mask_sum = tf.reduce_sum(seq_mask, axis=[0, 1])
-            # Loss
-            I2_cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(
-                labels=tf.stop_gradient(labels), logits=I2_logits)
-            recon_cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(
-                labels=tf.stop_gradient(labels), logits=recon_logits)
-            I2_loss = tf.reduce_sum(I2_cross_entropy * seq_mask) / seq_mask_sum
-            recon_loss = tf.reduce_sum(recon_cross_entropy * seq_mask) / \
-                seq_mask_sum
+
+            seq_mask = tf.sequence_mask(seq_len + 1, dtype=tf.float32)
+            I2_loss = seq2seq.sequence_loss(
+                I2_logits, wordset_seq, seq_mask, name='I2_sequence_loss')
+            recon_loss = seq2seq.sequence_loss(
+                recon_logits, wordset_seq, seq_mask, name='recon_sequence_loss')
+
             # Accuracy
             I2_token_acc, I2_seq_acc = self.sequence_accuracy(
-                I2_pred, I2_pred_len, labels_token, seq_len + 1,
-                self.region_max_len + 1)
+                I2_pred, I2_pred_len, wordset_seq, seq_len + 1)
             recon_token_acc, recon_seq_acc = self.sequence_accuracy(
-                recon_pred, recon_pred_len, labels_token, seq_len + 1,
-                self.region_max_len + 1)
+                recon_pred, recon_pred_len, wordset_seq, seq_len + 1)
 
         with tf.name_scope('Summary'):
-            gt_string = self.seq2string(labels_token, seq_len + 1)
+            gt_string = self.seq2string(wordset_seq, seq_len + 1)
             I2_string = self.seq2string(I2_pred, I2_pred_len)
             recon_string = self.seq2string(recon_pred, recon_pred_len)
 
