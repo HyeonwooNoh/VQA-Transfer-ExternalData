@@ -43,9 +43,9 @@ class Dataset(object):
         image_id, id = id.split()
         entry = self.data[image_id][id]
 
-        desc = entry['description'].vaue
+        desc = entry['description'].value
         padded_desc = np.zeros([self.max_len + 1], dtype=np.int32)
-        desc_len = len(desc)
+        desc_len = np.array(len(desc), dtype=np.int32)
         padded_desc[:desc_len] = desc
         padded_desc[desc_len] = self.vocab['dict']['<e>']  # end token
 

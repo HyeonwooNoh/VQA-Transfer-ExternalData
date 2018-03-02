@@ -20,19 +20,31 @@ class Trainer(object):
     def __init__(self, config, datasets):
         self.config = config
 
-        dataset_str = ''
-        dataset_str += '_'.join(config.object_dataset_path.replace(
-            'data/preprocessed/', '').split('/'))
-        dataset_str += '_' + '_'.join(config.region_dataset_path.replace(
-            'data/preprocessed/', '').split('/'))
+        dataset_str = 'd'
+        if not config.no_object:
+            dataset_str += '_' + '_'.join(config.object_dataset_path.replace(
+                'data/preprocessed/', '').split('/'))
+        if not config.no_region:
+            dataset_str += '_' + '_'.join(config.region_dataset_path.replace(
+                'data/preprocessed/', '').split('/'))
 
-        hyper_parameter_str = 'bs_{}_lr_{}'.format(
-            config.batch_size, config.learning_rate)
+        hyper_parameter_str = 'lr{}'.format(config.learning_rate)
+        if not config.no_object:
+            hyper_parameter_str += '_objbs{}'.format(config.object_batch_size)
+        if not config.no_region:
+            hyper_parameter_str += '_regbs{}'.format(config.region_batch_size)
+
+        if config.no_object:
+            hyper_parameter_str += '_no_obj'
+        if config.no_region:
+            hyper_parameter_str += '_no_reg'
 
         if config.finetune_enc_I:
             hyper_parameter_str += '_ft_enc_I'
-        if config.no_finetune_enc_L:
-            hyper_parameter_str += '_no_ft_enc_L'
+        if config.no_V_grad_enc_L:
+            hyper_parameter_str += '_no_V_grad_enc_L'
+        if config.no_V_grad_dec_L:
+            hyper_parameter_str += '_no_V_grad_dec_L'
 
         self.train_dir = './train_dir/{}_{}_{}_{}'.format(
             dataset_str, config.prefix, hyper_parameter_str,
@@ -41,18 +53,24 @@ class Trainer(object):
         log.infov("Train Dir: %s", self.train_dir)
 
         # Input
-        self.batch_size = config.batch_size
+        self.batch_size = 0
+        if not config.no_object:
+            self.batch_size += config.object_batch_size
+        if not config.no_region:
+            self.batch_size += config.region_batch_size
+        self.object_batch_size = config.object_batch_size
+        self.region_batch_size = config.region_batch_size
         with tf.name_scope('datasets'):
             self.target_split = tf.placeholder(tf.string)
         self.batches = {}
         with tf.name_scope('datasets/object_batch'):
             object_batches = {
                 'train': input_ops_objects.create(
-                    datasets['object']['train'], self.batch_size, is_train=True,
-                    scope='train_ops', shuffle=True),
+                    datasets['object']['train'], self.object_batch_size,
+                    is_train=True, scope='train_ops', shuffle=True),
                 'val': input_ops_objects.create(
-                    datasets['object']['val'], self.batch_size, is_train=True,
-                    scope='val_ops', shuffle=False)}
+                    datasets['object']['val'], self.object_batch_size,
+                    is_train=True, scope='val_ops', shuffle=False)}
             self.batches['object'] = tf.case(
                 {tf.equal(self.target_split, 'train'): lambda: object_batches['train'],
                  tf.equal(self.target_split, 'val'): lambda: object_batches['val']},
@@ -61,11 +79,11 @@ class Trainer(object):
         with tf.name_scope('datasets/region_batch'):
             region_batches = {
                 'train': input_ops_region_descriptions.create(
-                    datasets['region']['train'], self.batch_size, is_train=True,
-                    scope='train_ops', shuffle=True),
+                    datasets['region']['train'], self.region_batch_size,
+                    is_train=True, scope='train_ops', shuffle=True),
                 'val': input_ops_region_descriptions.create(
-                    datasets['region']['val'], self.batch_size, is_train=True,
-                    scope='val_ops', shuffle=False)}
+                    datasets['region']['val'], self.region_batch_size,
+                    is_train=True, scope='val_ops', shuffle=False)}
             self.batches['region'] = tf.case(
                 {tf.equal(self.target_split, 'train'): lambda: region_batches['train'],
                  tf.equal(self.target_split, 'val'): lambda: region_batches['val']},
@@ -90,17 +108,27 @@ class Trainer(object):
 
         # Checkpoint and monitoring
         all_vars = tf.trainable_variables()
-        enc_I_vars, learn_vars = self.model.filter_vars(all_vars)
-        log.warn('Trainable variables:')
-        tf.contrib.slim.model_analyzer.analyze_vars(learn_vars, print_info=True)
+        enc_I_vars, learn_v_vars, learn_l_vars = self.model.filter_vars(all_vars)
+        log.warn('Trainable V variables:')
+        tf.contrib.slim.model_analyzer.analyze_vars(learn_v_vars, print_info=True)
+        log.warn('Trainable L variables:')
+        tf.contrib.slim.model_analyzer.analyze_vars(learn_l_vars, print_info=True)
 
-        self.optimizer = tf.contrib.layers.optimize_loss(
-            loss=self.model.loss,
+        self.v_optimizer = tf.contrib.layers.optimize_loss(
+            loss=self.model.v_loss,
             global_step=self.global_step,
             learning_rate=self.learning_rate,
             optimizer=tf.train.AdamOptimizer,
             clip_gradients=20.0,
-            name='optimizer')
+            name='v_optimizer')
+
+        self.l_optimizer = tf.contrib.layers.optimize_loss(
+            loss=self.model.l_loss,
+            global_step=self.global_step,
+            learning_rate=self.learning_rate,
+            optimizer=tf.train.AdamOptimizer,
+            clip_gradients=20.0,
+            name='l_optimizer')
 
         self.summary_ops = {
             'train': tf.summary.merge_all(key='train'),
@@ -180,7 +208,7 @@ class Trainer(object):
     def run_train_step(self):
         _start_time = time.time()
         fetch = [self.global_step, self.summary_ops['train'],
-                 self.model.loss, self.optimizer]
+                 self.model.loss, self.v_optimizer, self.l_optimizer]
         fetch_values = self.session.run(fetch,
                                         feed_dict={self.target_split: 'train'})
         [step, summary, loss] = fetch_values[:3]
@@ -233,14 +261,18 @@ def main():
     parser.add_argument('--write_summary_step', type=int, default=100)
     # hyper parameters
     parser.add_argument('--object_num_k', type=int, default=500)
-    parser.add_argument('--prefix', type=str, default='default', help=" ")
-    parser.add_argument('--batch_size', type=int, default=32, help=" ")
+    parser.add_argument('--prefix', type=str, default='default', help='')
     parser.add_argument('--checkpoint', type=str, default=None)
-    parser.add_argument('--learning_rate', type=float, default=0.001, help=" ")
+    parser.add_argument('--learning_rate', type=float, default=0.001, help='')
     parser.add_argument('--lr_weight_decay', action='store_true', default=False)
     # model parameters
+    parser.add_argument('--object_batch_size', type=int, default=8, help='')
+    parser.add_argument('--region_batch_size', type=int, default=8, help='')
+    parser.add_argument('--no_object', action='store_true', default=False)
+    parser.add_argument('--no_region', action='store_true', default=False)
     parser.add_argument('--finetune_enc_I', action='store_true', default=False)
-    parser.add_argument('--no_finetune_enc_L', action='store_true', default=False)
+    parser.add_argument('--no_V_grad_enc_L', action='store_true', default=False)
+    parser.add_argument('--no_V_grad_dec_L', action='store_true', default=False)
 
     config = parser.parse_args()
 
