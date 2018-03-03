@@ -248,15 +248,15 @@ def main():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     # paths
     parser.add_argument('--vocab_path', type=str,
-                        default='data/preprocessed/vocab.json', help='')
+                        default='data/preprocessed/vocab50.json', help='')
     parser.add_argument('--image_dir', type=str,
                         default='data/VisualGenome/VG_100K', help='')
     parser.add_argument('--object_dataset_path', type=str,
-                        default='data/preprocessed/objects_min_occ20', help='')
+                        default='data/preprocessed/objects_vocab50_min_occ20', help='')
     parser.add_argument('--region_dataset_path', type=str,
-                        default='data/preprocessed/region_descriptions', help='')
+                        default='data/preprocessed/region_descriptions_vocab50', help='')
     parser.add_argument('--used_wordset_path', type=str,
-                        default='data/preprocessed/used_wordset.hdf5', help='')
+                        default='data/preprocessed/vocab50_used_wordset.hdf5', help='')
     # log
     parser.add_argument('--log_step', type=int, default=10)
     parser.add_argument('--val_sample_step', type=int, default=100)
