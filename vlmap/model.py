@@ -283,11 +283,23 @@ class Model(object):
             self.region_max_len + 1,  # + 1 for <e>
             unroll_type='teacher_forcing', output_layer=self.word_predictor,
             is_train=is_train, scope='language_decoder', reuse=tf.AUTO_REUSE)
+        _, greedy_pred, greedy_pred_len = modules.language_decoder(
+            in_L, dbl_embed_seq_with_start,
+            dbl_seq_len + 1,  # seq_len + 1 is for <s>
+            lambda e: tf.nn.embedding_lookup(self.glove_wordset, e),
+            W_DIM, dbl_start_tokens, self.vocab['dict']['<e>'],
+            self.region_max_len + 1,  # + 1 for <e>
+            unroll_type='greedy', output_layer=self.word_predictor,
+            is_train=is_train, scope='language_decoder', reuse=tf.AUTO_REUSE)
 
         with tf.name_scope('LanguageGenerationLoss'):
             I2_logits, recon_logits = tf.split(logits, 2, axis=0)
             I2_pred, recon_pred = tf.split(pred, 2, axis=0)
             I2_pred_len, recon_pred_len = tf.split(pred_len, 2, axis=0)
+
+            I2_greedy_pred, recon_greedy_pred = tf.split(greedy_pred, 2, axis=0)
+            I2_greedy_pred_len, recon_greedy_pred_len = tf.split(
+                greedy_pred_len, 2, axis=0)
 
             seq_mask = tf.sequence_mask(seq_len + 1, dtype=tf.float32)
             I2_loss = seq2seq.sequence_loss(
@@ -301,11 +313,22 @@ class Model(object):
             recon_token_acc, recon_seq_acc = self.sequence_accuracy(
                 recon_pred, recon_pred_len, wordset_seq, seq_len + 1)
 
+            # Greedy accuracy
+            I2_greedy_token_acc, I2_greedy_seq_acc = self.sequence_accuracy(
+                I2_greedy_pred, I2_greedy_pred_len, wordset_seq, seq_len + 1)
+            recon_greedy_token_acc, recon_greedy_seq_acc = self.sequence_accuracy(
+                recon_greedy_pred, recon_greedy_pred_len, wordset_seq, seq_len + 1)
+
         with tf.name_scope('Summary'):
             gt_string = self.seq2string(wordset_seq, seq_len + 1)
             I2_string = self.seq2string(I2_pred, I2_pred_len)
             recon_string = self.seq2string(recon_pred, recon_pred_len)
+            I2_greedy_string = self.seq2string(I2_greedy_pred,
+                                               I2_greedy_pred_len)
+            recon_greedy_string = self.seq2string(recon_greedy_pred,
+                                                  recon_greedy_pred_len)
 
+        # Loss
         tf.summary.scalar('train-region/I2_loss',
                           I2_loss, collections=['train'])
         tf.summary.scalar('val-region/I2_loss',
@@ -314,6 +337,7 @@ class Model(object):
                           recon_loss, collections=['train'])
         tf.summary.scalar('val-region/recon_loss',
                           recon_loss, collections=['val'])
+        # Accuracy
         tf.summary.scalar('train-region/I2_token_acc',
                           I2_token_acc, collections=['train'])
         tf.summary.scalar('train-region/I2_seq_acc',
@@ -330,7 +354,24 @@ class Model(object):
                           recon_token_acc, collections=['val'])
         tf.summary.scalar('val-region/recon_seq_acc',
                           recon_seq_acc, collections=['val'])
-
+        # Greedy accuracy
+        tf.summary.scalar('train-region/I2_greedy_token_acc',
+                          I2_greedy_token_acc, collections=['train'])
+        tf.summary.scalar('train-region/I2_greedy_seq_acc',
+                          I2_seq_acc, collections=['train'])
+        tf.summary.scalar('val-region/I2_greedy_token_acc',
+                          I2_token_acc, collections=['val'])
+        tf.summary.scalar('val-region/I2_greedy_seq_acc',
+                          I2_seq_acc, collections=['val'])
+        tf.summary.scalar('train-region/recon_greedy_token_acc',
+                          recon_token_acc, collections=['train'])
+        tf.summary.scalar('train-region/recon_greedy_seq_acc',
+                          recon_seq_acc, collections=['train'])
+        tf.summary.scalar('val-region/recon_greedy_token_acc',
+                          recon_token_acc, collections=['val'])
+        tf.summary.scalar('val-region/recon_greedy_seq_acc',
+                          recon_seq_acc, collections=['val'])
+        # Text summary
         tf.summary.text('train-region_gt_string',
                         gt_string, collections=['train'])
         tf.summary.text('train-region_I2_string',
@@ -343,6 +384,14 @@ class Model(object):
                         I2_string, collections=['val'])
         tf.summary.text('val-region_recon_string',
                         recon_string, collections=['val'])
+        tf.summary.text('train-region_I2_greedy_string',
+                        I2_greedy_string, collections=['train'])
+        tf.summary.text('train-region_recon_greedy_string',
+                        recon_greedy_string, collections=['train'])
+        tf.summary.text('val-region_I2_greedy_string',
+                        I2_greedy_string, collections=['val'])
+        tf.summary.text('val-region_recon_greedy_string',
+                        recon_greedy_string, collections=['val'])
         return I2_loss, recon_loss
 
     def build(self, is_train=True):
