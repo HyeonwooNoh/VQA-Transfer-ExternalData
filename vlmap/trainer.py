@@ -122,6 +122,7 @@ class Trainer(object):
             learning_rate=self.learning_rate,
             optimizer=tf.train.AdamOptimizer,
             clip_gradients=20.0,
+            variables=learn_v_vars,
             increment_global_step=True,
             name='v_optimizer')
 
@@ -131,6 +132,7 @@ class Trainer(object):
             learning_rate=self.learning_rate,
             optimizer=tf.train.AdamOptimizer,
             clip_gradients=20.0,
+            variables=learn_l_vars,
             increment_global_step=False,
             name='l_optimizer')
 
