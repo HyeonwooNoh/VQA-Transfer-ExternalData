@@ -49,6 +49,10 @@ class Trainer(object):
             hyper_parameter_str += '_no_L_grad_dec_L'
         if config.use_embed_transform:
             hyper_parameter_str += '_use_embed_transform'
+        if config.use_dense_predictor:
+            hyper_parameter_str += '_use_dense_predictor'
+        if config.no_glove:
+            hyper_parameter_str += '_no_glove'
 
         self.train_dir = './train_dir/{}_{}_{}_{}'.format(
             dataset_str, config.prefix, hyper_parameter_str,
@@ -283,6 +287,8 @@ def main():
     parser.add_argument('--no_V_grad_dec_L', action='store_true', default=False)
     parser.add_argument('--no_L_grad_dec_L', action='store_true', default=False)
     parser.add_argument('--use_embed_transform', action='store_true', default=False)
+    parser.add_argument('--use_dense_predictor', action='store_true', default=False)
+    parser.add_argument('--no_glove', action='store_true', default=False)
 
     config = parser.parse_args()
 

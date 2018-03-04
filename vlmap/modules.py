@@ -171,6 +171,16 @@ def language_decoder(inputs, embed_seq, seq_len, embedding_lookup,
         return output, pred, pred_length
 
 
+def learn_embedding_map(used_vocab, scope='learn_embedding_map', reuse=tf.AUTO_REUSE):
+    with tf.variable_scope(scope, reuse=reuse) as scope:
+        log.warning(scope.name)
+        embed_map = tf.get_variable(
+            name='learn', shape=[len(used_vocab['vocab']), 300],
+            initializer=tf.random_uniform_initializer(
+                minval=-0.01, maxval=0.01))
+        return embed_map
+
+
 def glove_embedding_map(used_vocab, scope='glove_embedding_map', reuse=tf.AUTO_REUSE):
     with tf.variable_scope(scope, reuse=reuse) as scope:
         log.warning(scope.name)

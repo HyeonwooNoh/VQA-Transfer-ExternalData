@@ -41,21 +41,11 @@ class Model(object):
         self.no_V_grad_dec_L = config.no_V_grad_dec_L
         self.no_L_grad_dec_L = config.no_L_grad_dec_L
         self.use_embed_transform = config.use_embed_transform
+        self.use_dense_predictor = config.use_dense_predictor
+        self.no_glove = config.no_glove
 
         self.vocab = json.load(open(config.vocab_path, 'r'))
         self.wordset = modules.used_wordset(config.used_wordset_path)
-
-        self.glove_all = modules.glove_embedding_map(self.vocab)
-        self.glove_wordset = tf.nn.embedding_lookup(self.glove_all,
-                                                    self.wordset)
-        predictor_embed = self.glove_wordset
-        if self.use_embed_transform:
-            predictor_embed = modules.embedding_transform(
-                predictor_embed, W_DIM, W_DIM, is_train=is_train)
-        self.word_predictor = modules.WordPredictor(predictor_embed,
-                                                    trainable=is_train,
-                                                    name='WordPredictor')
-
         self.wordset_vocab = {}
         with h5py.File(config.used_wordset_path, 'r') as f:
             wordset = list(f['used_wordset'].value)
@@ -63,6 +53,23 @@ class Model(object):
                                            for w in wordset]
             self.wordset_vocab['dict'] = {w: i for i, w in
                                           enumerate(self.wordset_vocab['vocab'])}
+
+        if self.no_glove:
+            self.glove_all = modules.learn_embedding_map(self.vocab)
+        else: self.glove_all = modules.glove_embedding_map(self.vocab)
+        self.glove_wordset = tf.nn.embedding_lookup(self.glove_all,
+                                                    self.wordset)
+        predictor_embed = self.glove_wordset
+        if self.use_embed_transform:
+            predictor_embed = modules.embedding_transform(
+                predictor_embed, W_DIM, W_DIM, is_train=is_train)
+        if self.use_dense_predictor:
+            self.word_predictor = tf.layers.Dense(
+                len(self.wordset_vocab['vocab']), use_bias=True, name='WordPredictor')
+        else:
+            self.word_predictor = modules.WordPredictor(predictor_embed,
+                                                        trainable=is_train,
+                                                        name='WordPredictor')
 
         self.build(is_train=is_train)
 
