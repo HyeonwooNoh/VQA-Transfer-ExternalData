@@ -2,8 +2,6 @@ import h5py
 import json
 import numpy as np
 import tensorflow as tf
-import tensorflow.contrib.slim as slim
-import tensorflow.contrib.slim.nets as nets
 import tensorflow.contrib.seq2seq as seq2seq
 
 from util import log
@@ -11,9 +9,9 @@ from vlmap import modules
 
 TOP_K = 5
 W_DIM = 300  # Word dimension
-L_DIM = 384  # Language dimension
-MAP_DIM = 384
-V_DIM = 384
+L_DIM = 512  # Language dimension
+MAP_DIM = 512
+V_DIM = 512
 ENC_I_PARAM_PATH = 'data/nets/resnet_v1_50.ckpt'
 
 
@@ -37,12 +35,23 @@ class Model(object):
 
         self.region_max_len = config.region_max_len
 
+        # model parameters
+        self.finetune_enc_I = config.finetune_enc_I
+        self.no_V_grad_enc_L = config.no_V_grad_enc_L
+        self.no_V_grad_dec_L = config.no_V_grad_dec_L
+        self.no_L_grad_dec_L = config.no_L_grad_dec_L
+        self.use_embed_transform = config.use_embed_transform
+
         self.wordset = modules.used_wordset(config.used_wordset_path)
 
         self.glove_all = modules.glove_embedding_map()
         self.glove_wordset = tf.nn.embedding_lookup(self.glove_all,
                                                     self.wordset)
-        self.word_predictor = modules.WordPredictor(self.glove_wordset,
+        predictor_embed = self.glove_wordset
+        if self.use_embed_transform:
+            predictor_embed = modules.embedding_transform(
+                predictor_embed, W_DIM, W_DIM, is_train=is_train)
+        self.word_predictor = modules.WordPredictor(predictor_embed,
                                                     trainable=is_train,
                                                     name='WordPredictor')
 
@@ -54,12 +63,6 @@ class Model(object):
                                            for w in wordset]
             self.wordset_vocab['dict'] = {w: i for i, w in
                                           enumerate(self.wordset_vocab['vocab'])}
-
-        # model parameters
-        self.finetune_enc_I = config.finetune_enc_I
-        self.no_V_grad_enc_L = config.no_V_grad_enc_L
-        self.no_V_grad_dec_L = config.no_V_grad_dec_L
-        self.no_L_grad_dec_L = config.no_L_grad_dec_L
 
         self.build(is_train=is_train)
 
@@ -278,8 +281,8 @@ class Model(object):
         feat_V = modules.I2V(enc_I, MAP_DIM, V_DIM, scope='I2V',
                              is_train=is_train, reuse=tf.AUTO_REUSE)
         # V2L [bs, L_DIM]
-        map_L = modules.V2L(feat_V, MAP_DIM, L_DIM, scope='V2L',
-                            is_train=is_train, reuse=tf.AUTO_REUSE)
+        map_L, V2L_hidden = modules.V2L(feat_V, MAP_DIM, L_DIM, scope='V2L',
+                                        is_train=is_train, reuse=tf.AUTO_REUSE)
         # Language inputs
         seq = self.batches['region']['region_description']
         seq_len = self.batches['region']['region_description_len']
@@ -294,8 +297,8 @@ class Model(object):
         dbl_seq_len = tf.concat([seq_len, seq_len], axis=0)
         dbl_start_tokens = tf.zeros([tf.shape(dbl_seq)[0]], dtype=tf.int32) + \
             self.vocab['dict']['<s>']
-        dbl_seq_with_start =  tf.concat([tf.expand_dims(dbl_start_tokens, axis=1),
-                                         dbl_seq[:, :-1]], axis=1)
+        dbl_seq_with_start = tf.concat([tf.expand_dims(dbl_start_tokens, axis=1),
+                                        dbl_seq[:, :-1]], axis=1)
         dbl_embed_seq_with_start = tf.nn.embedding_lookup(self.glove_all,
                                                           dbl_seq_with_start)
         dbl_start_wordset_tokens = \
@@ -363,6 +366,11 @@ class Model(object):
                 image, I2_greedy_string)
             image_n_recon_greedy_string = self.add_string2image(
                 image, recon_greedy_string)
+        # Debugging
+        tf.summary.histogram('region_V2L_hidden1', V2L_hidden[0],
+                             collections=['train'])
+        tf.summary.histogram('region_V2L_hidden2', V2L_hidden[1],
+                             collections=['train'])
 
         tf.summary.image('train-region_gt_string',
                          image_n_gt_string, collections=['train'])

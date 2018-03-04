@@ -70,6 +70,7 @@ def word_prediction(inputs, word_weights, activity_regularizer=None,
                           _scope=name, _reuse=reuse)
     return layer.apply(inputs)
 
+
 def batch_word_classifier(inputs, word_weights, scope='batch_word_classifier',
                           reuse=tf.AUTO_REUSE):
     with tf.variable_scope(scope, reuse=reuse) as scope:
@@ -167,6 +168,7 @@ def language_decoder(inputs, embed_seq, seq_len, embedding_lookup,
 
         return output, pred, pred_length
 
+
 def glove_embedding_map(scope='glove_embedding_map', reuse=tf.AUTO_REUSE):
     with tf.variable_scope(scope, reuse=reuse) as scope:
         log.warning(scope.name)
@@ -178,6 +180,7 @@ def glove_embedding_map(scope='glove_embedding_map', reuse=tf.AUTO_REUSE):
                 minval=-0.01, maxval=0.01))
         embed_map = tf.concat([fixed, learn], axis=0)
         return embed_map
+
 
 def glove_embedding(seq, scope='glove_embedding', reuse=tf.AUTO_REUSE):
     with tf.variable_scope(scope, reuse=reuse) as scope:
@@ -201,23 +204,38 @@ def used_wordset(used_wordset_path, scope='used_wordset'):
         return wordset
 
 
+def embedding_transform(embed_map, enc_dim, out_dim, is_train=True,
+                        scope='embedding_transform', reuse=tf.AUTO_REUSE):
+    with tf.variable_scope(scope, reuse=reuse) as scope:
+        log.warning(scope.name)
+        h = fc_layer(
+            embed_map, enc_dim, use_bias=True, use_bn=False,
+            activation_fn=tf.nn.relu, is_training=is_train,
+            scope='fc_1', reuse=reuse)
+        new_map = fc_layer(
+            h, out_dim, use_bias=True, use_bn=False,
+            activation_fn=None, is_training=is_train,
+            scope='Linear', reuse=reuse)
+        return new_map
+
+
 def V2L(feat_V, enc_dim, out_dim, is_train=True, scope='V2L',
         reuse=tf.AUTO_REUSE):
     with tf.variable_scope(scope, reuse=reuse) as scope:
         log.warning(scope.name)
-        h = fc_layer(
+        h1 = fc_layer(
             feat_V, enc_dim, use_bias=True, use_bn=False,
-            activation_fn=tf.nn.relu, is_training=is_train,
+            activation_fn=tf.nn.tanh, is_training=is_train,
             scope='fc_1', reuse=reuse)
-        h = fc_layer(
+        h2 = fc_layer(
             h, enc_dim, use_bias=True, use_bn=False,
-            activation_fn=tf.nn.relu, is_training=is_train,
+            activation_fn=tf.nn.tanh, is_training=is_train,
             scope='fc_2', reuse=reuse)
         map_L = fc_layer(
             h, out_dim, use_bias=True, use_bn=False,
             activation_fn=None, is_training=is_train,
             scope='Linear', reuse=reuse)
-        return map_L
+        return map_L, [h1, h2, map_L]
 
 
 def L2V(feat_L, enc_dim, out_dim, is_train=True, scope='L2V',

@@ -47,6 +47,8 @@ class Trainer(object):
             hyper_parameter_str += '_no_V_grad_dec_L'
         if config.no_L_grad_dec_L:
             hyper_parameter_str += '_no_L_grad_dec_L'
+        if config.use_embed_transform:
+            hyper_parameter_str += '_use_embed_transform'
 
         self.train_dir = './train_dir/{}_{}_{}_{}'.format(
             dataset_str, config.prefix, hyper_parameter_str,
@@ -280,6 +282,7 @@ def main():
     parser.add_argument('--no_V_grad_enc_L', action='store_true', default=False)
     parser.add_argument('--no_V_grad_dec_L', action='store_true', default=False)
     parser.add_argument('--no_L_grad_dec_L', action='store_true', default=False)
+    parser.add_argument('--use_embed_transform', action='store_true', default=False)
 
     config = parser.parse_args()
 
