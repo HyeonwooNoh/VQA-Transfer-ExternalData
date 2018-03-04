@@ -228,11 +228,11 @@ def V2L(feat_V, enc_dim, out_dim, is_train=True, scope='V2L',
             activation_fn=tf.nn.tanh, is_training=is_train,
             scope='fc_1', reuse=reuse)
         h2 = fc_layer(
-            h, enc_dim, use_bias=True, use_bn=False,
+            h1, enc_dim, use_bias=True, use_bn=False,
             activation_fn=tf.nn.tanh, is_training=is_train,
             scope='fc_2', reuse=reuse)
         map_L = fc_layer(
-            h, out_dim, use_bias=True, use_bn=False,
+            h2, out_dim, use_bias=True, use_bn=False,
             activation_fn=None, is_training=is_train,
             scope='Linear', reuse=reuse)
         return map_L, [h1, h2, map_L]
