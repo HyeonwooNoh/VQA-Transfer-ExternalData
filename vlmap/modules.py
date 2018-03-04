@@ -1,4 +1,5 @@
 import h5py
+import json
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
 import tensorflow.contrib.rnn as rnn
@@ -9,6 +10,7 @@ import tensorflow.contrib.slim.nets as nets
 from util import log
 
 GLOVE_EMBEDDING_PATH = 'data/preprocessed/glove.6B.300d.hdf5'
+GLOVE_VOCAB_PATH = 'data/preprocessed/vocab.json'
 ENC_I_R_MEAN = 123.68
 ENC_I_G_MEAN = 116.78
 ENC_I_B_MEAN = 103.94
@@ -169,7 +171,7 @@ def language_decoder(inputs, embed_seq, seq_len, embedding_lookup,
         return output, pred, pred_length
 
 
-def glove_embedding_map(scope='glove_embedding_map', reuse=tf.AUTO_REUSE):
+def glove_embedding_map(used_vocab, scope='glove_embedding_map', reuse=tf.AUTO_REUSE):
     with tf.variable_scope(scope, reuse=reuse) as scope:
         log.warning(scope.name)
         with h5py.File(GLOVE_EMBEDDING_PATH, 'r') as f:
@@ -179,7 +181,13 @@ def glove_embedding_map(scope='glove_embedding_map', reuse=tf.AUTO_REUSE):
             initializer=tf.random_uniform_initializer(
                 minval=-0.01, maxval=0.01))
         embed_map = tf.concat([fixed, learn], axis=0)
-        return embed_map
+
+        glove_vocab = json.load(open(GLOVE_VOCAB_PATH, 'r'))
+        selected_index = tf.constant(
+            [glove_vocab['dict'][v] for v in used_vocab['vocab']], dtype=tf.int32)
+        selected_embed_map = tf.nn.embedding_lookup(embed_map, selected_index)
+
+        return selected_embed_map
 
 
 def glove_embedding(seq, scope='glove_embedding', reuse=tf.AUTO_REUSE):

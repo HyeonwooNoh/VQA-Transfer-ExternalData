@@ -42,9 +42,10 @@ class Model(object):
         self.no_L_grad_dec_L = config.no_L_grad_dec_L
         self.use_embed_transform = config.use_embed_transform
 
+        self.vocab = json.load(open(config.vocab_path, 'r'))
         self.wordset = modules.used_wordset(config.used_wordset_path)
 
-        self.glove_all = modules.glove_embedding_map()
+        self.glove_all = modules.glove_embedding_map(self.vocab)
         self.glove_wordset = tf.nn.embedding_lookup(self.glove_all,
                                                     self.wordset)
         predictor_embed = self.glove_wordset
@@ -55,7 +56,6 @@ class Model(object):
                                                     trainable=is_train,
                                                     name='WordPredictor')
 
-        self.vocab = json.load(open(config.vocab_path, 'r'))
         self.wordset_vocab = {}
         with h5py.File(config.used_wordset_path, 'r') as f:
             wordset = list(f['used_wordset'].value)
