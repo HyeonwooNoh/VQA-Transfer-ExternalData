@@ -19,14 +19,16 @@ def create(dataset,
 
         def load_fn(id):
             image, region_description, region_description_len, \
-                wordset_region_description = dataset.get_data(id)
+                wordset_region_description, blank_description = dataset.get_data(id)
             return (id, image, region_description,
-                    region_description_len, wordset_region_description)
+                    region_description_len, wordset_region_description,
+                    blank_description)
 
         def load_py_func(id):
             py_func_out = tf.py_func(
                 load_fn, inp=[id],
-                Tout=[tf.string, tf.float32, tf.int32, tf.int32, tf.int32],
+                Tout=[tf.string, tf.float32, tf.int32, tf.int32,
+                      tf.int32, tf.int32],
                 name='input_py_func')
             return {
                 'id': py_func_out[0],
@@ -34,6 +36,7 @@ def create(dataset,
                 'region_description': py_func_out[2],
                 'region_description_len': py_func_out[3],
                 'wordset_region_description': py_func_out[4],
+                'blank_description': py_func_out[5],
             }
         tf_dataset = tf_dataset.map(load_py_func)
 
@@ -48,6 +51,8 @@ def create(dataset,
                 data_shapes['region_description_len'])
             entry['wordset_region_description'].set_shape(
                 data_shapes['wordset_region_description'])
+            entry['blank_description'].set_shape(
+                data_shapes['blank_description'])
             return entry
         tf_dataset = tf_dataset.map(set_shape)
 
@@ -59,7 +64,9 @@ def create(dataset,
          'image': data_shapes['image'],
          'region_description': data_shapes['region_description'],
          'region_description_len': data_shapes['region_description_len'],
-         'wordset_region_description': data_shapes['wordset_region_description']})
+         'wordset_region_description': data_shapes['wordset_region_description'],
+         'blank_description': data_shapes['blank_description'],
+         })
 
     if is_train:
         tf_dataset = tf_dataset.repeat(1000)  # repeat 1000 epoch

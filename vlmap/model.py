@@ -9,9 +9,9 @@ from vlmap import modules
 
 TOP_K = 5
 W_DIM = 300  # Word dimension
-L_DIM = 640  # Language dimension
-MAP_DIM = 640
-V_DIM = 640
+L_DIM = 512  # Language dimension
+MAP_DIM = 512
+V_DIM = 512
 ENC_I_PARAM_PATH = 'data/nets/resnet_v1_50.ckpt'
 
 
@@ -26,6 +26,7 @@ class Model(object):
 
         self.no_object = config.no_object
         self.no_region = config.no_region
+        self.use_blank_fill = config.use_blank_fill
 
         self.object_batch_size = config.object_batch_size
         self.region_batch_size = config.region_batch_size
@@ -259,18 +260,20 @@ class Model(object):
                                         name='object')
         return loss
 
-    def add_string2image(self, image, string):
+    def add_string2image(self, image, string, prefix=None):
         def add_string2image_fn(batch_image, batch_string):
             import textwrap
             from PIL import Image, ImageDraw, ImageFont
             font = ImageFont.load_default()
             new_images = []
             for image, string in zip(batch_image, batch_string):
+                if prefix is not None:
+                    string = prefix + string
                 text_image = np.zeros([50, image.shape[1], 3], dtype=np.uint8)
                 text_image += 220
                 pil_text = Image.fromarray(text_image)
                 pil_draw = ImageDraw.Draw(pil_text)
-                for i, line in enumerate(textwrap.wrap(string, width=30)):
+                for i, line in enumerate(textwrap.wrap(string, width=40)):
                     pil_draw.text((2, 2 + i * 15), line, font=font,
                                   fill=(10, 10, 50))
                 text_image = np.array(pil_text).astype(np.float32) / 255.0
@@ -467,6 +470,121 @@ class Model(object):
                         recon_greedy_string, collections=['val'])
         return I2_loss, recon_loss
 
+
+    def build_blank_fill(self, is_train=True):
+        # feat_V
+        enc_I = modules.encode_I(self.batches['region']['image'],
+                                 is_train=self.finetune_enc_I,
+                                 reuse=tf.AUTO_REUSE)
+        if not self.finetune_enc_I: enc_I = tf.stop_gradient(enc_I)
+        feat_V = modules.I2V(enc_I, MAP_DIM, V_DIM, scope='I2V',
+                             is_train=is_train, reuse=tf.AUTO_REUSE)
+        # V2L [bs, L_DIM]
+        map_L, V2L_hidden = modules.V2L(feat_V, MAP_DIM, L_DIM, scope='V2L',
+                                        is_train=is_train, reuse=tf.AUTO_REUSE)
+        # Language inputs
+        seq_len = self.batches['region']['region_description_len']
+        wordset_seq = self.batches['region']['wordset_region_description']
+        blank_seq = self.batches['region']['blank_description']
+        # enc_L: "enc" in language enc-dec [bs, L_DIM]
+        embed_blank_seq = tf.nn.embedding_lookup(self.glove_wordset, blank_seq)
+        enc_L = modules.language_encoder(
+            embed_blank_seq, seq_len + 1, L_DIM,
+            scope='language_encoder', reuse=tf.AUTO_REUSE)
+        # dec_L: "dec" in language enc-dec + description [2*bs, L_DIM]
+        start_tokens = tf.zeros([tf.shape(wordset_seq)[0]], dtype=tf.int32) + \
+            self.wordset_vocab['dict']['<s>']
+        seq_with_start = tf.concat([tf.expand_dims(start_tokens, axis=1),
+                                    wordset_seq[:, :-1]], axis=1)
+        embed_seq_with_start = tf.nn.embedding_lookup(self.glove_wordset,
+                                                      seq_with_start)
+        in_L = feat_V + enc_L
+        if self.use_embed_transform: decoder_dim = L_DIM
+        else: decoder_dim = W_DIM
+        logits, pred, pred_len = modules.language_decoder(
+            in_L, embed_seq_with_start,
+            seq_len + 1,  # seq_len + 1 is for <s>
+            lambda e: tf.nn.embedding_lookup(self.glove_wordset, e),
+            decoder_dim, start_tokens, self.wordset_vocab['dict']['<e>'],
+            self.region_max_len + 1,  # + 1 for <e>
+            unroll_type='teacher_forcing', output_layer=self.word_predictor,
+            is_train=is_train, scope='language_decoder', reuse=tf.AUTO_REUSE)
+        _, greedy_pred, greedy_pred_len = modules.language_decoder(
+            in_L, embed_seq_with_start,
+            seq_len + 1,  # seq_len + 1 is for <s>
+            lambda e: tf.nn.embedding_lookup(self.glove_wordset, e),
+            decoder_dim, start_tokens, self.wordset_vocab['dict']['<e>'],
+            self.region_max_len + 1,  # + 1 for <e>
+            unroll_type='greedy', output_layer=self.word_predictor,
+            is_train=is_train, scope='language_decoder', reuse=tf.AUTO_REUSE)
+
+        with tf.name_scope('LanguageGenerationLoss'):
+            seq_mask = tf.sequence_mask(seq_len + 1, dtype=tf.float32)
+            loss = seq2seq.sequence_loss(
+                logits, wordset_seq, seq_mask, name='blank_fill_sequence_loss')
+
+            # Accuracy
+            token_acc, seq_acc = self.sequence_accuracy(
+                pred, pred_len, wordset_seq, seq_len + 1)
+
+            # Greedy accuracy
+            greedy_token_acc, greedy_seq_acc = self.sequence_accuracy(
+                greedy_pred, greedy_pred_len, wordset_seq, seq_len + 1)
+
+        with tf.name_scope('Summary'):
+            gt_string = self.seq2string(wordset_seq, seq_len + 1)
+            pred_string = self.seq2string(pred, pred_len)
+            blank_string = self.seq2string(blank_seq, seq_len + 1)
+            greedy_string = self.seq2string(greedy_pred, greedy_pred_len)
+
+            image = self.batches['region']['image'] / 255.0
+            image_gt = self.add_string2image(image, gt_string, prefix='gt: ')
+            image_gt_blank = self.add_string2image(image_gt, blank_string,
+                                                   prefix='blank: ')
+            image_gt_blank_pred = self.add_string2image(
+                image_gt_blank, pred_string, prefix='pred: ')
+            image_gt_blank_pred_greedy = self.add_string2image(
+                image_gt_blank_pred, greedy_string, prefix='greedy: ')
+
+        # Debugging
+        tf.summary.histogram('region_V2L_hidden1', V2L_hidden[0],
+                             collections=['train'])
+        tf.summary.histogram('region_V2L_hidden2', V2L_hidden[1],
+                             collections=['train'])
+
+        tf.summary.image('train-blank-fill_result',
+                         image_gt_blank_pred_greedy, max_outputs=10,
+                         collections=['train'])
+        tf.summary.image('val-blank-fill_result',
+                         image_gt_blank_pred_greedy, max_outputs=10,
+                         collections=['val'])
+        # Loss
+        tf.summary.scalar('train-blank-fill/loss',
+                          loss, collections=['train'])
+        tf.summary.scalar('val-blank-fill/loss',
+                          loss, collections=['val'])
+        # Accuracy
+        tf.summary.scalar('train-blank-fill/token_acc',
+                          token_acc, collections=['train'])
+        tf.summary.scalar('train-blank-fill/seq_acc',
+                          seq_acc, collections=['train'])
+        tf.summary.scalar('val-blank-fill/token_acc',
+                          token_acc, collections=['val'])
+        tf.summary.scalar('val-blank-fill/seq_acc',
+                          seq_acc, collections=['val'])
+
+        # Greedy accuracy
+        tf.summary.scalar('train-blank-fill/greedy_token_acc',
+                          greedy_token_acc, collections=['train'])
+        tf.summary.scalar('train-blank-fill/greedy_seq_acc',
+                          greedy_seq_acc, collections=['train'])
+        tf.summary.scalar('val-blank-fill/greedy_token_acc',
+                          greedy_token_acc, collections=['val'])
+        tf.summary.scalar('val-blank-fill/greedy_seq_acc',
+                          greedy_seq_acc, collections=['val'])
+        return loss
+
+
     def build(self, is_train=True):
         self.v_loss = 0
         self.l_loss = 0
@@ -481,6 +599,10 @@ class Model(object):
             region_v_loss, region_l_loss = self.build_region(is_train=is_train)
             self.v_loss += region_v_loss
             self.l_loss += region_l_loss
+
+        if self.use_blank_fill:
+            log.info('build blank fill')
+            self.v_loss += self.build_blank_fill(is_train=is_train)
 
         self.loss = self.v_loss + self.l_loss
         tf.summary.scalar('train/loss', self.loss, collections=['train'])

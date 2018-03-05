@@ -44,6 +44,7 @@ class Dataset(object):
             region_description: [None]  (including <e>)
             region_description_len: () (length not including <e>)
             wordset_region_description: [None]  (including <e>)
+            blank_description: [None] (including <e>, wordset vocab)
         """
         image_id, id = id.split()
         entry = self.data[image_id][id]
@@ -54,6 +55,14 @@ class Dataset(object):
         desc_len = np.array(len(desc) - 1, dtype=np.int32)
         wordset_desc = np.array([self.wordset_dict[i] for i in desc],
                                 dtype=np.int32)
+        drop_word_count = RANDOM_STATE.choice([1, 2, 3], p=[0.9, 0.09, 0.01])
+        drop_word_count = min(drop_word_count, len(wordset_desc) - 1)
+        drop_word_start = RANDOM_STATE.randint(
+            0, len(wordset_desc) - drop_word_count)
+        drop_word_end = drop_word_start + drop_word_count
+        blank_desc = wordset_desc.copy()
+        blank_desc[drop_word_start: drop_word_end] = \
+            self.wordset_dict[self.vocab['dict']['<unk>']]
 
         x, y = entry['x'].value, entry['y'].value
         w, h = entry['w'].value, entry['h'].value
@@ -64,7 +73,7 @@ class Dataset(object):
             .resize([self.width, self.height]).convert('RGB'), dtype=np.float32
         )
 
-        return image, desc, desc_len, wordset_desc
+        return image, desc, desc_len, wordset_desc, blank_desc
 
     def get_data_shapes(self):
         data_shapes = {
@@ -72,6 +81,7 @@ class Dataset(object):
             'region_description': [None],
             'region_description_len': [],
             'wordset_region_description': [None],
+            'blank_description': [None],
         }
         return data_shapes
 

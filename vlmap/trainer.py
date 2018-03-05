@@ -33,11 +33,15 @@ class Trainer(object):
             hyper_parameter_str += '_objbs{}'.format(config.object_batch_size)
         if not config.no_region:
             hyper_parameter_str += '_regbs{}'.format(config.region_batch_size)
+        if config.use_blank_fill:
+            hyper_parameter_str += '_blankfillbs{}'.format(config.region_batch_size)
 
         if config.no_object:
             hyper_parameter_str += '_no_obj'
         if config.no_region:
             hyper_parameter_str += '_no_reg'
+        if config.use_blank_fill:
+            hyper_parameter_str += '_blankfill'
 
         if config.finetune_enc_I:
             hyper_parameter_str += '_ft_enc_I'
@@ -132,15 +136,18 @@ class Trainer(object):
             increment_global_step=True,
             name='v_optimizer')
 
-        self.l_optimizer = tf.contrib.layers.optimize_loss(
-            loss=self.model.l_loss,
-            global_step=self.global_step,
-            learning_rate=self.learning_rate,
-            optimizer=tf.train.AdamOptimizer,
-            clip_gradients=20.0,
-            variables=learn_l_vars,
-            increment_global_step=False,
-            name='l_optimizer')
+        if self.model.l_loss != 0:
+            self.l_optimizer = tf.contrib.layers.optimize_loss(
+                loss=self.model.l_loss,
+                global_step=self.global_step,
+                learning_rate=self.learning_rate,
+                optimizer=tf.train.AdamOptimizer,
+                clip_gradients=20.0,
+                variables=learn_l_vars,
+                increment_global_step=False,
+                name='l_optimizer')
+        else:
+            self.l_optimizer = tf.no_op()
 
         self.summary_ops = {
             'train': tf.summary.merge_all(key='train'),
@@ -282,6 +289,7 @@ def main():
     parser.add_argument('--region_batch_size', type=int, default=8, help='')
     parser.add_argument('--no_object', action='store_true', default=False)
     parser.add_argument('--no_region', action='store_true', default=False)
+    parser.add_argument('--use_blank_fill', action='store_true', default=False)
     parser.add_argument('--finetune_enc_I', action='store_true', default=False)
     parser.add_argument('--no_V_grad_enc_L', action='store_true', default=False)
     parser.add_argument('--no_V_grad_dec_L', action='store_true', default=False)
