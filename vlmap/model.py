@@ -9,9 +9,9 @@ from vlmap import modules
 
 TOP_K = 5
 W_DIM = 300  # Word dimension
-L_DIM = 512  # Language dimension
-MAP_DIM = 512
-V_DIM = 512
+L_DIM = 640  # Language dimension
+MAP_DIM = 640
+V_DIM = 640
 ENC_I_PARAM_PATH = 'data/nets/resnet_v1_50.ckpt'
 
 
@@ -62,7 +62,7 @@ class Model(object):
         predictor_embed = self.glove_wordset
         if self.use_embed_transform:
             predictor_embed = modules.embedding_transform(
-                predictor_embed, W_DIM, W_DIM, is_train=is_train)
+                predictor_embed, W_DIM, L_DIM, is_train=is_train)
         if self.use_dense_predictor:
             self.word_predictor = tf.layers.Dense(
                 len(self.wordset_vocab['vocab']), use_bias=True, name='WordPredictor')
@@ -311,12 +311,14 @@ class Model(object):
         dbl_start_wordset_tokens = \
             tf.zeros([tf.shape(dbl_seq)[0]], dtype=tf.int32) + \
             self.wordset_vocab['dict']['<s>']
-        in_L = tf.concat([map_L, enc_L], axis=0)
+        in_L = tf.concat([feat_V, enc_L], axis=0)
+        if self.use_embed_transform: decoder_dim = L_DIM
+        else: decoder_dim = W_DIM
         logits, pred, pred_len = modules.language_decoder(
             in_L, dbl_embed_seq_with_start,
             dbl_seq_len + 1,  # seq_len + 1 is for <s>
             lambda e: tf.nn.embedding_lookup(self.glove_wordset, e),
-            W_DIM, dbl_start_wordset_tokens, self.wordset_vocab['dict']['<e>'],
+            decoder_dim, dbl_start_wordset_tokens, self.wordset_vocab['dict']['<e>'],
             self.region_max_len + 1,  # + 1 for <e>
             unroll_type='teacher_forcing', output_layer=self.word_predictor,
             is_train=is_train, scope='language_decoder', reuse=tf.AUTO_REUSE)
@@ -324,7 +326,7 @@ class Model(object):
             in_L, dbl_embed_seq_with_start,
             dbl_seq_len + 1,  # seq_len + 1 is for <s>
             lambda e: tf.nn.embedding_lookup(self.glove_wordset, e),
-            W_DIM, dbl_start_wordset_tokens, self.wordset_vocab['dict']['<e>'],
+            decoder_dim, dbl_start_wordset_tokens, self.wordset_vocab['dict']['<e>'],
             self.region_max_len + 1,  # + 1 for <e>
             unroll_type='greedy', output_layer=self.word_predictor,
             is_train=is_train, scope='language_decoder', reuse=tf.AUTO_REUSE)
@@ -380,25 +382,25 @@ class Model(object):
                              collections=['train'])
 
         tf.summary.image('train-region_gt_string',
-                         image_n_gt_string, collections=['train'])
+                         image_n_gt_string, max_outputs=10, collections=['train'])
         tf.summary.image('val-region_gt_string',
-                         image_n_gt_string, collections=['val'])
+                         image_n_gt_string, max_outputs=10, collections=['val'])
         tf.summary.image('train-region_I2_string',
-                         image_n_I2_string, collections=['train'])
+                         image_n_I2_string, max_outputs=10, collections=['train'])
         tf.summary.image('val-region_I2_string',
-                         image_n_I2_string, collections=['val'])
+                         image_n_I2_string, max_outputs=10, collections=['val'])
         tf.summary.image('train-region_recon_string',
-                         image_n_recon_string, collections=['train'])
+                         image_n_recon_string, max_outputs=10, collections=['train'])
         tf.summary.image('val-region_recon_string',
-                         image_n_recon_string, collections=['val'])
+                         image_n_recon_string, max_outputs=10, collections=['val'])
         tf.summary.image('train-region_I2_greedy_string',
-                         image_n_I2_greedy_string, collections=['train'])
+                         image_n_I2_greedy_string, max_outputs=10, collections=['train'])
         tf.summary.image('val-region_I2_greedy_string',
-                         image_n_I2_greedy_string, collections=['val'])
+                         image_n_I2_greedy_string, max_outputs=10, collections=['val'])
         tf.summary.image('train-region_recon_greedy_string',
-                         image_n_recon_greedy_string, collections=['train'])
+                         image_n_recon_greedy_string, max_outputs=10, collections=['train'])
         tf.summary.image('val-region_recon_greedy_string',
-                         image_n_recon_greedy_string, collections=['val'])
+                         image_n_recon_greedy_string, max_outputs=10, collections=['val'])
         # Loss
         tf.summary.scalar('train-region/I2_loss',
                           I2_loss, collections=['train'])
