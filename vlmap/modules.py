@@ -54,7 +54,7 @@ def I2V(enc_I, enc_dim, out_dim, scope='I2V', is_train=False, reuse=tf.AUTO_REUS
     with tf.variable_scope(scope, reuse=reuse) as scope:
         log.warning(scope.name)
         feat_V = fc_layer(
-            enc_I, enc_dim, use_bias=False, use_bn=True,
+            enc_I, enc_dim, use_bias=True, use_bn=False,
             activation_fn=tf.nn.relu, is_training=is_train,
             scope='fc_1', reuse=reuse)
         feat_V = fc_layer(
