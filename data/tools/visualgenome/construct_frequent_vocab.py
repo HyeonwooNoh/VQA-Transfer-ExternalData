@@ -8,15 +8,19 @@ from tqdm import tqdm
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--object_dataset_path', type=str,
-                    default='preprocessed/objects_vocab_min_occ20', help=' ')
+                    default='preprocessed/visualgenome/objects_vocab_min_occ20',
+                    help=' ')
 parser.add_argument('--attribute_dataset_path', type=str,
-                    default='preprocessed/attributes_vocab_min_occ20', help=' ')
+                    default='preprocessed/visualgenome/attributes_vocab_min_occ20',
+                    help=' ')
 parser.add_argument('--relationship_dataset_path', type=str,
-                    default='preprocessed/relationships_vocab_min_occ20', help=' ')
+                    default='preprocessed/visualgenome/relationships_vocab_min_occ20',
+                    help=' ')
 parser.add_argument('--region_dataset_path', type=str,
-                    default='preprocessed/region_descriptions_vocab', help=' ')
+                    default='preprocessed/visualgenome/region_descriptions_vocab',
+                    help=' ')
 parser.add_argument('--vocab_path', type=str,
-                    default='preprocessed/vocab.json', help=' ')
+                    default='preprocessed/glove_vocab.json', help=' ')
 parser.add_argument('--min_word_occurrence', type=int, default=50, help=' ')
 config = parser.parse_args()
 

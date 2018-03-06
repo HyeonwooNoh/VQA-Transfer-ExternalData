@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 GLOVE_PATH = 'GloVe/glove.6B.300d.txt'
 
-VOCAB_PATH = 'preprocessed/vocab.json'
+VOCAB_PATH = 'preprocessed/glove_vocab.json'
 PARAM_PATH = 'preprocessed/glove.6B.300d.hdf5'
 
 if os.path.exists(VOCAB_PATH):

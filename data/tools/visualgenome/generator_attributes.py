@@ -29,7 +29,7 @@ parser.add_argument('--min_occurrence', type=int, default=20)
 parser.add_argument('--vocab_path', type=str, default='preprocessed/vocab.json')
 args = parser.parse_args()
 
-args.dir_name = os.path.join('preprocessed', args.dir_name)
+args.dir_name = os.path.join('preprocessed/visualgenome', args.dir_name)
 args.dir_name += '_{}_min_occ{}'.format(
     args.vocab_path.replace('preprocessed/', '').replace('.json', ''),
     args.min_occurrence)
