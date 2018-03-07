@@ -1,0 +1,233 @@
+"""
+Box utils: utility functions for box manipulation
+
+The codes are adapted from jcjohnson/densecap/blob/master/densecap/box_utils.lua
+"""
+import numpy as np
+
+
+def xcycwh_to_x1y1x2y2(boxes):
+    """
+    Convert boxes from (xc, yc, w, h) format to (x1, y2, x2, y2) format.
+
+    Input:
+        - boxes: Numpy tensor of shape (B, N, 4) or (N, 4) giving boxes
+          in (xc, yc, w, h) format.
+
+    Returns:
+        - Numpy tensor of shape (B, N, 4) or (N, 4) giving boxes in (x1, y2, x2, y2)
+          format; output shape will match input shape.
+    """
+    minibatch = True
+    if boxes.ndim == 2:
+        minibatch = False
+        boxes = np.expand_dims(boxes, axis=0)
+
+    xc = boxes[:, :, 0]
+    yc = boxes[:, :, 1]
+    w = boxes[:, :, 2]
+    h = boxes[:, :, 3]
+
+    x0 = xc - w / 2.
+    x1 = xc + w / 2.
+    y0 = yc - h / 2.
+    y1 = yc + h / 2.
+
+    ret = np.stack([x0, x1, y0, y1], axis=2)
+    if not minibatch: ret = ret.squeeze(axis=0)
+    return ret
+
+
+def xywh_to_x1y1x2y2(boxes):
+    """
+    Convert boxes from (x, y, w, h) format to (x1, y2, x2, y2) format.
+
+    Input:
+        - boxes: Tensor of shape (B, N, 4) or (N, 4) giving boxes
+        in (x, y, w, h) format.
+
+    Returns:
+        - Tensor of shape (B, N, 4) or (N, 4) giving boxes in (x1, y2, x2, y2)
+          format; output shape will match input shape.
+    """
+    minibatch = True
+    if boxes.ndim == 2:
+        minibatch = False
+        boxes = np.expand_dims(boxes, axis=0)
+
+    x = boxes[:, :, 0]
+    y = boxes[:, :, 1]
+    w = boxes[:, :, 2]
+    h = boxes[:, :, 3]
+
+    x0 = x.copy()
+    y0 = y.copy()
+    x1 = x0 + w
+    y1 = y0 + h
+
+    ret = np.stack([x0, x1, y0, y1], axis=2)
+    if not minibatch: ret = ret.squeeze(axis=0)
+    return ret
+
+
+def x1y1x2y2_to_xywh(boxes):
+    """
+    Convert boxes from (x1, y1, x2, y2) format to (x, y, w, y) format.
+
+    Input:
+        - boxes: Tensor of shape (B, N, 4) or (N, 4) giving boxes in
+          (x1, y1, x2, y2) format.
+
+    Returns:
+        - Tensor of same shape as input giving boxes in (x, y, w, h) format.
+    """
+    minibatch = True
+    if boxes.ndim == 2:
+        minibatch = False
+        boxes = np.expand_dims(boxes, axis=0)
+
+    x0 = boxes[:, :, 0]
+    y0 = boxes[:, :, 1]
+    x1 = boxes[:, :, 2]
+    y1 = boxes[:, :, 3]
+
+    x = x0.copy()
+    y = y0.copy()
+    w = x1 - x0
+    h = y1 - y0
+
+    ret = np.stack([x, y, w, h], axis=2)
+    if not minibatch: ret = ret.squeeze(axis=0)
+    return ret
+
+
+def x1y1x2y2_to_xcycwh(boxes):
+    minibatch = True
+    if boxes.ndim == 2:
+        minibatch = False
+        boxes = np.expand_dims(boxes, axis=0)
+
+    x0 = boxes[:, :, 0]
+    y0 = boxes[:, :, 1]
+    x1 = boxes[:, :, 2]
+    y1 = boxes[:, :, 3]
+
+    xc = (x0 + x1) / 2.0
+    yc = (y0 + y1) / 2.0
+    w = x1 - x0
+    h = y1 - y0
+
+    ret = np.stack([xc, yc, w, h], axis=2)
+    if not minibatch: ret = ret.squeeze(axis=0)
+    return ret
+
+
+def xcycwh_to_xywh(boxes):
+    boxes_x1y1x2y2 = xcycwh_to_x1y1x2y2(boxes)
+    boxes_xywh = x1y1x2y2_to_xywh(boxes_x1y1x2y2)
+    return boxes_xywh
+
+
+def clip_boxes(boxes, bounds, format='x1y1x2y2'):
+    """
+    Clip bounding boxes to a specified region.
+
+    Inputs:
+        - boxes: Numpy tensor containing boxes, of shape (N, 4) or (N, M, 4)
+        - bounds: List containing the following keys specifying the bounds:
+            [x_min, y_min, x_max, , y_max]
+            - x_min, x_max: Minimum and maximum values for x (inclusive)
+            - y_min, y_max: Minimum and maximum values for y (inclusive)
+        - format: The format of the boxes; either 'x1y1x2y2' or 'xcycwh'.
+
+    Outputs:
+        - boxes_clipped: Tensor giving coordinates of clipped boxes; has
+          same shape and format as input.
+        - valid: 1D byte Tensor indicating which bounding boxes are valid,
+          in sense of completely out of bounds of the image.
+    """
+    if format == 'x1y1x2y2': boxes_clipped = boxes.copy()
+    elif format == 'xcycwh': boxes_clipped = xcycwh_to_x1y1x2y2(boxes)
+    elif format == 'xywh': boxes_clipped = xywh_to_x1y1x2y2(boxes)
+    else: raise ValueError('Unknown box format: {}'.format(format))
+
+    if boxes_clipped.ndim == 3:
+        boxes_clipped = boxes_clipped.reshape([-1, 4])
+
+    x_min, y_min = bounds[0], bounds[1]
+    x_max, y_max = bounds[2], bounds[3]
+    assert x_min < x_max, 'x_min >= x_max'
+    assert y_min < y_max, 'y_min >= y_max'
+
+    boxes_clipped[:, 0] = boxes.clipped[:, 0].clip(x_min, x_max - 1)
+    boxes_clipped[:, 1] = boxes.clipped[:, 1].clip(y_min, y_max - 1)
+    boxes_clipped[:, 2] = boxes.clipped[:, 2].clip(x_min + 1, x_max)
+    boxes_clipped[:, 3] = boxes.clipped[:, 3].clip(y_min + 1, y_max)
+
+    validx = boxes_clipped[:, 0] < boxes.clipped[:, 2]
+    validy = boxes_clipped[:, 1] < boxes_clipped[:, 3]
+    valid = np.logical_and(validx, validy)
+
+    if format == 'xcycwh': boxes_clipped = x1y1x2y2_to_xcycwh(boxes_clipped)
+    elif format == 'xywh': boxes_clipped = x1y1x2y2_to_xywh(boxes_clipped)
+
+    boxes_clipped = boxes_clipped.reshape(boxes.shape)
+    valid = valid.reshape(boxes.shape[:-1])
+
+    # Conver to the same shape as the input
+    return boxes_clipped, valid
+
+
+def iou(box1, box2):
+    # box format: [x0, y0, x1, y1]
+    inter = np.maximum(box1[:2], box2[:2]) + np.minimum(box1[2:], box2[2:])
+    iw = inter[2] - inter[0]
+    ih = inter[3] - inter[1]
+    if iw <= 0 or ih <= 0: return 0.0
+    union = np.minimum(box1[:2], box2[:2]) + np.maximum(box1[2:], box2[2:])
+    uw = union[2] - union[0]
+    uh = union[3] - union[1]
+    iou = iw * ih / (uw * uh)
+    return iou
+
+
+def iou_matrix_by_iter(boxes1, boxes2):
+    """
+    Compute pairwise NxN IOU matrix in Nx4 array of boxes in x1y1x2y2 format
+    """
+    n1 = boxes1.shape[0]
+    n2 = boxes2.shape[0]
+
+    M = np.zeros(n1, n2)
+    for i1 in range(n1):
+        for i2 in range(n2):
+            M[i1, i2] = iou(boxes1[i1], boxes2[i2])
+    return M
+
+
+def iou_matrix(boxes1, boxes2):
+    """
+    Compute pairwise NxM IOU matrix in Nx4, Mx4 array of boxes in x1y1x2y2 format
+    """
+    # Make two NxMx4 matrices: box1 - row major, box2 - column major
+    n = boxes1.shape[0]
+    m = boxes2.shape[0]
+    tile_boxes1 = np.tile(np.expand_dims(boxes1, axis=1), [1, m, 1])
+    tile_boxes2 = np.tile(np.expand_dims(boxes2, axis=0), [n, 1, 1])
+
+    inter = np.concatenate([
+        np.maximum(tile_boxes1[:, :, :2], tile_boxes2[:, :, :2]),
+        np.minimum(tile_boxes1[:, :, 2:], tile_boxes2[:, :, 2:])], axis=2)
+    iw = inter[:, :, 2] - inter[:, :, 0]
+    ih = inter[:, :, 3] - inter[:, :, 1]
+    iw = iw.clip(min=0)
+    ih = ih.clip(min=0)
+    area_i = iw * ih
+
+    union = np.concatenate([
+        np.minimum(tile_boxes1[:, :, :2], tile_boxes2[:, :, :2]),
+        np.maximum(tile_boxes1[:, :, 2:], tile_boxes2[:, :, 2:])], axis=2)
+    uw = union[:, :, 2] - union[:, :, 0]
+    uh = union[:, :, 3] - union[:, :, 1]
+    area_u = uw * uh
+    return area_i.astype(np.float32) / area_u.astype(np.float32)
