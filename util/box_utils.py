@@ -265,3 +265,7 @@ def iou_matrix(boxes1, boxes2):
     uh = union[:, :, 3] - union[:, :, 1]
     area_u = uw * uh
     return area_i.astype(np.float32) / area_u.astype(np.float32)
+
+
+def iou_matrix_xywh(boxes1, boxes2):
+    return iou_matrix(xywh_to_x1y1x2y2(boxes1), xywh_to_x1y1x2y2(boxes2))
