@@ -210,11 +210,15 @@ def clip_boxes(boxes, bounds, format='x1y1x2y2'):
 
 def iou(box1, box2):
     # box format: [x0, y0, x1, y1]
-    inter = np.maximum(box1[:2], box2[:2]) + np.minimum(box1[2:], box2[2:])
+    inter = np.concatenate(
+        [np.maximum(box1[:2], box2[:2]), np.minimum(box1[2:], box2[2:])],
+        axis=0)
     iw = inter[2] - inter[0]
     ih = inter[3] - inter[1]
     if iw <= 0 or ih <= 0: return 0.0
-    union = np.minimum(box1[:2], box2[:2]) + np.maximum(box1[2:], box2[2:])
+    union = np.concatenate(
+        [np.minimum(box1[:2], box2[:2]), np.maximum(box1[2:], box2[2:])],
+        axis=0)
     uw = union[2] - union[0]
     uh = union[3] - union[1]
     iou = iw * ih / (uw * uh)
@@ -228,7 +232,7 @@ def iou_matrix_by_iter(boxes1, boxes2):
     n1 = boxes1.shape[0]
     n2 = boxes2.shape[0]
 
-    M = np.zeros(n1, n2)
+    M = np.zeros([n1, n2], dtype=np.float32)
     for i1 in range(n1):
         for i2 in range(n2):
             M[i1, i2] = iou(boxes1[i1], boxes2[i2])
