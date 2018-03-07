@@ -8,7 +8,7 @@ import numpy as np
 
 def xcycwh_to_x1y1x2y2(boxes):
     """
-    Convert boxes from (xc, yc, w, h) format to (x1, y2, x2, y2) format.
+    Convert boxes from (xc, yc, w, h) format to (x1, y1, x2, y2) format.
 
     Input:
         - boxes: Numpy tensor of shape (B, N, 4) or (N, 4) giving boxes
@@ -33,7 +33,7 @@ def xcycwh_to_x1y1x2y2(boxes):
     y0 = yc - h / 2.
     y1 = yc + h / 2.
 
-    ret = np.stack([x0, x1, y0, y1], axis=2)
+    ret = np.stack([x0, y0, x1, y1], axis=2)
     if not minibatch: ret = ret.squeeze(axis=0)
     return ret
 
@@ -65,7 +65,7 @@ def xywh_to_x1y1x2y2(boxes):
     x1 = x0 + w
     y1 = y0 + h
 
-    ret = np.stack([x0, x1, y0, y1], axis=2)
+    ret = np.stack([x0, y0, x1, y1], axis=2)
     if not minibatch: ret = ret.squeeze(axis=0)
     return ret
 
@@ -138,6 +138,7 @@ def scale_boxes_xywh(boxes, frac):
         - frac: Fraction by which to scale the boxes. For example
           if boxes assume that the input image has size 800x600 but we want to
           use them at 400x300 scale, then frac should be 0.5.
+          array [frac_x, frac_y] for using separate rescale
 
     Returns:
         - boxes_scaled: Tensor of shape (N, 4) giving rescaled box coordinates
@@ -145,7 +146,16 @@ def scale_boxes_xywh(boxes, frac):
     """
     # bb is given as Nx4 tensor of x,y,w,h
     # e.g. original width was 800 but now is 512, then frac will be 800/512 = 1.56
-    return boxes * frac
+    if isinstance(frac, list):
+        assert len(frac) == 2, 'only two dimension frac is possible for array input'
+        new_boxes = boxes.copy()
+        new_boxes[:, 0] *= frac[0]
+        new_boxes[:, 1] *= frac[1]
+        new_boxes[:, 2] *= frac[0]
+        new_boxes[:, 3] *= frac[1]
+    else:
+        new_boxes = boxes * float(frac)
+    return new_boxes
 
 
 def clip_boxes(boxes, bounds, format='x1y1x2y2'):
