@@ -128,6 +128,26 @@ def xcycwh_to_xywh(boxes):
     return boxes_xywh
 
 
+def scale_boxes_xywh(boxes, frac):
+    """
+    Rescale boxes to convert from one coordinate system to another.
+
+    Inputs:
+        - boxes: Tensor of shape (N, 4) giving coordinates of boxes in
+          (x, y, w, h) format.
+        - frac: Fraction by which to scale the boxes. For example
+          if boxes assume that the input image has size 800x600 but we want to
+          use them at 400x300 scale, then frac should be 0.5.
+
+    Returns:
+        - boxes_scaled: Tensor of shape (N, 4) giving rescaled box coordinates
+          in (x, y, w, h) format.
+    """
+    # bb is given as Nx4 tensor of x,y,w,h
+    # e.g. original width was 800 but now is 512, then frac will be 800/512 = 1.56
+    return boxes * frac
+
+
 def clip_boxes(boxes, bounds, format='x1y1x2y2'):
     """
     Clip bounding boxes to a specified region.
