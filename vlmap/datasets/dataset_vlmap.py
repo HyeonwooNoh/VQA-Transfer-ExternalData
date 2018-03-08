@@ -12,10 +12,16 @@ IMAGE_WIDTH = 540
 IMAGE_HEIGHT = 540
 
 NUM_K = 500  # number of entry used for classification.
+IMAGE_RETRIEVAL_K = 30
+LANGUAGE_RETRIEVAL_K = 30
 
 MAX_USED_BOX = 100
-MAX_REGION_BOX = 30
-MAX_OBJECT_BOX = 10
+MAX_BOX_PER_ENTRY = {
+    'region': 30,
+    'object': 10,
+    'attribute': 10,
+    'relationship': 10
+}
 
 class Dataset(object):
 
@@ -152,6 +158,158 @@ class Dataset(object):
         if num_pos_box > 0: used_box = np.take(box, pos_box_idx, axis=0)
         else: used_box = np.zeros([0, 4], dtype=np.float32)
 
+        box_idx_start = {}
+        asn_idx = {}
+        used_no_asn_idx = {}
+        for i, key in enumerate(['region', 'object', 'attribute', 'relationship']):
+            box_idx_start[key] = used_box.shape[0]
+
+            # [2, 3, 4] Add no-assigned regions to used box list
+            asn_idx[key] = entry['asn_{}_idx'].format(key)].value
+            no_asn_idx = entry['no_asn_{}_idx'.format(key)].value
+
+            num_asn = len(asn_idx[key])
+            num_no_asn = len(no_asn_idx)
+
+            # how to determine the number of no_asn regions
+            # 1. left 1 object, 1 attribute, 1 relations
+            # 2. fill max_region_box limitation
+            # 3. use all labeled regions
+            num_used_no_asn = min(MAX_USED_BOX - box_idx_start[key] - (3 - i),
+                                  MAX_BOX_PER_ENTRY[key] - num_asn,
+                                  num_no_asn)
+            used_no_asn_selector = list(range(num_no_asn))
+            RANDOM_STATE.shuffle(used_no_asn_selector)
+            used_no_asn_selector = used_no_asn_selector[:num_used_no_asn]
+
+            if len(used_no_asn_selector) > 0:
+                used_no_asn_idx[key] = np.take(
+                    no_asn_idx, used_no_asn_selector, axis=0)
+            else: used_no_asn_idx[key] = np.array([], dtype=np.int32)
+
+            entry_box = preprocess_box(entry['{}_xywh'.format(key)].value)
+            if len(used_no_asn_idx[key]) > 0:
+                no_asn_box = np.take(entry_box, used_no_asn_idx[key], axis=0)
+            else: no_asn_box = np.zeros([0, 4], dtype=np.float32)
+            used_box = np.concatenate([used_box, no_asn_box], axis=0)
+
+        # [5] Add negative boxes
+        box_idx_start['neg_box'] = used_box.shape[0]
+        neg_box_idx = entry['negative_box_idx'].value
+        num_neg_box = len(neg_box_idx)
+        num_used_neg_box = min(MAX_USED_BOX - box_idx_start['neg_box'],
+                               num_neg_box)
+        used_neg_box_selector = list(range(num_neg_box))
+        RANDOM_STATE.shuffle(used_neg_box_selector)
+        used_neg_box_selector = used_neg_box_selector[:num_used_neg_box]
+
+        if len(used_neg_box_selector) > 0:
+            used_neg_box_idx = np.take(
+                neg_box_idx, used_neg_box_selector, axis=0)
+        else: used_neg_box_idx = np.array([], dtype=np.int32)
+
+        if len(used_neg_box_idx) > 0:
+            used_neg_box = np.take(box, used_neg_box_idx, axis=0)
+        else: used_neg_box = np.zeros([0, 4], dtype=np.float32)
+        used_box = np.concatenate([used_box, used_neg_box], axis=0)
+
+        # [6] Add pad boxes (which covers whole image). this is to fix num_box
+        box_idx_start['pad_box'] = used_box.shape[0]
+        num_pad_box = MAX_USED_BOX - box_idx_start['pad_box']
+        pad_box = np.tile(np.expand_dims(np.array(
+            [0, 0, self.width, self.height], dtype=np.float32), axis=0),
+            [num_pad_box, 1])
+        used_box = np.concatenate([used_box, pad_box], axis=0)
+
+        # [7] Construct region description batch - required for caption generation.
+        # You can used the data in model with following way
+        # 1. box selection, 2. get feature from box, 3. description, 4. loss
+        all_desc = entry['region_descriptions'].value
+        all_desc_len = entry['region_description_len'].value
+        if len(asn_idx['region']) > 0:
+            asn_desc = np.take(all_desc, asn_idx[key], axis=0)
+            asn_desc_len = np.take(all_desc_len, asn_idx[key], axis=0)
+        else:
+            asn_desc = np.zeros([0, all_desc.shape[1]], dtype=np.int32)
+            asn_desc_len = np.zeros([0], dtype=np.int32)
+        asn_desc_box_idx = entry['asn_region2pos_idx'].value
+
+        if len(used_no_asn_idx['region']) > 0:
+            used_no_asn_desc = np.take(all_desc, used_no_asn_idx[key], axis=0)
+            used_no_asn_desc_len = np.take(
+                all_desc_len, used_no_asn_idx[key], axis=0)
+        else:
+            used_no_asn_desc = np.zeros([0, all_desc.shape[1]], dtype=np.int32)
+            used_no_asn_desc_len = np.zeros([0], dtype=np.int32)
+        used_no_asn_desc_box_idx = \
+            np.arange(len(used_no_asn_idx['region']), dtype=np.int32) + \
+            box_idx_start['region']
+
+        used_desc = np.concatenate([asn_desc, used_no_asn_desc], axis=0)
+        used_desc_len = np.concatenate([asn_desc_len, used_no_asn_desc_len],
+                                       axis=0)
+        used_desc_box_idx = np.concatenate(
+            [asn_desc_box_idx, used_no_asn_desc_box_idx], axis=0)
+        num_used_desc = used_desc.shape[0]
+
+        # pad descriptions to have fixed size MAX_BOX_PER_ENTRY['region']
+        pad_size = MAX_BOX_PER_ENTRY['region'] - num_used_desc
+        if pad_size > 0:
+            pad_desc = np.zeros([pad_size, used_desc.shape[1]], dtype=np.int32)
+            pad_desc_len = np.zeros([pad_size], dtype=np.int32)
+            pad_desc_box_idx = np.zeros([pad_size], dtype=np.int32)
+            used_desc = np.concatenate([used_desc, pad_desc], axis=0)
+            used_desc_len = np.concatenate([used_desc_len, pad_desc_len], axis=0)
+            used_desc_box_idx = np.concatenate([used_desc_box_idx,
+                                                pad_desc_box_idx], axis=0)
+        # add end token <e> to description
+        used_desc = np.concatenate(
+            [used_desc, np.zeros([used_desc.shape[0], 1], dtype=np.int32)],
+            axis=1)
+        for i in range(used_desc.shape[0]):
+            used_desc[i, used_desc_len[i]] = self.vocab['dict']['<e>']
+        used_desc_len += 1
+
+        # [8] additional information for image retrieval / language retrival with
+        # description
+        desc_idx_set = set(range(num_used_desc))  # do not use pad as gt
+        # use all box except for padding
+        box_idx_set = set(range(box_idx_start['pad_box']))
+        language_retrieval_desc = []
+        language_retrieval_gt = []
+        image_retrieval_box = []
+        image_retrieval_gt = []
+        for i in range(used_desc.shape[0]):
+            pos_desc_list = [i]
+            pos_box_list = [used_desc_box_idx[i]]
+            neg_desc_list = list(desc_idx_set - set(pos_desc_list))
+            neg_box_list = list(box_idx_set - set(pos_box_list))
+
+            RANDOM_STATE.shuffle(neg_desc_list)
+            RANDOM_STATE.shuffle(neg_box_list)
+
+            neg_desc_list = neg_desc_list[: LANGUAGE_RETRIEVAL_K - 1]
+            neg_box_list = neg_box_list[: IMAGE_RETRIEVAL_K - 1]
+
+            sampled_desc_ids = pos_desc_list + neg_desc_list
+            sampled_box_ids = pos_box_list + neg_box_list
+            gt_desc = np.array([1] + [0] * len(neg_desc_list), dtype=np.float32)
+            gt_box = np.array([1] + [0] * len(neg_box_list), dtype=np.float32)
+
+            language_retrieval_desc.append(sampled_desc_ids)
+            language_retrieval_gt.append(gt_desc)
+            image_retrieval_desc.append(sampled_box_ids)
+            image_retrieval_gt.append(gt_box)
+        language_retrieval_desc = np.stack(language_retrieval_desc, axis=0)
+        language_retrieval_gt = np.stack(language_retrieval_desc, axis=0)
+        image_retrieval_desc = np.stack(image_retrieval_desc, axis=0)
+        image_retrieval_gt = np.stack(image_retrieval_gt, axis=0)
+
+        # [9] Data for classification of object / attribute / relationship
+
+
+
+
         box_idx_start_region = used_box.shape[0]
 
         # [2] Add no-assigned regions
@@ -216,6 +374,10 @@ class Dataset(object):
         box_idx_start_attribute = used_box.shape[0]
 
         # [4] Add no-assigned attribute
+        asn_attribute_idx = entry['asn_attribute_idx'].value
+        no_asn_attribute_idx = entry['no_asn_attribute_idx'].value
+
+        num_asn_attribute = len(asn_attribute
 
 
 
