@@ -198,17 +198,17 @@ class Dataset(object):
         all_desc = entry['region_descriptions'].value
         all_desc_len = entry['region_description_len'].value
         if len(asn_idx['region']) > 0:
-            asn_desc = np.take(all_desc, asn_idx[key], axis=0)
-            asn_desc_len = np.take(all_desc_len, asn_idx[key], axis=0)
+            asn_desc = np.take(all_desc, asn_idx['region'], axis=0)
+            asn_desc_len = np.take(all_desc_len, asn_idx['region'], axis=0)
         else:
             asn_desc = np.zeros([0, all_desc.shape[1]], dtype=np.int32)
             asn_desc_len = np.zeros([0], dtype=np.int32)
         asn_desc_box_idx = entry['asn_region2pos_idx'].value
 
         if len(used_no_asn_idx['region']) > 0:
-            used_no_asn_desc = np.take(all_desc, used_no_asn_idx[key], axis=0)
+            used_no_asn_desc = np.take(all_desc, used_no_asn_idx['region'], axis=0)
             used_no_asn_desc_len = np.take(
-                all_desc_len, used_no_asn_idx[key], axis=0)
+                all_desc_len, used_no_asn_idx['region'], axis=0)
         else:
             used_no_asn_desc = np.zeros([0, all_desc.shape[1]], dtype=np.int32)
             used_no_asn_desc_len = np.zeros([0], dtype=np.int32)
