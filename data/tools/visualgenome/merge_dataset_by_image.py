@@ -22,7 +22,7 @@ parser.add_argument('--relationships_dir', type=str,
                     help=' ')
 parser.add_argument('--regions_dir', type=str,
                     default='preprocessed/visualgenome'
-                    '/region_descriptions_new_vocab50_min_len10',
+                    '/region_descriptions_new_vocab50_max_len10',
                     help=' ')
 parser.add_argument('--vocab_path', type=str,
                     default='preprocessed/new_vocab50.json', help=' ')
