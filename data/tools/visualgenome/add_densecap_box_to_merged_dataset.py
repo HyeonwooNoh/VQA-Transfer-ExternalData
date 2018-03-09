@@ -20,7 +20,7 @@ parser.add_argument('--densecap_results', type=str,
                     '/results_original_size.hdf5', help=' ')
 parser.add_argument('--merged_dataset_dir', type=str,
                     default='data/preprocessed/visualgenome'
-                    '/merged_by_image_vocab50', help=' ')
+                    '/merged_by_image_new_vocab50', help=' ')
 config = parser.parse_args()
 
 densecap = h5py.File(config.densecap_results, 'r')

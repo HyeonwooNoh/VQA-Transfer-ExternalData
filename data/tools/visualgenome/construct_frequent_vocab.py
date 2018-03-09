@@ -8,16 +8,16 @@ from tqdm import tqdm
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--object_dataset_path', type=str,
-                    default='preprocessed/visualgenome/objects_vocab_min_occ20',
+                    default='preprocessed/visualgenome/objects_glove_vocab_min_occ20',
                     help=' ')
 parser.add_argument('--attribute_dataset_path', type=str,
-                    default='preprocessed/visualgenome/attributes_vocab_min_occ20',
+                    default='preprocessed/visualgenome/attributes_glove_vocab_min_occ20',
                     help=' ')
 parser.add_argument('--relationship_dataset_path', type=str,
-                    default='preprocessed/visualgenome/relationships_vocab_min_occ20',
+                    default='preprocessed/visualgenome/relationships_glove_vocab_min_occ20',
                     help=' ')
 parser.add_argument('--region_dataset_path', type=str,
-                    default='preprocessed/visualgenome/region_descriptions_vocab',
+                    default='preprocessed/visualgenome/region_descriptions_glove_vocab_max_len10',
                     help=' ')
 parser.add_argument('--vocab_path', type=str,
                     default='preprocessed/glove_vocab.json', help=' ')
@@ -77,7 +77,7 @@ if '<e>' not in vocab: vocab.append('<e>')
 if '<unk>' not in vocab: vocab.append('<unk>')
 
 vocab = {'vocab': vocab, 'dict': {v: i for i, v in enumerate(vocab)}}
-save_vocab_path = 'preprocessed/vocab{}.json'.format(
+save_vocab_path = 'preprocessed/new_vocab{}.json'.format(
     config.min_word_occurrence)
 json.dump(vocab, open(save_vocab_path, 'w'))
 print('vocabulary with {} words are constructed: {}'.format(

@@ -31,15 +31,15 @@ Use following commands.
 
 1. construct glove vocab and image\_scplit
 ```python
-python tools/construct_vocab.py
-python tools/construct_image_split.py
+python tools/preprocess_glove.py
+python tools/visualgenome/construct_image_split.py
 ```
 1. construct dataset with glove vocab
 ```python
-python tools/generator_objects.py --vocab_path preprocessed/vocab.json
-python tools/generator_attributes.py --vocab_path preprocessed/vocab.json
-python tools/generator_relationships.py --vocab_path preprocessed/vocab.json
-python tools/generator_region_descriptions.py --vocab_path preprocessed/vocab.json
+python tools/visualgenome/generator_objects.py --vocab_path preprocessed/glove_vocab.json
+python tools/visualgenome/generator_attributes.py --vocab_path preprocessed/glove_vocab.json
+python tools/visualgenome/generator_relationships.py --vocab_path preprocessed/glove_vocab.json
+python tools/visualgenome/generator_region_descriptions.py --vocab_path preprocessed/glove_vocab.json --max_description_length 10
 ```
 1. extract frequent vocab from constructed datasets
 ```python
@@ -47,13 +47,16 @@ python tools/construct_frequent_vocab.py --min_occurrence 50
 ```
 1. construct dataset with new vocab
 ```python
-python tools/generator_objects.py --vocab_path preprocessed/vocab50.json
-python tools/generator_attributes.py --vocab_path preprocessed/vocab50.json
-python tools/generator_relationships.py --vocab_path preprocessed/vocab50.json
-python tools/generator_region_descriptions.py --vocab_path preprocessed/vocab50.json
+python tools/visualgenome/generator_objects.py --vocab_path preprocessed/new_vocab50.json
+python tools/visualgenome/generator_attributes.py --vocab_path preprocessed/new_vocab50.json
+python tools/visualgenome/generator_relationships.py --vocab_path preprocessed/new_vocab50.json
+python tools/visualgenome/generator_region_descriptions.py --vocab_path preprocessed/new_vocab50.json --max_description_length 10
 ```
-1. construct used wordset
+1. merge dataset
 ```python
-python tools/construct_used_wordset.py --vocab_path preprocessed/vocab50.json\
---save_used_wordset_path preprocessed/vocab50_used_wordset.hdf5
+python tools/visualgenome/merge_dataset_by_image.py
+```
+1. add densecap boxe to merged dataset
+```python
+python tools/visualgenome/add_densecap_box_to_merged_dataset.py
 ```

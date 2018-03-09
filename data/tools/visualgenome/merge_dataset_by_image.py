@@ -9,24 +9,29 @@ from tqdm import tqdm
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--objects_dir', type=str,
-                    default='preprocessed/visualgenome/objects_vocab50_min_occ20',
+                    default='preprocessed/visualgenome'
+                    '/objects_new_vocab50_min_occ20',
                     help=' ')
 parser.add_argument('--attributes_dir', type=str,
-                    default='preprocessed/visualgenome/attributes_vocab50_min_occ20',
+                    default='preprocessed/visualgenome'
+                    '/attributes_new_vocab50_min_occ20',
                     help=' ')
 parser.add_argument('--relationships_dir', type=str,
-                    default='preprocessed/visualgenome/relationships_vocab50_min_occ20',
+                    default='preprocessed/visualgenome'
+                    '/relationships_new_vocab50_min_occ20',
                     help=' ')
 parser.add_argument('--regions_dir', type=str,
-                    default='preprocessed/visualgenome/region_descriptions_vocab50',
+                    default='preprocessed/visualgenome'
+                    '/region_descriptions_new_vocab50_min_len10',
                     help=' ')
 parser.add_argument('--vocab_path', type=str,
-                    default='preprocessed/vocab50.json', help=' ')
+                    default='preprocessed/new_vocab50.json', help=' ')
 parser.add_argument('--image_split_path', type=str,
                     default='preprocessed/visualgenome/image_split.json',
                     help=' ')
 parser.add_argument('--merged_dataset_dir',
-                    default='preprocessed/visualgenome/merged_by_image_vocab50',
+                    default='preprocessed/visualgenome'
+                    '/merged_by_image_new_vocab50',
                     help=' ')
 config = parser.parse_args()
 
