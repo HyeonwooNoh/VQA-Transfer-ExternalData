@@ -425,7 +425,7 @@ class Dataset(object):
             'ir_box_idx': ir_box_idx,
             'ir_gt': ir_gt}
         for key in ['object', 'attribute', 'relationship']:
-            returns['{}_box_idx'.format(key)] = used_entry_box_idx
+            returns['{}_box_idx'.format(key)] = used_entry_box_idx[key]
             returns['{}_num_used_box'.format(key)] = num_used_entry[key]
             returns['{}_candidate'.format(key)] = entry_candidate[key]
             returns['{}_candidate_len'.format(key)] = entry_candidate_len[key]
