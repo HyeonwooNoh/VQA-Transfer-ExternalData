@@ -38,6 +38,7 @@ else:
     raise ValueError('The directory {} already exists. Do not overwrite'.format(
         config.merged_dataset_dir))
 
+
 def construct_image2id(id_pairs):
     image2id = {}
     for id_pair in id_pairs:
@@ -62,7 +63,7 @@ print('Loading separate datasets..')
 object_f = h5py.File(os.path.join(config.objects_dir, 'data.hdf5'), 'r')
 attr_f = h5py.File(os.path.join(config.attributes_dir, 'data.hdf5'), 'r')
 relation_f = h5py.File(os.path.join(config.relationships_dir, 'data.hdf5'), 'r')
-region_f =h5py.File(os.path.join(config.regions_dir, 'data.hdf5'), 'r')
+region_f = h5py.File(os.path.join(config.regions_dir, 'data.hdf5'), 'r')
 print('Done')
 
 f = h5py.File(os.path.join(config.merged_dataset_dir, 'data.hdf5'), 'w')
@@ -152,7 +153,7 @@ for image_id in tqdm(image_ids, desc='process_image_ids'):
         min_box[key] = min(min_box[key], len(ids[key]))
         max_box[key] = max(max_box[key], len(ids[key]))
 
-    entry= {}
+    entry = {}
     entry['obj'] = object_f[image_id]
     entry['attr'] = attr_f[image_id]
     entry['rel'] = relation_f[image_id]
@@ -231,7 +232,11 @@ for image_id in tqdm(image_ids, desc='process_image_ids'):
             name_ids_in_image[key]
         image_grp['{}_name_len'.format(prefix[key])] =\
             name_len_in_image[key]
+        # TODO(hyeonwoonoh): save names in to "{}_num_names" and save names to
+        # "{}_names" and change reading code in vlmap/datasets/dataset_vlmap
         image_grp['{}_names'.format(prefix[key])] =\
+            names_in_image[key]
+        image_grp['{}_num_names'.format(prefix[key])] =\
             num_names_in_image[key]
     image_grp['region_xywh'] = region_boxes
     image_grp['region_descriptions'] = region_descriptions
