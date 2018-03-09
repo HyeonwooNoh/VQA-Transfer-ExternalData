@@ -80,58 +80,29 @@ class Dataset(object):
     def get_data(self, id):
         """
         Returns:
-            image: [height, width, channel]
-
-            * following boxes will be concatenated
-            pos_box: [N, 4 (x1, y1, x2, y2)]
-                - This is set of densecap boxes used by at least one task
-            neg_box: [M, 4 (x1, y1, x2, y2)]
-                - This is for metric learning - "finding box from description"
-                - N + M can be a constant for effective batching.
-            region_gt_box
-            obj_gt_box
-            attr_gt_box
-            rel_gt_box
-
-            * following data will be used for description / blank-fill
-            region_box_idx [None]
-            region_desc [None, Len] (including <e>)
-            region_desc_len [None] (length including <e>)
-            region_blank_desc [None, Len] (including <e>)
-            region_blank_desc_len [None] (length including <e>)
-
-            (region_box_idx will be used as ground truth for image retrieval task)
-            region_box_candidates_idx [None, num_k]
-            region_box_gt [None, num_k] (one-hot)
-
-            * following data will be used for text retrieval
-            region_box_idx [None]
-            region_desc [None, Len] (including <e>)
-            region_desc_len [None] (length including <e>)
-            (we don't have to explicitly make and return this data. This could
-            be handled by the model)
-
-            * following data will be used for classification
-            obj_box_idx [None]
-            obj_name_list: [None, num_k]
-            obj_name_len: [None, num_k]
-            obj_gt: [None, num_k] (one-hot)
-
-            attr_box_idx [None]
-            attr_name_list: [None, num_k]
-            attr_name_len: [None, num_k]
-            attr_gt: [None, num_k] (one-hot)
-
-            rel_box_idx [None]
-            rel_name_list: [None, num_k]
-            rel_name_len: [None, num_k]
-            rel_gt: [None, num_k] (one-hot)
-
-            positive_box
-            sampled_objects: [num_k, max_name_len]  (first is positive object)
-            sampled_objects_len: [num_k]
-            ground_truth: [num_k]  (one-hot vector with 1 as the first entry
-            sampled_objects_name: [num_k]
+            * image and box:
+                - image: resized rgb image (scale: [0, 255])
+                - box: all set of boxes used for roi pooling (x1y1x2y2 format)
+            * description:
+                - desc: region description ground truths
+                - desc_len: region description lengths
+                - desc_box_idx: index of description corresponded boxes
+                - num_used_desc: number of descriptions except for padding
+            * blank fill:
+                - blank_desc: region description with random blank
+                - blank_desc_len: length of blank_desc
+            * language retrieval (lr) and image retrieval (ir):
+                - lr_desc_idx: description candidates index for matching
+                - lr_gt: ground truth retrieval results (one-hot)
+                - ir_box_idx: candidate boxes index
+                - ir_gt: ground truth retrieval results (one-hot)
+            * entry [object, attribute, relationship] classification:
+                - {}_box_idx: box index for entry classification
+                - {}_num_used_box: number of used boxes (for masking loss)
+                - {}_candidate: intseq of candidate entry names
+                - {}_candidate_len: intseq length  of candidate entry names
+                - {}_candidate_name: string of candidate entry (for debugging)
+                - {}_selection_gt: gt for entry selection task
         """
         entry = self.data[id]
 
@@ -439,7 +410,6 @@ class Dataset(object):
                 - {}_candidate_len: intseq length  of candidate entry names
                 - {}_candidate_name: string of candidate entry (for debugging)
                 - {}_selection_gt: gt for entry selection task
-
         """
         returns = {
             'image': image,
