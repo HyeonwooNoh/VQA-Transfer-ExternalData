@@ -18,18 +18,23 @@ ANNO_FILE = {
     'region_descriptions': 'region_descriptions.json',
 }
 
-IMAGE_SPLIT_FILE = 'preprocessed/image_split.json'
+IMAGE_SPLIT_FILE = 'preprocessed/visualgenome/image_split.json'
 MIN_CROP_SIZE = 32
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('--dir_name', type=str, default='region_descriptions')
-parser.add_argument('--vocab_path', type=str, default='preprocessed/vocab.json')
+parser.add_argument('--dir_name', type=str, default='region_descriptions',
+                    help=' ')
+parser.add_argument('--vocab_path', type=str,
+                    default='preprocessed/glove_vocab.json', help=' ')
+parser.add_argument('--max_description_length', type=int, default=10, help=' ')
 args = parser.parse_args()
 
 args.dir_name = os.path.join('preprocessed/visualgenome', args.dir_name)
 args.dir_name += '_{}'.format(
     args.vocab_path.replace('preprocessed/', '').replace('.json', ''))
+if args.max_description_length > 0:
+    args.dir_name += '_max_len{}'.format(args.max_description_length)
 
 if not os.path.exists(args.dir_name):
     os.makedirs(args.dir_name)
@@ -93,6 +98,9 @@ for entry in tqdm(anno['region_descriptions'], desc='region_descriptions'):
         descriptions.append(phrase)
 
         phrase = np.array(phrase2intseq(phrase), dtype=np.int32)
+
+        len_limit = args.max_description_length
+        if len_limit > 0 and len(phrase) > len_limit: continue
 
         max_length = max(max_length, len(phrase))
 

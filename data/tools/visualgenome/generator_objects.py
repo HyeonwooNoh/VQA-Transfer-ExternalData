@@ -19,14 +19,15 @@ ANNO_FILE = {
     'objects': 'objects.json',
 }
 
-IMAGE_SPLIT_FILE = 'preprocessed/image_split.json'
+IMAGE_SPLIT_FILE = 'preprocessed/visualgenome/image_split.json'
 MIN_CROP_SIZE = 32
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('--dir_name', type=str, default='objects')
-parser.add_argument('--min_occurrence', type=int, default=20)
-parser.add_argument('--vocab_path', type=str, default='preprocessed/vocab.json')
+parser.add_argument('--dir_name', type=str, default='objects', help=' ')
+parser.add_argument('--min_occurrence', type=int, default=20, help=' ')
+parser.add_argument('--vocab_path', type=str,
+                    default='preprocessed/glove_vocab.json', help=' ')
 args = parser.parse_args()
 
 args.dir_name = os.path.join('preprocessed/visualgenome', args.dir_name)
