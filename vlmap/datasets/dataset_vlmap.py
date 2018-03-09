@@ -136,7 +136,7 @@ class Dataset(object):
         entry = self.data[id]
 
         # Image
-        image_path = os.path.join(self.image_dir, '{}.jpg'.format(image_id))
+        image_path = os.path.join(self.image_dir, '{}.jpg'.format(id))
         o_image = Image.open(image_path)
         o_w, o_h = o_image.size
         image = np.array(
@@ -165,7 +165,7 @@ class Dataset(object):
             box_idx_start[key] = used_box.shape[0]
 
             # [2, 3, 4] Add no-assigned regions to used box list
-            asn_idx[key] = entry['asn_{}_idx'].format(key)].value
+            asn_idx[key] = entry['asn_{}_idx'.format(key)].value
             no_asn_idx = entry['no_asn_{}_idx'.format(key)].value
 
             num_asn = len(asn_idx[key])
@@ -278,7 +278,7 @@ class Dataset(object):
             drop_count = RANDOM_STATE.choice([1, 2, 3], p=[0.5, 0.3, 0.2])
             drop_count = min(drop_count, used_desc_len[i])
             # drop start and end
-            drop_s = RANDOM_STATE.randint(0, used_desc_len[i] - drop_count)
+            drop_s = RANDOM_STATE.randint(0, used_desc_len[i] - drop_count + 1)
             drop_e = drop_s + drop_count
             a_blank_desc = np.zeros([used_desc.shape[1]], dtype=np.int32)
             a_blank_desc[:drop_s] = used_desc[i][:drop_s]
@@ -315,8 +315,10 @@ class Dataset(object):
                 (pos_desc_list + neg_desc_list)[: LANGUAGE_RETRIEVAL_K]
             sampled_box_idx = \
                 (pos_box_list + neg_box_list)[: IMAGE_RETRIEVAL_K]
-            gt_desc = np.array([1] + [0] * len(neg_desc_list), dtype=np.float32)
-            gt_box = np.array([1] + [0] * len(neg_box_list), dtype=np.float32)
+            gt_desc = np.zeros([LANGUAGE_RETRIEVAL_K], dtype=np.float32)
+            gt_desc[0] = 1
+            gt_box = np.zeros([IMAGE_RETRIEVAL_K], dtype=np.float32)
+            gt_box[0] = 1
 
             lr_desc_idx.append(sampled_desc_idx)
             lr_gt.append(gt_desc)
@@ -344,7 +346,7 @@ class Dataset(object):
                 asn_name_ids = np.take(all_name_ids, asn_idx[key], axis=0)
                 asn_num_names = np.take(all_num_names, asn_idx[key], axis=0)
             else:
-                asn_num_ids = np.zeros([0, all_name_ids.shape[1]], dtype=np.int32)
+                asn_name_ids = np.zeros([0, all_name_ids.shape[1]], dtype=np.int32)
                 asn_num_names = np.zeros([0], dtype=np.int32)
             asn_entry_box_idx = entry['asn_{}2pos_idx'.format(key)].value
 
@@ -354,10 +356,10 @@ class Dataset(object):
                 used_no_asn_num_names = np.take(
                     all_num_names, used_no_asn_idx[key], axis=0)
             else:
-                used_no_asn_num_ids = np.zeros(
+                used_no_asn_name_ids = np.zeros(
                     [0, all_name_ids.shape[1]], dtype=np.int32)
                 used_no_asn_num_names = np.zeros([0], dtype=np.int32)
-            no_asn_entry_box_idx = \
+            used_no_asn_entry_box_idx = \
                 np.arange(len(used_no_asn_idx[key]), dtype=np.int32) + \
                 box_idx_start[key]
 
@@ -396,11 +398,11 @@ class Dataset(object):
 
                 a_sampled_ids = (a_name_ids + a_neg_ids)[: NUM_K]
                 a_sampled_entry = np.take(
-                    self.entry, a_sampled_ids, axis=0)
+                    self.entry[key], a_sampled_ids, axis=0)
                 a_sampled_entry_len = np.take(
-                    self.entry_len, a_sampled_ids, axis=0)
+                    self.entry_len[key], a_sampled_ids, axis=0)
                 a_sampled_entry_name = np.take(
-                    self.entry_name, a_sampled_ids, axis=0)
+                    self.entry_name[key], a_sampled_ids, axis=0)
                 a_sampled_entry_gt = np.zeros([NUM_K], dtype=np.float32)
                 a_sampled_entry_gt[: a_num_names] = 1
 
