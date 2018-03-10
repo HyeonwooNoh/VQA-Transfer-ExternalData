@@ -29,12 +29,18 @@ parser.add_argument('--vocab_path', type=str,
 parser.add_argument('--image_split_path', type=str,
                     default='preprocessed/visualgenome/image_split.json',
                     help=' ')
-parser.add_argument('--merged_dataset_dir',
+parser.add_argument('--merged_dataset_dir', type=str,
                     default='preprocessed/visualgenome'
                     '/merged_by_image_new_vocab50',
                     help=' ')
+parser.add_argument('--min_region_per_image', type=int, default=20, help=' ')
 config = parser.parse_args()
 
+if config.min_region_per_image > 1:
+    config.merged_dataset_dir += '_min_region{}'.format(
+        config.min_region_per_image)
+if config.min_region_per_image < 1:
+    config.min_region_per_image = 1
 
 if not os.path.exists(config.merged_dataset_dir):
     print('Create dataset dir: {}'.format(config.merged_dataset_dir))
@@ -151,8 +157,8 @@ for image_id in tqdm(image_ids, desc='process_image_ids'):
     ids['attr'] = attribute_image2id.get(image_id, [])
     ids['rel'] = relationship_image2id.get(image_id, [])
     ids['region'] = region_image2id.get(image_id, [])
-    if len(ids['obj']) == 0 or len(ids['attr']) == 0 or \
-            len(ids['rel']) == 0 or len(ids['region']) == 0:
+    if len(ids['obj']) == 0 or len(ids['attr']) == 0 or len(ids['rel']) == 0 or \
+            len(ids['region']) < config.min_region_per_image:
         continue
     for key in ids.keys():
         min_box[key] = min(min_box[key], len(ids[key]))
