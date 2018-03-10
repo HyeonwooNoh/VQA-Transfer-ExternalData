@@ -83,6 +83,7 @@ class Dataset(object):
             * image and box:
                 - image: resized rgb image (scale: [0, 255])
                 - box: all set of boxes used for roi pooling (x1y1x2y2 format)
+                - normal_box: normalized (y1x1y2x2 [0, 1]) box
             * description:
                 - desc: region description ground truths
                 - desc_len: region description lengths
@@ -200,6 +201,9 @@ class Dataset(object):
             [0, 0, self.width, self.height], dtype=np.float32), axis=0),
             [num_pad_box, 1])
         used_box = np.concatenate([used_box, pad_box], axis=0)
+
+        normal_used_box = box_utils.normalize_boxes_x1y1x2y2(
+            used_box, self.width, self.height)
 
         # [7] Construct region description batch - required for caption generation.
         # You can used the data in model with following way
@@ -407,6 +411,7 @@ class Dataset(object):
             * image and box:
                 - image: resized rgb image (scale: [0, 255])
                 - box: all set of boxes used for roi pooling (x1y1x2y2 format)
+                - normal_box: normalized (y1x1y2x2 [0, 1]) box
             * description:
                 - desc: region description ground truths
                 - desc_len: region description lengths
@@ -431,6 +436,7 @@ class Dataset(object):
         returns = {
             'image': image,
             'box': used_box,
+            'normal_box': normal_used_box,
             'desc': used_desc,
             'desc_len': used_desc_len,
             'desc_box_idx': used_desc_box_idx,
@@ -455,6 +461,7 @@ class Dataset(object):
         data_shapes = {
             'image': [self.height, self.width, 3],
             'box': [MAX_USED_BOX, 4],
+            'normal_box': [MAX_USED_BOX, 4],
             'desc': [MAX_BOX_PER_ENTRY['region'], None],
             'desc_len': [MAX_BOX_PER_ENTRY['region']],
             'desc_box_idx': [MAX_BOX_PER_ENTRY['region']],
@@ -484,6 +491,7 @@ class Dataset(object):
         data_types = {
             'image': np.float32,
             'box': np.float32,
+            'normal_box': np.float32,
             'desc': np.int32,
             'desc_len': np.int32,
             'desc_box_idx': np.int32,

@@ -25,6 +25,7 @@ def create(dataset,
     key_list = [
         'id',
         'box',
+        'normal_box',
         'image',
         'desc',
         'desc_len',

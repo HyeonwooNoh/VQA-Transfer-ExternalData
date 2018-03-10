@@ -128,6 +128,16 @@ def xcycwh_to_xywh(boxes):
     return boxes_xywh
 
 
+def normalize_boxes_x1y1x2y2(boxes, width, height):
+    boxes = boxes.astype(np.float32)
+    x1 = boxes[:, 0] / width
+    y1 = boxes[:, 1] / height
+    x2 = boxes[:, 2] / width
+    y2 = boxes[:, 3] / height
+    new_boxes = np.stack([y1, x1, y2, x2], axis=1)
+    return np.clip(new_boxes, 0, 1)
+
+
 def scale_boxes_xywh(boxes, frac):
     """
     Rescale boxes to convert from one coordinate system to another.
