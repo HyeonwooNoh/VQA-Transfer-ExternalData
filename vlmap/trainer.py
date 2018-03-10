@@ -269,6 +269,7 @@ def main():
     dataset = dataset_vlmap.create_default_splits(
         config.dataset_path, config.image_dir, config.vocab_path,
         is_train=True)
+    config.dataset_config = dataset['train'].get_config()
 
     trainer = Trainer(config, dataset)
     trainer.train()
