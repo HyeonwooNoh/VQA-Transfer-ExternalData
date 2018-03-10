@@ -42,26 +42,49 @@ def encode_I(images, is_train=False, reuse=tf.AUTO_REUSE):
         enc_I, _ = nets.resnet_v1.resnet_v1_50(
             processed_I,
             is_training=is_train,
-            global_pool=True,
+            global_pool=False,
             output_stride=None,
             reuse=reuse,
             scope='resnet_v1_50')
-        enc_I = tf.squeeze(enc_I, axis=[1, 2])
     return enc_I
+
+
+def roi_pool(ftmap, box, height, width, scope='roi_pool'):
+    with tf.name_scope(scope):
+        ft_dim = ftmap.get_shape().as_list()[3]
+        box_sz = tf.shape(box)
+
+        batch_box = tf.reshape(box, [-1, 4])
+        batch_ids = tf.reshape(tf.tile(tf.expand_dims(
+            tf.range(0, box_sz[0]), axis=1), [1, box_sz[1]]), [-1])
+
+        pooled = tf.reshape(tf.image.crop_and_resize(
+            ftmap, batch_box, batch_ids, [height, width]),
+            [-1, box_sz[1], height, width, ft_dim])
+        return pooled
+
+
+def I_reduce_dim(enc_I, out_dim, scope='I_reduce_dim', is_train=False,
+                 reuse=tf.AUTO_REUSE):
+    with tf.variable_scope(scope, reuse=reuse) as scope:
+        log.warning(scope.name)
+        enc_I = conv2d(enc_I, out_dim, 1, pad='same', use_bias=False,
+                       use_bn=True, activation_fn=tf.nn.relu,
+                       is_training=is_train, scope='conv2d', reuse=reuse)
+        return enc_I
 
 
 def I2V(enc_I, enc_dim, out_dim, scope='I2V', is_train=False, reuse=tf.AUTO_REUSE):
     with tf.variable_scope(scope, reuse=reuse) as scope:
         log.warning(scope.name)
-        feat_V = fc_layer(
-            enc_I, enc_dim, use_bias=True, use_bn=False,
-            activation_fn=tf.nn.relu, is_training=is_train,
-            scope='fc_1', reuse=reuse)
-        feat_V = fc_layer(
-            feat_V, out_dim, use_bias=True, use_bn=False,
-            activation_fn=None, is_training=is_train,
-            scope='Linear', reuse=reuse)
-        return feat_V
+        V_ft = conv2d(enc_I, enc_dim, 3, pad='valid', use_bias=False,
+                      use_bn=True, activation_fn=tf.nn.relu,
+                      is_training=is_train, scope='conv2d_1', reuse=reuse)
+        V_ft = conv2d(V_ft, out_dim, 3, pad='valid', use_bias=False,
+                        use_bn=True, activation_fn=tf.nn.relu,
+                        is_training=is_train, scope='conv2d_1', reuse=reuse)
+        V_ft = tf.squeeze(V_ft, axis=[-3, -2])
+        return V_ft
 
 
 def word_prediction(inputs, word_weights, activity_regularizer=None,
@@ -273,6 +296,29 @@ def L2V(feat_L, enc_dim, out_dim, is_train=True, scope='L2V',
             activation_fn=None, is_training=is_train,
             scope='Linear', reuse=reuse)
         return map_V
+
+
+def conv2d(input, dim, kernel_size, pad='same', use_bias=False, use_bn=False,
+           activation_fn=None, is_training=True, scope='conv2d',
+           reuse=tf.AUTO_REUSE):
+    with tf.variable_scope(scope, reuse=reuse) as scope:
+        log.warning(scope.name)
+        if use_bias:
+            out = layers.conv2d(input, dim, kernel_size, padding=pad,
+                                activation_fn=None, reuse=reuse,
+                                trainable=is_training, scope='conv2d')
+        else:
+            out = layers.conv2d(input, dim, kernel_size, padding=pad,
+                                activation_fn=None,
+                                biases_initializer=None, reuse=reuse,
+                                trainable=is_training, scope='conv2d')
+        if use_bn:
+            out = layers.batch_norm(out, center=True, scale=True, decay=0.9,
+                                    is_training=is_training,
+                                    updates_collections=None)
+        if activation_fn is not None:
+            out = activation_fn(out)
+        return out
 
 
 def fc_layer(input, dim, use_bias=False, use_bn=False, activation_fn=None,
