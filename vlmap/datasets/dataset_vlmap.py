@@ -13,7 +13,7 @@ IMAGE_HEIGHT = 540
 
 NUM_K = 500  # number of entry used for classification.
 IMAGE_RETRIEVAL_K = 10
-LANGUAGE_RETRIEVAL_K = 10
+LANGUAGE_RETRIEVAL_K = 2 # TODO only for temporary. plan to increate in the future
 
 MAX_USED_BOX = 60
 MAX_BOX_PER_ENTRY = {
@@ -131,15 +131,23 @@ class Dataset(object):
 
         box_idx_start = {}
         asn_idx = {}
+        asn_order_idx = {}
         used_no_asn_idx = {}
         for i, key in enumerate(['region', 'object', 'attribute', 'relationship']):
             box_idx_start[key] = used_box.shape[0]
 
             # [2, 3, 4] Add no-assigned regions to used box list
             asn_idx[key] = entry['asn_{}_idx'.format(key)].value
+            asn_order_idx[key] = np.arange(len(asn_idx[key]), dtype=np.int32)
             no_asn_idx = entry['no_asn_{}_idx'.format(key)].value
 
             num_asn = len(asn_idx[key])
+            if num_asn > MAX_BOX_PER_ENTRY[key]:
+                num_asn = min(num_asn, MAX_BOX_PER_ENTRY[key])
+                RANDOM_STATE.shuffle(asn_order_idx[key])
+                asn_order_idx[key] = asn_order_idx[key][:num_asn]
+                asn_idx[key] = np.take(asn_idx[key], asn_order_idx[key], axis=0)
+
             num_no_asn = len(no_asn_idx)
 
             # how to determine the number of no_asn regions
@@ -149,6 +157,7 @@ class Dataset(object):
             num_used_no_asn = min(MAX_USED_BOX - box_idx_start[key] - (3 - i),
                                   MAX_BOX_PER_ENTRY[key] - num_asn,
                                   num_no_asn)
+
             used_no_asn_selector = list(range(num_no_asn))
             RANDOM_STATE.shuffle(used_no_asn_selector)
             used_no_asn_selector = used_no_asn_selector[:num_used_no_asn]
@@ -200,10 +209,13 @@ class Dataset(object):
         if len(asn_idx['region']) > 0:
             asn_desc = np.take(all_desc, asn_idx['region'], axis=0)
             asn_desc_len = np.take(all_desc_len, asn_idx['region'], axis=0)
+            asn_desc_box_idx = np.take(
+                entry['asn_region2pos_idx'].value, asn_order_idx['region'],
+                axis=0)
         else:
             asn_desc = np.zeros([0, all_desc.shape[1]], dtype=np.int32)
             asn_desc_len = np.zeros([0], dtype=np.int32)
-        asn_desc_box_idx = entry['asn_region2pos_idx'].value
+            asn_desc_box_idx = np.zeros([0], dtype=np.int32)
 
         if len(used_no_asn_idx['region']) > 0:
             used_no_asn_desc = np.take(all_desc, used_no_asn_idx['region'], axis=0)
@@ -222,7 +234,7 @@ class Dataset(object):
             [asn_desc_len, used_no_asn_desc_len], axis=0)
         used_desc_box_idx = np.concatenate(
             [asn_desc_box_idx, used_no_asn_desc_box_idx], axis=0)
-        num_used_desc = used_desc.shape[0]
+        num_used_desc = np.array(used_desc.shape[0], dtype=np.int32)
 
         # pad descriptions to have fixed size MAX_BOX_PER_ENTRY['region']
         pad_size = MAX_BOX_PER_ENTRY['region'] - num_used_desc
@@ -282,10 +294,12 @@ class Dataset(object):
             RANDOM_STATE.shuffle(neg_desc_list)
             RANDOM_STATE.shuffle(neg_box_list)
 
-            sampled_desc_idx = \
-                (pos_desc_list + neg_desc_list)[: LANGUAGE_RETRIEVAL_K]
-            sampled_box_idx = \
-                (pos_box_list + neg_box_list)[: IMAGE_RETRIEVAL_K]
+            sampled_desc_idx = np.array(
+                (pos_desc_list + neg_desc_list)[: LANGUAGE_RETRIEVAL_K],
+                dtype=np.int32)
+            sampled_box_idx = np.array(
+                (pos_box_list + neg_box_list)[: IMAGE_RETRIEVAL_K],
+                dtype=np.int32)
             gt_desc = np.zeros([LANGUAGE_RETRIEVAL_K], dtype=np.float32)
             gt_desc[0] = 1
             gt_box = np.zeros([IMAGE_RETRIEVAL_K], dtype=np.float32)
@@ -316,10 +330,13 @@ class Dataset(object):
             if len(asn_idx[key]) > 0:
                 asn_name_ids = np.take(all_name_ids, asn_idx[key], axis=0)
                 asn_num_names = np.take(all_num_names, asn_idx[key], axis=0)
+                asn_entry_box_idx = np.take(
+                    entry['asn_{}2pos_idx'.format(key)].value,
+                    asn_order_idx[key], axis=0)
             else:
                 asn_name_ids = np.zeros([0, all_name_ids.shape[1]], dtype=np.int32)
                 asn_num_names = np.zeros([0], dtype=np.int32)
-            asn_entry_box_idx = entry['asn_{}2pos_idx'.format(key)].value
+                asn_entry_box_idx = np.zeros([0], dtype=np.int32)
 
             if len(used_no_asn_idx[key]) > 0:
                 used_no_asn_name_ids = np.take(
@@ -340,7 +357,7 @@ class Dataset(object):
                 [asn_num_names, used_no_asn_num_names], axis=0)
             used_entry_box_idx[key] = np.concatenate(
                 [asn_entry_box_idx, used_no_asn_entry_box_idx], axis=0)
-            num_used_entry[key] = used_name_ids.shape[0]
+            num_used_entry[key] = np.array(used_name_ids.shape[0], dtype=np.int32)
 
             pad_size = MAX_BOX_PER_ENTRY[key] - num_used_entry[key]
             if pad_size > 0:
@@ -361,7 +378,7 @@ class Dataset(object):
             entry_candidate_name[key] = []
             entry_selection_gt[key] = []
             for i in range(used_name_ids.shape[0]):
-                a_name_ids = list(used_name_ids[i])
+                a_name_ids = list(used_name_ids[i][:used_num_names[i]])
                 a_num_names = int(used_num_names[i])
 
                 a_neg_ids = list(total_name_ids_set - set(a_name_ids))
@@ -462,6 +479,32 @@ class Dataset(object):
                 [MAX_BOX_PER_ENTRY[key], NUM_K]
 
         return data_shapes
+
+    def get_data_types(self):
+        data_types = {
+            'image': np.float32,
+            'box': np.float32,
+            'desc': np.int32,
+            'desc_len': np.int32,
+            'desc_box_idx': np.int32,
+            'num_used_desc': np.int32,
+            'blank_desc': np.int32,
+            'blank_desc_len': np.int32,
+            'lr_desc_idx': np.int32,
+            'lr_gt': np.float32,
+            'ir_box_idx': np.int32,
+            'ir_gt': np.float32,
+        }
+        for key in ['object', 'attribute', 'relationship']:
+            data_types['{}_box_idx'.format(key)] = np.int32
+            data_types['{}_num_used_box'.format(key)] = np.int32
+            data_types['{}_candidate'.format(key)] = np.int32
+            data_types['{}_candidate_len'.format(key)] = np.int32
+            data_types['{}_candidate_name'.format(key)] = np.str
+            data_types['{}_selection_gt'.format(key)] = np.float32
+
+        return data_types
+
 
     @property
     def ids(self):
