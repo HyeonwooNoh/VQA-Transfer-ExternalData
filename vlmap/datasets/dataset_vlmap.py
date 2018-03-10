@@ -1,3 +1,4 @@
+import collections
 import h5py
 import json
 import os
@@ -13,7 +14,7 @@ IMAGE_HEIGHT = 540
 
 NUM_K = 500  # number of entry used for classification.
 IMAGE_RETRIEVAL_K = 10
-LANGUAGE_RETRIEVAL_K = 2 # TODO only for temporary. plan to increate in the future
+LANGUAGE_RETRIEVAL_K = 10
 
 MAX_USED_BOX = 60
 MAX_BOX_PER_ENTRY = {
@@ -76,6 +77,22 @@ class Dataset(object):
             'relationship': int(self.data_info['max_relationship_num_per_box'].value)}
 
         log.info('Reading Done {}'.format(file_name))
+
+    def get_config(self):
+        config = collections.namedtuple('dataset_config', [])
+        config.image_width = IMAGE_WIDTH
+        config.image_height = IMAGE_HEIGHT
+        config.num_k = NUM_K
+        config.ir_k = IMAGE_RETRIEVAL_K
+        config.lr_k = IMAGE_RETRIEVAL_K
+        config.num_box = MAX_USED_BOX
+        config.num_entry_box = {
+            'region': MAX_BOX_PER_ENTRY['region'],
+            'object': MAX_BOX_PER_ENTRY['object'],
+            'attribute': MAX_BOX_PER_ENTRY['attribute'],
+            'relationship': MAX_BOX_PER_ENTRY['relationship']
+        }
+        return config
 
     def get_data(self, id):
         """
