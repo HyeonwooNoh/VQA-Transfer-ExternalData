@@ -22,10 +22,24 @@ class Model(object):
     def __init__(self, batch, config, is_train=True):
         self.batch = batch
         self.config = config
-        self.dataset_config = config.dataset_config
+        self.data_cfg = config.dataset_config
 
         self.report = {}
         self.output = {}
+
+        self.vocab = json.load(open(config.vocab_path, 'r'))
+        self.glove_map = modules.GloVe(config.glove_path)
+
+        # model parameters
+        self.ft_enc_I = config.ft_enc_I
+        self.no_V_grad_enc_L = config.no_V_grad_enc_L
+        self.use_relation = config.use_relation
+        self.description_task = config.description_task
+        self.decoder_type = config.decoder_type
+        self.num_aug_retrieval = config.num_aug_retrieval
+
+
+
 
         self.no_object = config.no_object
         self.no_region = config.no_region
@@ -48,7 +62,6 @@ class Model(object):
         self.use_dense_predictor = config.use_dense_predictor
         self.no_glove = config.no_glove
 
-        self.vocab = json.load(open(config.vocab_path, 'r'))
         self.wordset = modules.used_wordset(config.used_wordset_path)
         self.wordset_vocab = {}
         with h5py.File(config.used_wordset_path, 'r') as f:
@@ -219,11 +232,34 @@ class Model(object):
         tf.summary.text('val-{}_pred_string'.format(name),
                         pred_string, collections=['val'])
 
+
+    def aug_retrieval(V, gt, num_aug, num_b, num_k, dim, scope='aug_retrieval'):
+        with tf.name_scope(scope):
+            sz = tf.shape(V)
+            rotate_idx = [tf.mod(tf.range(-1 - i, sz[0] - 1 - i), sz[0])
+                          for i in num_aug]
+            rotate_idx = tf.stack(rotate_idx, axis=0)
+            rotate_V = tf.transpose(tf.reshape(
+                tf.gather(V, tf.reshape(rotate_idx, [-1]), axis=0),
+                [num_aug, -1, num_b, num_k, dim]), [1, 2, 0, 3, 4])
+            rotate_V = tf.reshape(rotate_V, [-1, num_b, num_k * num_aug, dim])
+            V = tf.concat([V, rotate_V], axis=2)
+            gt_pad = tf.zeros([sz[0], num_b, num_k * new_aug], dtype=tf.float32)
+            gt = tf.concat([gt, gt_pad], axis=2)
+            return V, gt
+
     def build(self, is_train=True):
+        """
+        build network architecture and loss
+        """
+
+        """
+        Visual features
+        """
         # feat_V
         enc_I = modules.encode_I(self.batch['image'],
-                                 is_train=self.finetune_enc_I)
-        if not self.finetune_enc_I: enc_I = tf.stop_gradient(enc_I)
+                                 is_train=self.ft_enc_I)
+        if not self.ft_enc_I: enc_I = tf.stop_gradient(enc_I)
 
         I_lowdim = modules.I_reduce_dim(enc_I, V_DIM, scope='I_reduce_dim',
                                         is_train=is_train)
@@ -235,7 +271,194 @@ class Model(object):
         roi_ft_flat = tf.reshape(roi_ft, [-1, ROI_SZ, ROI_SZ, V_DIM])
 
         V_ft_flat = modules.I2V(roi_ft_flat, V_DIM, V_DIM, is_train=is_train)
-        V_ft = tf.reshape(V_ft_flat, [-1, self.dataset_config.num_box, V_DIM])
+        V_ft = tf.reshape(V_ft_flat, [-1, self.data_cfg.num_box, V_DIM])
+
+        """
+        Classification: object, attribute, relationship
+        """
+        target_entry = ['object', 'attribute']
+        if self.use_relation: target_entry.append('relationship')
+        losses = {}
+        for key in target_entry:
+            log.info('Language: {}'.format(key))
+            num_b = self.data_cfg.num_entry_box[key]
+            num_k = self.data_cfg.num_k
+
+            token = self.batch['{}_candidate'.format(key)]
+            token_len = self.batch['{}_candidate_len'.format(key)]
+            token_maxlen = tf.shape(token)[-1]
+            # encode_L
+            embed_seq = tf.nn.embedding_lookup(self.glove_map, token)
+            enc_L_flat = modules.encode_L(
+                tf.reshape(embed_seq, [-1, token_maxlen, W_DIM]),
+                tf.reshape(token_len, [-1]), L_DIM)
+            if self.no_V_grad_enc_L: enc_L_flat = tf.stop_gradient(enc_L_flat)
+            enc_L = tf.reshape(enc_L_flat, [-1, num_b, num_k, L_DIM])
+
+            # L2V mapping
+            map_V = modules.L2V(enc_L, MAP_DIM, V_DIM, is_train=is_train)
+
+            # gather target V_ft
+            box_idx = modules.batch_box(self.batch['{}_box_idx'],
+                                        offset=self.data_cfg.num_box)
+            box_V_ft_flat = tf.gather(V_ft_flat, tf.reshape(box_idx, [-1]))
+            box_V_ft = tf.reshape(box_V_ft_flat, [-1, num_b, V_DIM])
+
+            # classification
+            logits = modules.batch_word_classifier(box_V_ft, map_V)
+
+            with tf.name_scope('{}_classification_loss'.format(key)):
+                gt = batch['{}_selection_gt'.format(key)]
+                num_used_box = batch['{}_num_used_box'.format(key)]
+                used_mask = tf.sequence_mask(num_used_box, dtype=tf.float32)
+
+                if key == 'attribute':
+                    losses[key] = modules.sigmoid_cross_entropy_with_mask(
+                        gt, logits, used_mask)
+                else:
+                    losses[key] = modules.softmax_cross_entropy_with_mask(
+                        gt, logits, used_mask)
+
+        """
+        Region description
+        """
+        # Select V_ft for descriptions
+        num_desc_box = self.data_cfg.num_entry_box['region']
+        desc_box_idx = modules.batch_box(self.batch['desc_box_idx'],
+                                         offset=self.data_cfg.num_box)
+        desc_box_V_ft_flat = tf.gather(V_ft_flat, tf.reshape(desc_box_idx, [-1]))
+        desc_box_V_ft = tf.reshape(desc_box_V_ft, [-1, num_desc_box, V_DIM])
+
+        # Metric learning
+        desc = self.batch['desc']
+        desc_len = self.batch['desc_len']
+        desc_maxlen = tf.shape(desc)[-1]
+
+        # encode desc_map_V
+        desc_embed_seq = tf.nn.embedding_lookup(self.glove_map, desc)
+        desc_L_flat = modules.encode_L(
+            tf.reshape(desc_embed_seq, [-1, desc_maxlen, W_DIM]),
+            tf.reshape(desc_len, [-1]), L_DIM)
+        if self.no_V_grad_enc_L: desc_L_flat = tf.stop_gradient(desc_L_flat)
+
+        desc_map_V_flat = modules.L2V(desc_L_flat, MAP_DIM, V_DIM,
+                                      is_train=is_train)
+        desc_map_V = tf.reshape(desc_map_V_flat, [-1, num_desc_box, V_DIM])
+
+        # Language retrieval - for each region - classification over descriptions
+        lr_num_k = self.data_cfg.lr_num_k
+        lr_desc_idx_flat = modules.batch_box(
+            tf.reshape(self.batch['lr_desc_idx'], [-1, num_desc_box, lr_num_k]),
+            offset=num_desc_box)
+        lr_map_V_flat = tf.gather(desc_map_V_flat,
+                                  tf.reshape(lr_desc_idx_flat, [-1]))
+        lr_map_V = tf.reshape(lr_map_V_flat, [-1, num_desc_box, lr_num_k, V_DIM])
+        lr_gt = batch['lr_gt']
+
+        if self.num_aug_retrieval > 0:
+            lr_map_V, lr_gt = self.aug_retrieval(
+                lr_map_V, lr_gt, self.num_aug_retrieval, num_desc_box,
+                lr_num_k, V_DIM, scope='aug_LR')
+
+        # Language Retrieval Classifier
+        lr_logits = modules.batch_word_classifier(desc_box_V_ft, lr_map_V)
+
+        with tf.name_scope('LR_classification_loss'):
+            num_used_desc = batch['num_used_desc']
+            used_desc_mask = tf.sequence_mask(num_used_desc, dtype=tf.float32)
+
+            losses['lr'] = modules.softmax_cross_entropy_with_mask(
+                lr_gt, lr_logits, used_desc_mask)
+
+        # Image retrieval - for each description - classification over images
+        ir_num_k = self.data_cfg.ir_num_k
+        ir_box_idx_flat = modules.batch_box(
+            tf.reshape(self.batch['ir_box_idx'], [-1, num_desc_box, ir_num_k]),
+            offset=num_desc_box)
+        ir_box_V_ft_flat = tf.gather(desc_box_V_ft_flat,
+                                     tf.reshape(ir_box_V_ft_flat, [-1]))
+        ir_box_V = tf.reshape(ir_box_V_ft_flat,
+                              [-1, num_desc_box, ir_num_k, V_DIM])
+        ir_gt = batch['ir_gt']
+
+        if self.num_aug_retrieval > 0:
+            ir_box_V, ir_gt = self.aug_retrieval(
+                ir_box_V, ir_gt, self.num_aug_retrieval, num_desc_box,
+                ir_num_k, V_DIM, scope='aug_IR')
+
+        # Image Retrieval Classifier
+        ir_logits = modules.batch_word_classifier(desc_map_V_ft, ir_box_V)
+
+        with tf.name_scope('IR_classification_loss'):
+            num_used_desc = batch['num_used_desc']
+            used_desc_mask = tf.sequence_mask(num_used_desc, dtype=tf.float32)
+
+            losses['ir'] = modules.softmax_cross_entropy_with_mask(
+                ir_gt, ir_logits, used_desc_mask)
+
+        # Description / blank-fill task
+
+        # V2L mapping
+        desc_box_map_L, V2L_hidden = modules.V2L(
+            desc_box_V_ft, MAP_DIM, L_DIM, is_train=is_train)
+        in_L = desc_box_map_L  # language feature used for the decoding
+
+        # Add blank-fill feature to mapped language for decoding
+        if description_task == 'blank-fill':
+            blank_desc = self.batch['blank_desc']
+            blank_desc_len = self.batch['blank_desc_len']
+            blank_max_len = tf.shape(blank_desc)[-1]
+
+            blank_embed_seq = tf.nn.embedding_lookup(self.glove_map, blank_desc)
+            blank_L_flat = modules.encode_L(
+                tf.reshape(blank_embed_seq, [-1, blank_max_len, W_DIM]),
+                tf.reshape(blank_desc_len, [-1]), L_DIM)
+            blank_L = tf.reshape(blank_L_flat, [-1, num_desc_box, L_DIM])
+            in_L = in_L + blank_L
+
+        # Decode
+        in_L_flat = tf.reshape(in_L, [-1, L_DIM])
+        desc_flat = tf.reshape(desc, [-1, desc_maxlen])
+        desc_len_flat = tf.reshape(desc_len, [-1])
+        if self.decoder_type == 'glove_et':
+            pred_embed = modules.embed_transform(
+                self.glove_map, L_DIM, L_DIM, is_train=is_train)
+            word_predictor = modules.WordPredictor(
+                pred_embed, trainable=is_train)
+            decoder_dim = L_DIM
+        elif self.decoder_type == 'glove':
+            pred_embed = self.glove_map
+            word_predictor = modules.WordPredictor(
+                pred_embed, trainable=is_train)
+            decoder_dim = W_DIM
+        elif self.decoder_type == 'dense':
+            word_predictor = tf.layers.Dense(
+                len(self.vocab['vocab']), use_bias=True, name='WordPredictor')
+            decoder_dim = L_DIM
+
+        logits_flat, pred_flat, pred_len_flat = modules.decode_L(
+            in_L_flat, decoder_dim, self.glove_map, self.vocab['dict']['<s>'],
+            unroll_type='teacher_forcing',
+            seq=desc_flat, seq_len=desc_len_flat + 1,
+            output_layer=word_predictor, is_train=is_train)
+
+        _, greedy_pred_flat, greedy_pred_len_flat = modules.decode_L(
+            in_L_flat, decoder_dim, self.glove_map, self.vocab['dict']['<s>'],
+            unroll_type='greedy', end_token=self.vocab['dict']['<e>'],
+            max_seq_len=self.data_cfg.max_len['region'] + 1,
+            output_layer=word_predictor, is_train=is_train)
+
+        with tf.name_scope('description_loss'):
+            desc_used_mask = tf.sequence_mask(
+                num_used_desc, maxlen=num_desc_box, dtype=tf.float32)
+            desc_len_mask = tf.sequence_mask(
+                desc_len + 1, maxlen=desc_maxlen, dtype=tf.float32)
+            desc_mask = tf.expand_dims(desc_used_mask, axis=-1) * desc_len_mask
+            desc_mask_flat = tf.reshape(desc_mask, [-1, desc_maxlen])
+
+            losses['description'] = \
+                modules.sparse_softmax_cross_entropy_with_mask(
+                    desc_flat, logits_flat, desc_mask_flat)
 
 
         # enc_L: encode object classes
@@ -245,7 +468,7 @@ class Model(object):
             tf.reshape(embed_seq, [-1, self.object_max_name_len, W_DIM]),
             tf.reshape(self.batches['object']['objects_len'], [-1]),
             L_DIM, scope='language_encoder', reuse=tf.AUTO_REUSE)
-        enc_L = tf.reshape(enc_L_flat, [-1, self.object_num_k, L_DIM])
+        enc_L = tf.reshape(enc_L_flat, [-1, self.data_cfg.num_entry_box[key], L_DIM])
         if self.no_V_grad_enc_L: enc_L = tf.stop_gradient(enc_L)
         # L2V
         map_V = modules.L2V(enc_L, MAP_DIM, V_DIM, is_train=is_train,

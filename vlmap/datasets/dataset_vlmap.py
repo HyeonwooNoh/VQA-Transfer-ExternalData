@@ -92,6 +92,7 @@ class Dataset(object):
             'attribute': MAX_BOX_PER_ENTRY['attribute'],
             'relationship': MAX_BOX_PER_ENTRY['relationship']
         }
+        config.max_len = self.max_len
         return config
 
     def get_data(self, id):

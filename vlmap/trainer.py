@@ -27,7 +27,7 @@ class Trainer(object):
         hyper_parameter_str = 'bs{}_lr{}'.format(
             config.batch_size, config.learning_rate)
 
-        if config.finetune_enc_I:
+        if config.ft_enc_I:
             hyper_parameter_str += '_ft_enc_I'
         if config.decoder_type != 'glove_et':
             hyper_parameter_str += '_{}'.format(config.decoder_type)
@@ -35,6 +35,11 @@ class Trainer(object):
             hyper_parameter_str += '_{}'.format(config.description_task)
         if config.no_V_grad_enc_L:
             hyper_parameter_str += '_no_V_grad_enc_L'
+        if config.use_relation:
+            hyper_parameter_str += '_use_relation'
+        if config.num_aug_retrieval > 0:
+            hyper_parameter_str += '_aug_retriev{}'.format(
+                config.num_aug_retrieval)
 
         self.train_dir = './train_dir/{}_{}_{}_{}_{}'.format(
             config.model_type, dataset_str, config.prefix, hyper_parameter_str,
@@ -222,6 +227,8 @@ class Trainer(object):
 def check_config(config):
     if config.description_task != 'blank-fill' and config.no_V_grad_enc_L:
         raise ValueError('Set no_V_grad_enc_L only for blank-fill task')
+    if config.num_aug_retrieval >= config.batch_size:
+        raise ValueError('Set num_aug_retrieval smaller than batch_size')
 
 
 def main():
@@ -230,6 +237,9 @@ def main():
     # paths
     parser.add_argument('--vocab_path', type=str,
                         default='data/preprocessed/vocab50.json', help=' ')
+    parser.add_argument('--glove_path', type=str,
+                        default='data/preprocessed/glove.new_vocab50.300d.hdf5',
+                        help=' ')
     parser.add_argument('--image_dir', type=str,
                         default='data/VisualGenome/VG_100K', help=' ')
     parser.add_argument('--dataset_path', type=str,
@@ -250,7 +260,8 @@ def main():
     # vljoint: having vision-language joint embedding space and learn v2j, l2j
     parser.add_argument('--model_type', type=str, default='vlmap', help=' ',
                         choices=['vlmap', 'vljoint'])
-    parser.add_argument('--finetune_enc_I', action='store_true', default=False)
+    parser.add_argument('--ft_enc_I', action='store_true', default=False)
+    parser.add_argument('--use_relation', action='store_true', default=False)
     # glove_et: glove with embedding transform
     # glove: direct matching with glove vector
     # dense: not using glove vector, but using dense prediction layer
@@ -262,6 +273,8 @@ def main():
                         choices=['generation', 'blank-fill'], help=' ')
     parser.add_argument('--no_V_grad_enc_L', action='store_true', default=False,
                         help=' ')  # only for description_task == blank-fill
+    parser.add_argument('--num_aug_retrieval', type=int, default=2,
+                        help-'Augment retrieval with interbatch data')
 
     config = parser.parse_args()
     check_config(config)

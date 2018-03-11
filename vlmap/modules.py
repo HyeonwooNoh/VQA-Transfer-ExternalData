@@ -16,8 +16,8 @@ ENC_I_G_MEAN = 116.78
 ENC_I_B_MEAN = 103.94
 
 
-def language_encoder(seq, seq_len, dim=384, scope='language_encoder',
-                     reuse=tf.AUTO_REUSE):
+def encode_L(seq, seq_len, dim=384, scope='encode_L',
+             reuse=tf.AUTO_REUSE):
     with tf.variable_scope(scope, reuse=reuse) as scope:
         log.warning(scope.name)
         cell = rnn.BasicLSTMCell(num_units=dim, state_is_tuple=True)
@@ -47,6 +47,16 @@ def encode_I(images, is_train=False, reuse=tf.AUTO_REUSE):
             reuse=reuse,
             scope='resnet_v1_50')
     return enc_I
+
+
+def batch_box(box_idx, offset=None):
+    sz = tf.shape(box_idx)
+    if offset is None:
+        offset = sz[1]
+    offset = tf.tile(tf.expand_dims(tf.range(0, sz[0]),
+                                    axis=1), [1, sz[1]]) * offset
+    batch_box = box_idx + offset
+    return batch_box
 
 
 def roi_pool(ftmap, box, height, width, scope='roi_pool'):
@@ -87,6 +97,27 @@ def I2V(enc_I, enc_dim, out_dim, scope='I2V', is_train=False, reuse=tf.AUTO_REUS
         return V_ft
 
 
+def sigmoid_cross_entropy_with_mask(labels, logits, mask):
+    cse = tf.nn.sigmoid_cross_entropy_with_logits(
+        labels=labels, logits=logits)
+    cse = tf.reduce_mean(cse, axis=-1)
+    masked_loss = tf.reduce_sum(cse * mask) / tf.reduce_sum(mask)
+    return masked_loss
+
+
+def softmax_cross_entropy_with_mask(labels, logits, mask):
+    cse = tf.nn.softmax_cross_entropy_with_logits_V2(
+        labels=labels, logits=logits, dim=-1)
+    masked_loss = tf.reduce_sum(cse * mask) / tf.reduce_sum(mask)
+    return masked_loss
+
+
+def sparse_softmax_cross_entropy_with_mask(labels, logits, mask):
+    cse = tf.nn.sparse_softmax_cross_entropy_with_logits(
+        labels=labels, logits=logits)
+    masked_loss = tf.reduce_sum(cse * mask) / tf.reduce_sum(mask)
+    return masked_loss
+
 def word_prediction(inputs, word_weights, activity_regularizer=None,
                     trainable=True, name=None, reuse=None):
     layer = WordPredictor(word_weights, activity_regularizer=activity_regularizer,
@@ -102,7 +133,7 @@ def batch_word_classifier(inputs, word_weights, scope='batch_word_classifier',
         log.warning(scope.name)
         bias = tf.get_variable(name='bias', shape=(),
                                initializer=tf.zeros_initializer())
-        logits = tf.reduce_sum(tf.expand_dims(inputs, axis=1) * word_weights,
+        logits = tf.reduce_sum(tf.expand_dims(inputs, axis=-2) * word_weights,
                                axis=-1) + bias
         return logits
 
@@ -151,33 +182,35 @@ class WordPredictor(tf.layers.Layer):
         return output_shape
 
 
-def language_decoder(inputs, embed_seq, seq_len, embedding_lookup,
-                     dim, start_tokens, end_token, max_seq_len,
-                     unroll_type='teacher_forcing',
-                     output_layer=None, is_train=True,
-                     scope='language_decoder', reuse=tf.AUTO_REUSE):
-    """
-    Args:
-        seq: sequence of token (usually ground truth sequence)
-        embed_seq: pre-embedded sequence of token for teacher forcing
-        embedding_lookup: embedding lookup function for greedy unrolling
-        start_token: tensor for start token [<s>] * bs
-        end_token: integer for end token <e>
-    """
+def decode_L(inputs, dim, embed_map, start_token,
+             unroll_type='teacher_forcing', seq=None, seq_len=None,
+             end_token=None, max_seq_len=None, output_layer=None,
+             is_train=True, scope='decode_L', reuse=tf.AUTO_REUSE):
+
     with tf.variable_scope(scope, reuse=reuse) as scope:
         init_c = fc_layer(inputs, dim, use_bias=True, use_bn=False,
-                          activation_fn=None, is_training=is_train,
+                          activation_fn=tf.nn.tanh, is_training=is_train,
                           scope='Linear_c', reuse=reuse)
         init_h = fc_layer(inputs, dim, use_bias=True, use_bn=False,
-                          activation_fn=None, is_training=is_train,
+                          activation_fn=tf.nn.tanh, is_training=is_train,
                           scope='Linear_h', reuse=reuse)
         init_state = rnn.LSTMStateTuple(init_c, init_h)
         log.warning(scope.name)
+
+        start_tokens = tf.zeros(
+            [tf.shape(inputs)[0]], dtype=tf.int32) + start_token
         if unroll_type == 'teacher_forcing':
-            helper = seq2seq.TrainingHelper(embed_seq, seq_len)
+            if seq is None: raise ValueError('seq is None')
+            if seq_len is None: raise ValueError('seq_len is None')
+            seq_with_start = tf.concat([tf.expand_dims(start_tokens, axis=1),
+                                        seq[:, :-1]], axis=1)
+            helper = seq2seq.TrainingHelper(
+                tf.nn.embedding_lookup(embed_map, seq_with_start), seq_len)
         elif unroll_type == 'greedy':
+            if end_token is None: raise ValueError('end_token is None')
             helper = seq2seq.GreedyEmbeddingHelper(
-                embedding_lookup, start_tokens, end_token)
+                lambda  e: tf.nn.embedding_lookup(embed_map, e),
+                start_tokens, end_token)
         else:
             raise ValueError('Unknown unroll_type')
 
@@ -204,49 +237,21 @@ def learn_embedding_map(used_vocab, scope='learn_embedding_map', reuse=tf.AUTO_R
         return embed_map
 
 
-def glove_embedding_map(used_vocab, scope='glove_embedding_map', reuse=tf.AUTO_REUSE):
+def GloVe(glove_path, scope='GloVe', reuse=tf.AUTO_REUSE):
     with tf.variable_scope(scope, reuse=reuse) as scope:
         log.warning(scope.name)
-        with h5py.File(GLOVE_EMBEDDING_PATH, 'r') as f:
+        with h5py.File(glove_path, 'r') as f:
             fixed = tf.constant(f['param'].value.transpose())
         learn = tf.get_variable(
             name='learn', shape=[3, 300],
             initializer=tf.random_uniform_initializer(
                 minval=-0.01, maxval=0.01))
         embed_map = tf.concat([fixed, learn], axis=0)
-
-        glove_vocab = json.load(open(GLOVE_VOCAB_PATH, 'r'))
-        selected_index = tf.constant(
-            [glove_vocab['dict'][v] for v in used_vocab['vocab']], dtype=tf.int32)
-        selected_embed_map = tf.nn.embedding_lookup(embed_map, selected_index)
-
-        return selected_embed_map
+        return embed_map
 
 
-def glove_embedding(seq, scope='glove_embedding', reuse=tf.AUTO_REUSE):
-    with tf.variable_scope(scope, reuse=reuse) as scope:
-        log.warning(scope.name)
-        with h5py.File(GLOVE_EMBEDDING_PATH, 'r') as f:
-            fixed = tf.constant(f['param'].value.transpose())
-        learn = tf.get_variable(
-            name='learn', shape=[3, 300],
-            initializer=tf.random_uniform_initializer(
-                minval=-0.01, maxval=0.01))
-        embed_map = tf.concat([fixed, learn], axis=0)
-        embed = tf.nn.embedding_lookup(embed_map, seq)
-        return embed
-
-
-def used_wordset(used_wordset_path, scope='used_wordset'):
-    with tf.name_scope(scope):
-        log.warning(scope)
-        with h5py.File(used_wordset_path, 'r') as f:
-            wordset = tf.constant(f['used_wordset'].value, dtype=tf.int32)
-        return wordset
-
-
-def embedding_transform(embed_map, enc_dim, out_dim, is_train=True,
-                        scope='embedding_transform', reuse=tf.AUTO_REUSE):
+def embed_transform(embed_map, enc_dim, out_dim, is_train=True,
+                    scope='embed_transform', reuse=tf.AUTO_REUSE):
     with tf.variable_scope(scope, reuse=reuse) as scope:
         log.warning(scope.name)
         h = fc_layer(
@@ -277,6 +282,12 @@ def V2L(feat_V, enc_dim, out_dim, is_train=True, scope='V2L',
             activation_fn=None, is_training=is_train,
             scope='Linear', reuse=reuse)
         return map_L, [h1, h2, map_L]
+
+
+def flat_sigmoid_loss(labels=None, logits=None):
+    sigmoid_ce = tf.nn.sigmoid_cross_entropy_with_logits(
+        labels=labels, logits=logits)
+    return tf.reduce_mean(sigmoid_ce, axis=-1)
 
 
 def L2V(feat_L, enc_dim, out_dim, is_train=True, scope='L2V',
