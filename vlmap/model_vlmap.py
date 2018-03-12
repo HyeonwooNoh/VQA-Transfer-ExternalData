@@ -128,6 +128,55 @@ class Model(object):
             tf.tile(pred_image, [1, 10, 1]), [-1, self.object_num_k, 3])
         return tf.expand_dims(pred_image, axis=0)
 
+
+    def vis_n_way_image_classification(self, image, box, logits, labels,
+                                       names, used_box, vis_num_box, line_width):
+        label_token = tf.cast(tf.argmax(labels, axis=-1), tf.int32)
+        probs = tf.nn.softmax(logits, axis=01)
+        top_k_prob, top_k_pred = tf.nn.top_k(probs, k=TOP_K)
+        def add_result2image(b_image, bb_box, bb_label,
+                             bb_top_k_prob, bb_top_k_pred,
+                             bb_names, bb_used_mask, vis_num_box):
+            # b_ : batch
+            # bb_ : [batch, box]
+            import textwrap
+            from PIL import Image, ImageDraw, ImageFont
+            font = ImaegFont.load_default()
+            for image, b_box, b_label, b_top_k_prob, b_top_k_pred,\
+                b_names, b_used_mask in zip(b_image, bb_box, bb_label,
+                                            bb_top_k_prob, bb_top_k_pred,
+                                            bb_names, bb_used_mask):
+                b_image_with_text = []
+                for i in range(min(vis_num_box, len(b_box))):
+                    # Draw box and attach text image
+                    pil_image = Image.fromarray(image.astype(np.uint8))
+                    draw = ImageDraw.Draw(pil_image)
+                    (x1, y1, x2, y2) = b_box[i]
+                    for w in line_width:
+                        draw.rectangle([x1 - w, y1 - w, x2 + w, y2 + w],
+                                       outline=(255, 0, 0))
+                    box_image = np.array(pil_image).astype(np.float32) / 255.0
+
+                    text_image = np.zeros([35, image.shape[1], 3],
+                                          dtype=np.uint8) + 220
+                    pil_text = Image.fromarray(text_image)
+                    t_draw = ImageDraw.Draw(pil_text)
+                    names = b_names[i]
+                    string = '{}, gt: {}, pred: '.format(
+                        'used' if b_used_mask[i] else 'not_used',
+                        names[b_label[i]])
+                    for prob, pred in zip(b_top_k_prob[i], b_top_k_pred[i]):
+                        string += '{}({:.5f}), '.format(names[pred], prob)
+                    for l, line in enumerate(textwrap.wrap(string, width=40)):
+                        t_draw.text((2, 2 + l * 15), line, font=font,
+                                    fill=(10, 10, 50))
+                    text_image = np.array(pil_text).astype(np.float32) / 255.0
+
+                    image_with_text = np.concatenamte([box_image, text_image],
+                                                      axis=0)
+                    # TODO(hyeonwoonoh): start implementation from this line
+
+
     def visualize_word_prediction_text(self, logits, labels, names):
         label_token = tf.cast(tf.argmax(labels, axis=-1), tf.int32)
         _, top_k_pred = tf.nn.top_k(logits, k=TOP_K)
@@ -433,15 +482,18 @@ class Model(object):
                                         offset=self.data_cfg.num_box)
             box_V_ft_flat = tf.gather(V_ft_flat, tf.reshape(box_idx, [-1]))
             box_V_ft = tf.reshape(box_V_ft_flat, [-1, num_b, V_DIM])
-            self.mid_result['{}_visbox'.format(key)] = tf.gather(visbox, box_idx)
+            self.mid_result['{}_visbox'.format(key)] = tf.reshape(tf.gather(
+                visbox, tf.reshape(box_idx, [-1])), [-1, num_b, 4])
 
             # classification
             logits = modules.batch_word_classifier(box_V_ft, map_V)
+            self.mid_result['{}_logits'.format(key)] = logits
 
             with tf.name_scope('{}_classification_loss'.format(key)):
-                gt = batch['{}_selection_gt'.format(key)]
-                num_used_box = batch['{}_num_used_box'.format(key)]
+                gt = self.batch['{}_selection_gt'.format(key)]
+                num_used_box = self.batch['{}_num_used_box'.format(key)]
                 used_mask = tf.sequence_mask(num_used_box, dtype=tf.float32)
+                self.mid_result['{}_used_mask'.format(key)] = used_mask
 
                 if key == 'attribute':
                     loss, acc, recall, precision = \
@@ -618,6 +670,14 @@ class Model(object):
 
         with tf.name_scope('prepare_summary'):
             image = self.batch['image']
+            self.mid_result['object_visbox']
+            self.mid_result['object_logits']
+            self.mid_result['object_used_mask']
+            batch['object_selection_gt']
+            batch['object_candidate_name']
+
+            self.mid_result['attribute_visbox']
+
 
         # scalar summary
         for key, val in self.report.items():
