@@ -26,7 +26,7 @@ class Model(object):
 
         self.losses = {}
         self.report = {}
-        self.output = {}
+        self.mid_result = {}
 
         self.vocab = json.load(open(config.vocab_path, 'r'))
         self.glove_map = modules.GloVe(config.glove_path)
@@ -396,6 +396,7 @@ class Model(object):
 
         roi_ft = modules.roi_pool(I_lowdim, self.batch['normal_box'],
                                   ROI_SZ, ROI_SZ)
+        visbox = self.batch['box']  # box for visualization
 
         # _flat regards "num box" dimension as a batch
         roi_ft_flat = tf.reshape(roi_ft, [-1, ROI_SZ, ROI_SZ, V_DIM])
@@ -428,10 +429,11 @@ class Model(object):
             map_V = modules.L2V(enc_L, MAP_DIM, V_DIM, is_train=is_train)
 
             # gather target V_ft
-            box_idx = modules.batch_box(self.batch['{}_box_idx'],
+            box_idx = modules.batch_box(self.batch['{}_box_idx'.format(key)],
                                         offset=self.data_cfg.num_box)
             box_V_ft_flat = tf.gather(V_ft_flat, tf.reshape(box_idx, [-1]))
             box_V_ft = tf.reshape(box_V_ft_flat, [-1, num_b, V_DIM])
+            self.mid_result['{}_visbox'.format(key)] = tf.gather(visbox, box_idx)
 
             # classification
             logits = modules.batch_word_classifier(box_V_ft, map_V)
@@ -613,6 +615,14 @@ class Model(object):
             self.report['pred_seq_acc'] = pred_seq_acc
             self.report['greedy_token_acc'] = greedy_token_acc
             self.report['greedy_seq_acc'] = greedy_seq_acc
+
+        with tf.name_scope('prepare_summary'):
+            image = self.batch['image']
+
+        # scalar summary
+        for key, val in self.report.items():
+            tf.summary.scalar('train/{}'.format(key), val, collections=['train'])
+            tf.summary.scalar('val/{}'.format(key), val, collections=['val'])
 
         # enc_L: encode object classes
         embed_seq = tf.nn.embedding_lookup(self.glove_all,
