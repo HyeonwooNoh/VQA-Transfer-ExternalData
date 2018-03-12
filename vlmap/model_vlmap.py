@@ -24,6 +24,7 @@ class Model(object):
         self.config = config
         self.data_cfg = config.dataset_config
 
+        self.losses = {}
         self.report = {}
         self.output = {}
 
@@ -164,7 +165,136 @@ class Model(object):
             tf.equal(k_label_token, top_k_pred), axis=1)))
         return loss, acc, top_k_acc
 
-    def sequence_accuracy(self, pred, pred_len, seq, seq_len):
+
+    def description_loss(self, logits, gt_seq, mask):
+        cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+            labels=gt_seq, logits=logits)
+        loss = tf.reduce_sum(cross_entropy * mask) / tf.reduce_sum(mask)
+
+
+    def n_way_classification_loss(self, logits, labels, mask=None):
+        # Loss
+        cross_entropy = tf.nn.softmax_cross_entropy_with_logits_V2(
+            labels=labels, logits=logits, dim=-1)
+        if mask is None:
+            loss = tf.reduce_mean(cross_entropy)
+        else:
+            loss = tf.reduce_sum(cross_entropy * mask) / tf.reduce_sum(mask)
+
+        # Top-1 Accuracy
+        label_token = tf.cast(tf.argmax(labels, axis=-1), tf.int32)
+        logit_token = tf.cast(tf.argmax(logits, axis=-1), tf.int32)
+
+        correct = tf.to_float(tf.equal(label_token, logit_token))
+        if mask is None:
+            acc = tf.reduce_mean(correct)
+        else:
+            acc = tf.reduce_sum(correct * mask) / tf.reduce_sum(mask)
+
+        # Top-K Accuracy
+        _, top_k_pred = tf.nn.top_k(logits, k=TOP_K)
+        k_label_token = tf.tile(
+            tf.expand_dims(label_token, axis=1), [1, TOP_K])
+
+        top_k_correct = tf.to_float(tf.reduce_any(
+            tf.equal(k_label_token, top_k_pred), axis=1))
+        if mask is None:
+            top_k_acc = tf.reduce_mean(top_k_correct)
+        else:
+            top_k_acc = tf.reduce_sum(top_k_correct * mask) / tf.reduce_sum(mask)
+
+        return loss, acc, top_k_acc
+
+
+    def binary_classification_loss(self, logits, labels, mask=None):
+        # Loss
+        cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
+            labels=labels, logits=logits, dim=-1)
+        cross_entropy = tf.reduce_mean(cross_entropy, axis=-1)
+        if mask is None:
+            loss = tf.reduce_mean(cross_entropy)
+        else:
+            loss = tf.reduce_sum(cross_entropy * mask) / tf.reduce_sum(mask)
+
+        binary_pred = tf.cast(logits > 0, tf.int32)
+        binary_label = tf.cast(labels, tf.int32)
+
+        tp = tf.to_float(tf.logical_and(binary_pred == 1, binary_label == 1))
+        fp = tf.to_float(tf.logical_and(binary_pred == 1, binary_label == 0))
+        tn = tf.to_float(tf.logical_and(binary_pred == 0, binary_label == 0))
+        fn = tf.to_float(tf.logical_and(binary_pred == 0, binary_label == 1))
+
+        if mask is not None:
+            expand_mask = tf.expand_dims(mask, axis=-1)
+            tp = tp * expand_mask
+            fp = fp * expand_mask
+            tn = tn * expand_mask
+            fn = fn * expand_mask
+
+        n_tp = tf.reduce_sum(tp)  # true positive
+        n_fp = tf.reduce_sum(fp)  # false positive
+        n_tn = tf.reduce_sum(tn)  # true negative
+        n_fn = tf.reduce_sum(fn)  # false negative
+
+        acc = (n_tp + n_tn) / (n_tp + n_fp + n_tn + n_fn)
+        recall = (n_tp) / (n_tp + n_fn)
+        precision = (n_tp) / (n_tp + n_fp)
+
+        return loss, acc, recall, precision
+
+
+    def flat_description_loss(self, logits_flat,
+                              desc_flat, desc_len_flat, used_mask):
+        desc_maxlen = tf.shape(desc_flat)[-1]
+        used_mask_flat = tf.expand_dims(tf.reshape(used_mask, [-1]), axis=-1)
+        mask = tf.sequence_mask(
+            desc_len_flat, maxlen=desc_maxlen, dtype=tf.float32) * used_mask_flat
+
+        cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+            labels=desc_flat, logits=logits_flat)
+        loss = tf.reduce_sum(cross_entropy * mask) / \
+            tf.reduce_sum(mask)
+        return loss
+
+
+    def flat_description_accuracy(self, pred_flat, pred_len_flat,
+                                  desc_flat, desc_len_flat, used_mask):
+        max_len = tf.reduce_max(tf.concat(
+            [pred_len_flat, desc_len_flat], axis=0))
+        p_sz = tf.shape(pred_flat)
+        d_sz = tf.shape(desc_flat)
+        max_len = tf.maximum(max_len, p_sz[1])
+        max_len = tf.maximum(max_len, d_sz[1])
+        # Dynamic padding
+        p_pad = tf.zeros([p_sz[0], max_len - p_sz[1]], dtype=pred_flat.dtype)
+        d_pad = tf.zeros([d_sz[0], max_len - d_sz[1]], dtype=desc_flat.dtype)
+        pred_flat = tf.concat([pred_flat, p_pad], axis=1)
+        desc_flat = tf.concat([desc_flat, d_pad], axis=1)
+        # Mask construction
+        used_mask_flat = tf.expand_dims(tf.reshape(used_mask, [-1]), axis=-1)
+        mask = tf.sequence_mask(
+            desc_len_flat, maxlen=max_len,
+            dtype=tf.float32, name='mask') * used_mask_flat
+        min_mask = tf.sequence_mask(
+            tf.minimum(pred_len_flat, desc_len_flat), maxlen=max_len,
+            dtype=tf.float32, name='min_mask') * used_mask_flat
+        max_mask = tf.sequence_mask(
+            tf.maximum(pred_len_flat, desc_len_flat), maxlen=max_len,
+            dtype=tf.float32, name='max_mask') * used_mask_flat
+        # Accuracy
+        token_acc = tf.reduce_sum(
+            tf.to_float(tf.equal(pred_flat, desc_flat)) * min_mask) / \
+            tf.reduce_sum(max_mask)
+        seq_acc = tf.logical_and(
+            tf.reduce_all(tf.equal(pred_flat * mask_int,
+                                   desc_flat * mask_int), axis=-1),
+            tf.equal(desc_len_flat, pred_len_flat))
+        seq_acc = tf.reduce_sum(tf.to_float(seq_acc) * used_mask_flat) / \
+            tf.reduce_sum(used_mask_flat)
+        return token_acc, seq_acc
+
+
+    def sequence_accuracy(self, pred, pred_len, seq, seq_len, mask):
         max_len = tf.reduce_max(tf.concat([pred_len, seq_len], axis=0))
         p_sz = tf.shape(pred)
         s_sz = tf.shape(seq)
@@ -278,7 +408,6 @@ class Model(object):
         """
         target_entry = ['object', 'attribute']
         if self.use_relation: target_entry.append('relationship')
-        losses = {}
         for key in target_entry:
             log.info('Language: {}'.format(key))
             num_b = self.data_cfg.num_entry_box[key]
@@ -313,11 +442,20 @@ class Model(object):
                 used_mask = tf.sequence_mask(num_used_box, dtype=tf.float32)
 
                 if key == 'attribute':
-                    losses[key] = modules.sigmoid_cross_entropy_with_mask(
-                        gt, logits, used_mask)
+                    loss, acc, recall, precision = \
+                        self.binary_classification_loss(logits, gt, used_mask)
+                    self.losses[key] = loss
+                    self.report['{}_loss'.format(key)] = loss
+                    self.report['{}_acc'.format(key)] = acc
+                    self.report['{}_recall'.format(key)] = recall
+                    self.report['{}_precision'.format(key)] = precision
                 else:
-                    losses[key] = modules.softmax_cross_entropy_with_mask(
-                        gt, logits, used_mask)
+                    loss, acc, top_k_acc = \
+                        self.n_way_classification_loss(logits, gt, used_mask)
+                    self.losses[key] = loss
+                    self.report['{}_loss'.format(key)] = loss
+                    self.report['{}_acc'.format(key)] = acc
+                    self.report['{}_top_k_acc'.format(key)] = top_k_acc
 
         """
         Region description
@@ -367,8 +505,12 @@ class Model(object):
             num_used_desc = batch['num_used_desc']
             used_desc_mask = tf.sequence_mask(num_used_desc, dtype=tf.float32)
 
-            losses['lr'] = modules.softmax_cross_entropy_with_mask(
-                lr_gt, lr_logits, used_desc_mask)
+            loss, acc, top_k_acc = self.n_way_classification_loss(
+                lr_logits, lr_gt, used_desc_mask)
+            self.losses['retrieval_L'] = loss
+            self.report['retrieval_L_loss'] = loss
+            self.report['retrieval_L_acc'] = acc
+            self.report['retrieval_L_top_k_acc'] = top_k_acc
 
         # Image retrieval - for each description - classification over images
         ir_num_k = self.data_cfg.ir_num_k
@@ -393,8 +535,12 @@ class Model(object):
             num_used_desc = batch['num_used_desc']
             used_desc_mask = tf.sequence_mask(num_used_desc, dtype=tf.float32)
 
-            losses['ir'] = modules.softmax_cross_entropy_with_mask(
-                ir_gt, ir_logits, used_desc_mask)
+            loss, acc, top_k_acc = self.n_way_classification_loss(
+                ir_logits, ir_gt, used_desc_mask)
+            self.losses['retrieval_I'] = loss
+            self.report['retrieval_I_loss'] = loss
+            self.report['retrieval_I_acc'] = acc
+            self.report['retrieval_I_top_k_acc'] = top_k_acc
 
         # Description / blank-fill task
 
@@ -442,7 +588,7 @@ class Model(object):
             seq=desc_flat, seq_len=desc_len_flat + 1,
             output_layer=word_predictor, is_train=is_train)
 
-        _, greedy_pred_flat, greedy_pred_len_flat = modules.decode_L(
+        _, greedy_flat, greedy_len_flat = modules.decode_L(
             in_L_flat, decoder_dim, self.glove_map, self.vocab['dict']['<s>'],
             unroll_type='greedy', end_token=self.vocab['dict']['<e>'],
             max_seq_len=self.data_cfg.max_len['region'] + 1,
@@ -451,15 +597,22 @@ class Model(object):
         with tf.name_scope('description_loss'):
             desc_used_mask = tf.sequence_mask(
                 num_used_desc, maxlen=num_desc_box, dtype=tf.float32)
-            desc_len_mask = tf.sequence_mask(
-                desc_len + 1, maxlen=desc_maxlen, dtype=tf.float32)
-            desc_mask = tf.expand_dims(desc_used_mask, axis=-1) * desc_len_mask
-            desc_mask_flat = tf.reshape(desc_mask, [-1, desc_maxlen])
 
-            losses['description'] = \
-                modules.sparse_softmax_cross_entropy_with_mask(
-                    desc_flat, logits_flat, desc_mask_flat)
+            loss = self.flat_description_loss(
+                logits_flat, desc_flat, desc_len_flat + 1, desc_used_mask)
+            pred_token_acc, pred_seq_acc = self.flat_description_accuracy(
+                pred_flat, pred_flat_len, desc_flat, desc_flat_len + 1,
+                desc_used_mask)
+            greedy_token_acc, greedy_seq_acc = self.flat_description_accuracy(
+                greedy_flat, greedy_flat_len, desc_flat, desc_flat_len + 1,
+                desc_used_mask)
 
+            self.losses['description'] = loss
+            self.report['description_loss'] = loss
+            self.report['pred_token_acc'] = pred_token_acc
+            self.report['pred_seq_acc'] = pred_seq_acc
+            self.report['greedy_token_acc'] = greedy_token_acc
+            self.report['greedy_seq_acc'] = greedy_seq_acc
 
         # enc_L: encode object classes
         embed_seq = tf.nn.embedding_lookup(self.glove_all,
