@@ -27,6 +27,7 @@ class Model(object):
         self.losses = {}
         self.report = {}
         self.mid_result = {}
+        self.vis_image = {}
 
         self.vocab = json.load(open(config.vocab_path, 'r'))
         self.glove_map = modules.GloVe(config.glove_path)
@@ -130,18 +131,19 @@ class Model(object):
 
 
     def vis_n_way_image_classification(self, image, box, logits, labels,
-                                       names, used_box, vis_num_box, line_width):
+                                       names, used_mask, vis_num_box, line_width):
         label_token = tf.cast(tf.argmax(labels, axis=-1), tf.int32)
         probs = tf.nn.softmax(logits, axis=01)
         top_k_prob, top_k_pred = tf.nn.top_k(probs, k=TOP_K)
-        def add_result2image(b_image, bb_box, bb_label,
-                             bb_top_k_prob, bb_top_k_pred,
-                             bb_names, bb_used_mask, vis_num_box):
+        def add_result2image_fn(b_image, bb_box, bb_label,
+                                bb_top_k_prob, bb_top_k_pred,
+                                bb_names, bb_used_mask):
             # b_ : batch
             # bb_ : [batch, box]
             import textwrap
             from PIL import Image, ImageDraw, ImageFont
             font = ImaegFont.load_default()
+            bb_image_with_text = []
             for image, b_box, b_label, b_top_k_prob, b_top_k_pred,\
                 b_names, b_used_mask in zip(b_image, bb_box, bb_label,
                                             bb_top_k_prob, bb_top_k_pred,
@@ -172,8 +174,17 @@ class Model(object):
                                     fill=(10, 10, 50))
                     text_image = np.array(pil_text).astype(np.float32) / 255.0
 
-                    image_with_text = np.concatenamte([box_image, text_image],
-                                                      axis=0)
+                    image_with_text = np.concatenate([box_image, text_image],
+                                                     axis=0)
+                    b_image_with_text.append(image_with_text)
+                b_image_with_text = np.concatenate(b_image_with_text, axis=1)
+                bb_image_with_text.append(b_image_with_text)
+            bb_image_with_text = np.stack(bb_image_with_text, axis=0)
+            return bb_image_with_text
+        return tf.py_func(
+            add_result2image_fn,
+            inp=[image, box, label_token, top_k_prob, top_k_pred, names, used_mask],
+            Tout=tf.float32)
                     # TODO(hyeonwoonoh): start implementation from this line
 
 
@@ -670,19 +681,29 @@ class Model(object):
 
         with tf.name_scope('prepare_summary'):
             image = self.batch['image']
-            self.mid_result['object_visbox']
-            self.mid_result['object_logits']
-            self.mid_result['object_used_mask']
-            batch['object_selection_gt']
-            batch['object_candidate_name']
+            for key in target_entry:
+                visbox = self.mid_result['{}_visbox'.format(key)]
+                logits = self.mid_result['{}_logits'.format(key)]
+                labels = self.mid_result['{}_selection_gt'.format(key)]
+                names = self.mid_result['{}_candidate_name'.format(key)]
+                used_mask = self.mid_result['{}_used_mask'.format(key)]
 
-            self.mid_result['attribute_visbox']
-
+                self.vis_image['{}_classification_result'.format(key)] =\
+                    self.vis_n_way_image_classification(
+                        image, visbox, logits, labels, names,
+                        used_mask, vis_num_box=5, line_width=2)
 
         # scalar summary
         for key, val in self.report.items():
             tf.summary.scalar('train/{}'.format(key), val, collections=['train'])
             tf.summary.scalar('val/{}'.format(key), val, collections=['val'])
+
+        # image summary
+        for key, val in self.vis_image.items():
+            tf.summary.image('train/{}'.format(key), val, collections=['train'])
+            tf.summary.image('val/{}'.format(key), val, collections=['val'])
+
+
 
         # enc_L: encode object classes
         embed_seq = tf.nn.embedding_lookup(self.glove_all,
