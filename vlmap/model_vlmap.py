@@ -41,7 +41,7 @@ class Model(object):
         self.use_relation = config.use_relation
         self.description_task = config.description_task
         self.decoder_type = config.decoder_type
-        self.num_aug_retrieval = config.num_aug_retrieval
+        self.num_aug_retrieval = max(config.num_aug_retrieval, 0)
 
 
 
@@ -131,6 +131,45 @@ class Model(object):
         pred_image = tf.reshape(
             tf.tile(pred_image, [1, 10, 1]), [-1, self.object_num_k, 3])
         return tf.expand_dims(pred_image, axis=0)
+
+
+    def vis_retrieval_I(self, image, ir_visbox, desc, desc_len,
+                        num_aug, ir_num_k, ir_logits, ir_gt, used_mask):
+        ir_gt_idx = tf.cast(tf.argmax(ir_gt, axis=-1), tf.int32)
+        probs = tf.nn.softmax(ir_logits, axis=-1)
+        top_k_prob, top_k_pred = tf.nn.top_k(probs, k=TOP_K)
+        def add_result2image_fn(b_image, bb_ir_box, bb_desc, bb_desc_len,
+                                bb_gt_idx, bb_top_k_prob, bb_top_k_pred,
+                                bb_used_mask):
+            # b_ : batch
+            # bb_ : [batch, box]
+            import textwrap
+            from PIL import Image, ImageDraw, ImageFont
+            font = ImaegFont.load_default()
+
+            def intseq2str(intseq):
+                return ' '.join([self.vocab['vocab'][i] for i in intseq])
+
+            def string2image(string):
+                pil_text = Image.fromarray(
+                    np.zeros([35, b_image.shape[1] * (num_aug + 1), 3],
+                             dtype=np.uint8) + 220)
+                t_draw = ImageDraw.Draw(pil_text)
+                for l, line in enumerate(textwrap.wrap(
+                    string, width=40 * (num_aug + 1))):
+                    t_draw.text((2, 2 + l * 15), line, font=font,
+                                fill=(10, 10, 50))
+                return np.array(pil_text).astype(np.float32) / 255.0
+
+            bb_image_with_text = []
+            # TODO(hyeonwoonoh): Start implementing from this line
+            pass
+
+        return tf.py_func(
+            add_result2image_fn,
+            inp=[image, ir_visbox, desc, desc_len, ir_gt_idx,
+                 top_k_prob, top_k_pred, used_mask],
+            Tout=tf.float32)
 
 
     def vis_retrieval_L(self, image, visbox, desc, desc_len,
@@ -639,11 +678,11 @@ class Model(object):
 
         # Language retrieval - for each region - classification over descriptions
         lr_num_k = self.data_cfg.lr_num_k
-        lr_desc_idx = modules.batch_box(
-            tf.reshape(self.batch['lr_desc_idx'], [-1, num_desc_box, lr_num_k]),
+        lr_desc_idx_flat = modules.batch_box(
+            tf.reshape(self.batch['lr_desc_idx'], [-1, num_desc_box * lr_num_k]),
             offset=num_desc_box)
         lr_map_V_flat = tf.gather(desc_map_V_flat,
-                                  tf.reshape(lr_desc_idx, [-1]))
+                                  tf.reshape(lr_desc_idx_flat, [-1]))
         lr_map_V = tf.reshape(lr_map_V_flat, [-1, num_desc_box, lr_num_k, V_DIM])
         lr_gt = self.batch['lr_gt']
 
@@ -655,11 +694,12 @@ class Model(object):
         # Language Retrieval Classifier
         lr_logits = modules.batch_word_classifier(desc_box_V_ft, lr_map_V)
         self.mid_result['lr_logits'] = lr_logits
+        self.mid_result['aug_lr_gt'] = lr_gt
 
         with tf.name_scope('LR_classification_loss'):
             num_used_desc = self.batch['num_used_desc']
             used_desc_mask = tf.sequence_mask(num_used_desc, dtype=tf.float32)
-            self.mid_result['used_desc_mask']
+            self.mid_result['lr_used_desc_mask'] = used_desc_mask
 
             loss, acc, top_k_acc = self.n_way_classification_loss(
                 lr_logits, lr_gt, used_desc_mask)
@@ -671,13 +711,16 @@ class Model(object):
         # Image retrieval - for each description - classification over images
         ir_num_k = self.data_cfg.ir_num_k
         ir_box_idx_flat = modules.batch_box(
-            tf.reshape(self.batch['ir_box_idx'], [-1, num_desc_box, ir_num_k]),
+            tf.reshape(self.batch['ir_box_idx'], [-1, num_desc_box * ir_num_k]),
             offset=num_desc_box)
-        ir_box_V_ft_flat = tf.gather(desc_box_V_ft_flat,
+        ir_box_V_ft_flat = tf.gather(V_ft_flat,
                                      tf.reshape(ir_box_V_ft_flat, [-1]))
         ir_box_V = tf.reshape(ir_box_V_ft_flat,
                               [-1, num_desc_box, ir_num_k, V_DIM])
         ir_gt = self.batch['ir_gt']
+        self.mid_result['retrieval_I_visbox'] = tf.reshape(tf.gather(
+            visbox_flat, tf.reshape(ir_box_V_ft_flat, [-1])),
+            [-1, num_desc_box, ir_num_k, 4])
 
         if self.num_aug_retrieval > 0:
             ir_box_V, ir_gt = self.aug_retrieval(
@@ -686,10 +729,13 @@ class Model(object):
 
         # Image Retrieval Classifier
         ir_logits = modules.batch_word_classifier(desc_map_V_ft, ir_box_V)
+        self.mid_result['ir_logits'] = ir_logits
+        self.mid_result['aug_ir_gt'] = ir_gt
 
         with tf.name_scope('IR_classification_loss'):
             num_used_desc = self.batch['num_used_desc']
             used_desc_mask = tf.sequence_mask(num_used_desc, dtype=tf.float32)
+            self.mid_result['ir_used_desc_mask'] = used_desc_mask
 
             loss, acc, top_k_acc = self.n_way_classification_loss(
                 ir_logits, ir_gt, used_desc_mask)
@@ -791,10 +837,21 @@ class Model(object):
                 self.batch['lr_desc_idx'],
                 self.data_cfg.lr_num_k,
                 self.mid_result['lr_logits'],
-                self.batch['lr_gt'],
-                self.mid_result['used_desc_mask'],
+                self.mid_result['aug_lr_gt'],
+                self.mid_result['lr_used_desc_mask'],
                 vis_numbox=VIS_NUMBOX, line_width=LINE_WIDTH)
 
+            self.vis_image['retrieval_I'] = self.vis_retrieval_I(
+                self.batch['image'],
+                self.mid_result['retrieval_I_visbox'],
+                self.batch['desc'],
+                self.batch['desc_len'],
+                self.num_aug_retrieval,
+                self.data_cfg.ir_num_k,
+                self.mid_result['ir_logits'],
+                self.mid_result['aug_ir_gt'],
+                self.mid_result['ir_used_desc_mask'],
+                vis_numbox=VIS_NUMBOX, line_width=LINE_WIDTH)
 
         # scalar summary
         for key, val in self.report.items():
