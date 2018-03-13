@@ -97,27 +97,6 @@ def I2V(enc_I, enc_dim, out_dim, scope='I2V', is_train=False, reuse=tf.AUTO_REUS
         return V_ft
 
 
-def sigmoid_cross_entropy_with_mask(labels, logits, mask):
-    cse = tf.nn.sigmoid_cross_entropy_with_logits(
-        labels=labels, logits=logits)
-    cse = tf.reduce_mean(cse, axis=-1)
-    masked_loss = tf.reduce_sum(cse * mask) / tf.reduce_sum(mask)
-    return masked_loss
-
-
-def softmax_cross_entropy_with_mask(labels, logits, mask):
-    cse = tf.nn.softmax_cross_entropy_with_logits_V2(
-        labels=labels, logits=logits, dim=-1)
-    masked_loss = tf.reduce_sum(cse * mask) / tf.reduce_sum(mask)
-    return masked_loss
-
-
-def sparse_softmax_cross_entropy_with_mask(labels, logits, mask):
-    cse = tf.nn.sparse_softmax_cross_entropy_with_logits(
-        labels=labels, logits=logits)
-    masked_loss = tf.reduce_sum(cse * mask) / tf.reduce_sum(mask)
-    return masked_loss
-
 def word_prediction(inputs, word_weights, activity_regularizer=None,
                     trainable=True, name=None, reuse=None):
     layer = WordPredictor(word_weights, activity_regularizer=activity_regularizer,
