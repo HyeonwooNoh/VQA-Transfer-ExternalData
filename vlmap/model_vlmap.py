@@ -557,10 +557,14 @@ class Model(object):
         binary_pred = tf.cast(logits > 0, tf.int32)
         binary_label = tf.cast(labels, tf.int32)
 
-        tp = tf.to_float(tf.logical_and(binary_pred == 1, binary_label == 1))
-        fp = tf.to_float(tf.logical_and(binary_pred == 1, binary_label == 0))
-        tn = tf.to_float(tf.logical_and(binary_pred == 0, binary_label == 0))
-        fn = tf.to_float(tf.logical_and(binary_pred == 0, binary_label == 1))
+        tp = tf.to_float(tf.logical_and(tf.equal(binary_pred, 1),
+                                        tf.equal(binary_label, 1)))
+        fp = tf.to_float(tf.logical_and(tf.equal(binary_pred, 1),
+                                        tf.equal(binary_label, 0)))
+        tn = tf.to_float(tf.logical_and(tf.equal(binary_pred, 0),
+                                        tf.equal(binary_label, 0)))
+        fn = tf.to_float(tf.logical_and(tf.equal(binary_pred, 0),
+                                        tf.equal(binary_label, 1)))
 
         if mask is not None:
             expand_mask = tf.expand_dims(mask, axis=-1)
