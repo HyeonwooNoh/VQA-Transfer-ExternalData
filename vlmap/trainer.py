@@ -115,7 +115,9 @@ class Trainer(object):
 
         self.summary_ops = {
             'train': tf.summary.merge_all(key='train'),
-            'val': tf.summary.merge_all(key='val')
+            'val': tf.summary.merge_all(key='val'),
+            'heavy_train': tf.summary.merge_all(key='heavy_train'),
+            'heavy_val': tf.summary.merge_all(key='heavy_val')
         }
 
         self.saver = tf.train.Saver(max_to_keep=100)
@@ -123,6 +125,7 @@ class Trainer(object):
         self.pretrain_saver = tf.train.Saver(max_to_keep=1)
         self.summary_writer = tf.summary.FileWriter(self.train_dir)
         self.log_step = self.config.log_step
+        self.heavy_summary_step = self.config.heavy_summary_step
         self.val_sample_step = self.config.val_sample_step
         self.write_summary_step = self.config.write_summary_step
 
@@ -165,14 +168,14 @@ class Trainer(object):
 
         for s in range(max_steps):
             step, train_summary, loss, step_time = \
-                self.run_train_step()
+                self.run_train_step(s % self.heavy_summary_step == 0)
             if s % self.log_step == 0:
                 self.log_step_message(step, loss, step_time, is_train=True)
 
             # Periodic inference
             if s % self.val_sample_step == 0:
                 val_step, val_summary, val_loss, val_step_time = \
-                    self.run_val_step()
+                    self.run_val_step(s % self.heavy_summary_step == 0)
                 self.summary_writer.add_summary(val_summary,
                                                 global_step=val_step)
                 self.log_step_message(val_step, val_loss, val_step_time,
@@ -188,9 +191,11 @@ class Trainer(object):
                     self.session, os.path.join(self.train_dir, 'model'),
                     global_step=step)
 
-    def run_train_step(self):
+    def run_train_step(self, use_heavy_summary):
+        if use_heavy_summary: summary_key = 'heavy_train'
+        else: summary_key = 'train'
         _start_time = time.time()
-        fetch = [self.global_step, self.summary_ops['train'],
+        fetch = [self.global_step, self.summary_ops[summary_key],
                  self.model.loss, self.v_optimizer, self.l_optimizer]
         fetch_values = self.session.run(fetch,
                                         feed_dict={self.target_split: 'train'})
@@ -198,9 +203,11 @@ class Trainer(object):
         _end_time = time.time()
         return step, summary, loss, (_end_time - _start_time)
 
-    def run_val_step(self):
+    def run_val_step(self, use_heavy_summary):
+        if use_heavy_summary: summary_key = 'heavy_val'
+        else: summary_key = 'val'
         _start_time = time.time()
-        fetch = [self.global_step, self.summary_ops['val'],
+        fetch = [self.global_step, self.summary_ops['heavy_val'],
                  self.model.loss]
         fetch_values = self.session.run(fetch,
                                         feed_dict={self.target_split: 'val'})
@@ -247,6 +254,7 @@ def main():
                         '/merged_by_image_new_vocab50_min_region20', help=' ')
     # log
     parser.add_argument('--log_step', type=int, default=10)
+    parser.add_argument('--heavy_summary_step', type=int, default=1000)
     parser.add_argument('--val_sample_step', type=int, default=100)
     parser.add_argument('--write_summary_step', type=int, default=100)
     # hyper parameters

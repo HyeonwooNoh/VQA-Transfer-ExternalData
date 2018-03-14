@@ -1,5 +1,4 @@
 import h5py
-import json
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
 import tensorflow.contrib.rnn as rnn
@@ -91,8 +90,8 @@ def I2V(enc_I, enc_dim, out_dim, scope='I2V', is_train=False, reuse=tf.AUTO_REUS
                       use_bn=True, activation_fn=tf.nn.relu,
                       is_training=is_train, scope='conv2d_1', reuse=reuse)
         V_ft = conv2d(V_ft, out_dim, 3, pad='valid', use_bias=False,
-                        use_bn=True, activation_fn=tf.nn.relu,
-                        is_training=is_train, scope='conv2d_1', reuse=reuse)
+                      use_bn=True, activation_fn=tf.nn.relu,
+                      is_training=is_train, scope='conv2d_1', reuse=reuse)
         V_ft = tf.squeeze(V_ft, axis=[-3, -2])
         return V_ft
 
@@ -152,7 +151,7 @@ class WordPredictor(tf.layers.Layer):
                                axis=-1) + self.bias
         return logits  # [bs, num_words]
 
-    def _compute_output_shape(self, input_shape):
+    def compute_output_shape(self, input_shape):
         # [bs, dim]
         input_shape = tf.TensorShape(input_shape).as_list()
 
@@ -188,7 +187,7 @@ def decode_L(inputs, dim, embed_map, start_token,
         elif unroll_type == 'greedy':
             if end_token is None: raise ValueError('end_token is None')
             helper = seq2seq.GreedyEmbeddingHelper(
-                lambda  e: tf.nn.embedding_lookup(embed_map, e),
+                lambda e: tf.nn.embedding_lookup(embed_map, e),
                 start_tokens, end_token)
         else:
             raise ValueError('Unknown unroll_type')

@@ -70,19 +70,18 @@ class Model(object):
         for var in all_vars:
             if var.name.split('/')[0] == 'resnet_v1_50':
                 enc_I_vars.append(var)
-                if self.finetune_enc_I:
+                if self.ft_enc_I:
                     learn_v_vars.append(var)
-            elif var.name.split('/')[0] == 'language_encoder':
+                    learn_l_vars.append(var)
+            elif var.name.split('/')[0] == 'encode_L':
                 learn_l_vars.append(var)
                 if not self.no_V_grad_enc_L:
                     learn_v_vars.append(var)
-            elif var.name.split('/')[0] == 'language_decoder':
-                if not self.no_L_grad_dec_L:
-                    learn_l_vars.append(var)
-                if not self.no_V_grad_dec_L:
-                    learn_v_vars.append(var)
+            elif var.name.split('/')[0] == 'decode_L':
+                learn_l_vars.append(var)
             else:
                 learn_v_vars.append(var)
+                learn_l_vars.append(var)
         return enc_I_vars, learn_v_vars, learn_l_vars
 
     def get_enc_I_param_path(self):
@@ -109,7 +108,7 @@ class Model(object):
                 pil_text = Image.fromarray(
                     np.zeros([35, b_image.shape[1], 3], dtype=np.uint8) + 220)
                 t_draw = ImageDraw.Draw(pil_text)
-                for l, line in enumerate(textwrap.wrap(string, width=40)):
+                for l, line in enumerate(textwrap.wrap(string, width=90)):
                     t_draw.text((2, 2 + l * 15), line, font=font,
                                 fill=(10, 10, 50))
                 return np.array(pil_text).astype(np.float32) / 255.0
@@ -120,7 +119,7 @@ class Model(object):
                     if bb_used_mask[b][i] == 0:
                         vis_images = []
                         vis_images.append(image.copy() / 255.0)
-                        vis_images.append(string2image('[{}] unused'.format(i)))
+                        vis_images.append(string2image('[{}] [not_used]'.format(i)))
                         vis_images.append(string2image(' '))  # blank
                         vis_images.append(string2image(' '))  # pred
                         vis_images.append(string2image(' '))  # greedy
@@ -131,7 +130,7 @@ class Model(object):
                     pil_image = Image.fromarray(image.astype(np.uint8))
                     draw = ImageDraw.Draw(pil_image)
                     (x1, y1, x2, y2) = bb_box[b][i]
-                    for w in line_width:
+                    for w in range(line_width):
                         draw.rectangle([x1 - w, y1 - w, x2 + w, y2 + w],
                                        outline=(255, 0, 0))
                     vis_images = []
@@ -142,15 +141,15 @@ class Model(object):
                     blank_string = intseq2str(
                         bb_blank_desc[b][i][:bb_blank_desc_len[b][i]])
                     blank_string = ('[used] ' if is_blank_used
-                                    else '[unused] ') + blank_string
+                                    else '[not_used] ') + blank_string
                     pred_string = intseq2str(
                         bb_pred[b][i][:bb_pred_len[b][i]])
                     greedy_string = intseq2str(
                         bb_greedy[b][i][:bb_greedy_len[b][i]])
-                    vis_images.append(string2image(gt_string))
-                    vis_images.append(string2image(blank_string))
-                    vis_images.append(string2image(pred_string))
-                    vis_images.append(string2image(greedy_string))
+                    vis_images.append(string2image('[GT]: ' + gt_string))
+                    vis_images.append(string2image('[Blank]: ' + blank_string))
+                    vis_images.append(string2image('[Pred]: ' + pred_string))
+                    vis_images.append(string2image('[Greedy]: ' + greedy_string))
                     b_image_with_text.append(np.concatenate(vis_images, axis=0))
                 num_i = len(b_image_with_text)
                 if num_i < vis_numbox:
@@ -180,16 +179,15 @@ class Model(object):
             import textwrap
             from PIL import Image, ImageDraw, ImageFont
             font = ImageFont.load_default()
-
             def intseq2str(intseq):
                 return ' '.join([self.vocab['vocab'][i] for i in intseq])
 
             def string2image(string):
                 pil_text = Image.fromarray(
-                    np.zeros([35, b_image.shape[1] * (num_aug + 1), 3],
+                    np.zeros([35 * (num_aug + 1), b_image.shape[1] * (num_aug + 1), 3],
                              dtype=np.uint8) + 220)
                 t_draw = ImageDraw.Draw(pil_text)
-                for l, line in enumerate(textwrap.wrap(string, width=40 * (num_aug + 1))):
+                for l, line in enumerate(textwrap.wrap(string, width=90)):
                     t_draw.text((2, 2 + l * 15), line, font=font, fill=(10, 10, 50))
                 return np.array(pil_text).astype(np.float32) / 255.0
             b_image_with_box = []
@@ -200,60 +198,58 @@ class Model(object):
                     draw = ImageDraw.Draw(pil_image)
                     for ir_box in b_ir_box[i]:
                         (x1, y1, x2, y2) = ir_box
-                        for w in line_width:
+                        for w in range(line_width):
                             draw.rectangle([x1 - w, y1 - w, x2 + w, y2 + w],
                                            outline=(0, 0, 0))
                     desc_image_with_box.append(np.array(pil_image))
                 b_image_with_box.append(desc_image_with_box)
 
             bb_image_with_text = []
-            for b, (image, b_ir_box, b_desc, b_desc_len, b_gt_idx,
-                    b_top_k_prob, b_top_k_pred, b_used_mask) \
+            for b, (image, b_ir_box, b_desc, b_desc_len, b_gt_idx, b_used_mask) \
                 in enumerate(zip(b_image, bb_ir_box, bb_desc, bb_desc_len,
-                                 bb_gt_idx, bb_top_k_prob, bb_top_k_pred,
-                                 bb_used_mask)):
+                                 bb_gt_idx, bb_used_mask)):
                 b_image_with_text = []
                 for i in range(min(vis_numbox, len(b_desc))):
                     if b_used_mask[i] == 0:
                         box_vis_img = np.zeros(
                             [image.shape[0], image.shape[1] * (1 + num_aug), 3],
                             dtype=np.float32)
-                        string_img = string2image('usused')
+                        string_img = string2image('[usused]')
                         b_image_with_text.append(
                             np.concatenate([box_vis_img, string_img], axis=0))
                         continue
 
                     target_images = []
                     target_images.append(b_image_with_box[b][i])
-                    for j in num_aug:
-                        target_images.append(b_image_with_box[b - j][i])
+                    for j in range(num_aug):
+                        target_images.append(b_image_with_box[b - j - 1][i])
                     gt_idx = b_gt_idx[i]
                     gt_b = int(gt_idx / ir_num_k)
                     gt_i = int(gt_idx) % ir_num_k
-                    gt_box = bb_ir_box[b - gt_b, gt_i]
+                    gt_box = bb_ir_box[b - gt_b, i, gt_i]
                     gt_img = target_images[gt_b]
                     pil_gt_img = Image.fromarray(gt_img.copy())
                     gt_draw = ImageDraw.Draw(pil_gt_img)
                     (x1, y1, x2, y2) = gt_box
-                    for w in line_width:
+                    for w in range(line_width):
                         gt_draw.rectangle([x1 - w, y1 - w, x2 + w, y2 + w],
                                           outline=(0, 0, 255))
                     gt_draw.text((x1 + 2, y1 + 2), 'GT', font=font,
                                  fill=(0, 0, 255))
                     target_images[gt_b] = np.array(pil_gt_img)
-                    for k in TOP_K:
-                        prob = top_k_prob[b][i][k]
-                        pred = top_k_pred[b][i][k]
+                    for k in range(TOP_K):
+                        prob = bb_top_k_prob[b, i, k]
+                        pred = bb_top_k_pred[b, i, k]
                         if pred == gt_idx: color = (0, 255 - (k * 20), 0)
                         else: color = (255 - (k * 20), 0, 0)
                         p_b = int(pred / ir_num_k)
                         p_i = int(pred) % ir_num_k
-                        p_box = bb_ir_box[b - p_b, p_i]
+                        p_box = bb_ir_box[b - p_b, i, p_i]
                         p_img = target_images[p_b]
                         pil_p_img = Image.fromarray(p_img.copy())
                         p_draw = ImageDraw.Draw(pil_p_img)
                         (x1, y1, x2, y2) = p_box
-                        for w in line_width:
+                        for w in range(line_width):
                             p_draw.rectangle([x1 - w, y1 - w, x2 + w, y2 + w],
                                              outline=color)
                         p_draw.text((x1 + 2, y1 + 2),
@@ -272,6 +268,7 @@ class Model(object):
                         [b_image_with_text[-1]] * (vis_numbox - num_i))
                 bb_image_with_text.append(
                     np.concatenate(b_image_with_text, axis=0))
+            output = np.stack(bb_image_with_text, axis=0)
             return np.stack(bb_image_with_text, axis=0)
         return tf.py_func(
             add_result2image_fn,
@@ -302,7 +299,7 @@ class Model(object):
                 pil_text = Image.fromarray(
                     np.zeros([35, b_image.shape[1], 3], dtype=np.uint8) + 220)
                 t_draw = ImageDraw.Draw(pil_text)
-                for l, line in enumerate(textwrap.wrap(string, width=40)):
+                for l, line in enumerate(textwrap.wrap(string, width=90)):
                     t_draw.text((2, 2 + l * 15), line, font=font,
                                 fill=(10, 10, 50))
                 return np.array(pil_text).astype(np.float32) / 255.0
@@ -317,7 +314,7 @@ class Model(object):
                     if b_used_mask[i] == 0:
                         vis_images = []
                         vis_images.append(image.copy() / 255.0)
-                        vis_images.append(string2image('[{}] unused'.format(i)))
+                        vis_images.append(string2image('[{}] [unused]'.format(i)))
                         for _ in range(TOP_K):
                             vis_images.append(string2image('   '))
                         b_image_with_text.append(
@@ -327,21 +324,20 @@ class Model(object):
                     pil_image = Image.fromarray(image.astype(np.uint8))
                     draw = ImageDraw.Draw(pil_image)
                     (x1, y1, x2, y2) = b_box[i]
-                    for w in line_width:
+                    for w in range(line_width):
                         draw.rectangle([x1 - w, y1 - w, x2 + w, y2 + w],
                                        outline=(255, 0, 0))
                     vis_images = []
                     vis_images.append(
                         np.array(pil_image).astype(np.float32) / 255.0)
-
-                    gt_i = bb_desc_idx[b, b_gt_idx[i]]
+                    gt_i = bb_desc_idx[b, i, b_gt_idx[i]]
                     gt_intseq = bb_desc[b, gt_i][:bb_desc_len[b, gt_i]]
                     gt_string = 'gt: {}'.format(intseq2str(gt_intseq))
                     vis_images.append(string2image(gt_string))
                     for k, pred in enumerate(b_top_k_pred[i]):
                         p_b = b - int(pred / lr_num_k)
                         p_i = int(pred % lr_num_k)
-                        pred_i = bb_desc_idx[p_b, p_i]
+                        pred_i = bb_desc_idx[p_b, i, p_i]
                         pred_intseq = bb_desc[p_b, pred_i][:bb_desc_len[p_b, pred_i]]
                         pred_string = intseq2str(pred_intseq)
                         pred_string = 'pred ({:.5f}): {}'.format(
@@ -362,14 +358,16 @@ class Model(object):
             Tout=tf.float32)
 
     def vis_n_way_image_classification(self, image, visbox, logits, labels,
-                                       names, used_mask, vis_numbox, line_width):
+                                       intseqs, intseqs_len, names,
+                                       used_mask, vis_numbox, line_width):
         label_token = tf.cast(tf.argmax(labels, axis=-1), tf.int32)
         probs = tf.nn.softmax(logits, axis=-1)
         top_k_prob, top_k_pred = tf.nn.top_k(probs, k=TOP_K)
 
         def add_result2image_fn(b_image, bb_box, bb_label,
                                 bb_top_k_prob, bb_top_k_pred,
-                                bb_names, bb_used_mask):
+                                bb_intseqs, bb_intseqs_len, bb_names,
+                                bb_used_mask):
             # b_ : batch
             # bb_ : [batch, box]
             import textwrap
@@ -377,16 +375,18 @@ class Model(object):
             font = ImageFont.load_default()
             bb_image_with_text = []
             for image, b_box, b_label, b_top_k_prob, b_top_k_pred,\
-                b_names, b_used_mask in zip(b_image, bb_box, bb_label,
-                                            bb_top_k_prob, bb_top_k_pred,
-                                            bb_names, bb_used_mask):
+                b_intseqs, b_intseqs_len, b_names,\
+                b_used_mask in zip(b_image, bb_box, bb_label,
+                                   bb_top_k_prob, bb_top_k_pred,
+                                   bb_intseqs, bb_intseqs_len,
+                                   bb_names, bb_used_mask):
                 b_image_with_text = []
                 for i in range(min(vis_numbox, len(b_box))):
                     # Draw box and attach text image
                     pil_image = Image.fromarray(image.astype(np.uint8))
                     draw = ImageDraw.Draw(pil_image)
                     (x1, y1, x2, y2) = b_box[i]
-                    for w in line_width:
+                    for w in range(line_width):
                         draw.rectangle([x1 - w, y1 - w, x2 + w, y2 + w],
                                        outline=(255, 0, 0))
                     box_image = np.array(pil_image).astype(np.float32) / 255.0
@@ -395,13 +395,22 @@ class Model(object):
                                           dtype=np.uint8) + 220
                     pil_text = Image.fromarray(text_image)
                     t_draw = ImageDraw.Draw(pil_text)
+                    intseqs = b_intseqs[i]
+                    intseqs_len = b_intseqs_len[i]
                     names = b_names[i]
-                    string = '{}, gt: {}, pred: '.format(
-                        'used' if b_used_mask[i] else 'not_used',
-                        names[b_label[i]])
+                    string = '{}, [gt]: {}'.format(
+                        '[used]' if b_used_mask[i] else '[not_used]',
+                        ' '.join([self.vocab['vocab'][t]
+                                  for t in
+                                  intseqs[b_label[i]][:intseqs_len[b_label[i]]]]))
+                    string += ', [pred]: '
                     for prob, pred in zip(b_top_k_prob[i], b_top_k_pred[i]):
-                        string += '{}({:.5f}), '.format(names[pred], prob)
-                    for l, line in enumerate(textwrap.wrap(string, width=40)):
+                        string += '{}'.format(
+                            ' '.join([self.vocab['vocab'][t]
+                                      for t in
+                                      intseqs[pred][:intseqs_len[pred]]]))
+                        string += '({:.5f}), '.format(prob)
+                    for l, line in enumerate(textwrap.wrap(string, width=90)):
                         t_draw.text((2, 2 + l * 15), line, font=font,
                                     fill=(10, 10, 50))
                     text_image = np.array(pil_text).astype(np.float32) / 255.0
@@ -419,7 +428,7 @@ class Model(object):
         return tf.py_func(
             add_result2image_fn,
             inp=[image, visbox, label_token, top_k_prob,
-                 top_k_pred, names, used_mask],
+                 top_k_pred, intseqs, intseqs_len, names, used_mask],
             Tout=tf.float32)
 
     def n_way_classification_loss(self, logits, labels, mask=None):
@@ -444,10 +453,10 @@ class Model(object):
         # Top-K Accuracy
         _, top_k_pred = tf.nn.top_k(logits, k=TOP_K)
         k_label_token = tf.tile(
-            tf.expand_dims(label_token, axis=1), [1, TOP_K])
+            tf.expand_dims(label_token, axis=-1), [1, 1, TOP_K])
 
         top_k_correct = tf.to_float(tf.reduce_any(
-            tf.equal(k_label_token, top_k_pred), axis=1))
+            tf.equal(k_label_token, top_k_pred), axis=-1))
         if mask is None:
             top_k_acc = tf.reduce_mean(top_k_correct)
         else:
@@ -458,7 +467,7 @@ class Model(object):
     def binary_classification_loss(self, logits, labels, mask=None):
         # Loss
         cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
-            labels=labels, logits=logits, dim=-1)
+            labels=labels, logits=logits)
         cross_entropy = tf.reduce_mean(cross_entropy, axis=-1)
         if mask is None:
             loss = tf.reduce_mean(cross_entropy)
@@ -497,7 +506,11 @@ class Model(object):
         used_mask_flat = tf.expand_dims(tf.reshape(used_mask, [-1]), axis=-1)
         mask = tf.sequence_mask(
             desc_len_flat, maxlen=desc_maxlen, dtype=tf.float32) * used_mask_flat
-
+        # dynamic_padding logit
+        sz = tf.shape(logits_flat)
+        pad = tf.zeros([sz[0], desc_maxlen - sz[1], sz[2]],
+                       dtype=logits_flat.dtype)
+        logits_flat = tf.concat([logits_flat, pad], axis=1)
         cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
             labels=desc_flat, logits=logits_flat)
         loss = tf.reduce_sum(cross_entropy * mask) / \
@@ -540,11 +553,12 @@ class Model(object):
             tf.reduce_sum(used_mask_flat)
         return token_acc, seq_acc
 
-    def aug_retrieval(V, gt, num_aug, num_b, num_k, dim, scope='aug_retrieval'):
+    def aug_retrieval(self, V, gt, num_aug, num_b, num_k, dim,
+                      scope='aug_retrieval'):
         with tf.name_scope(scope):
             sz = tf.shape(V)
             rotate_idx = [tf.mod(tf.range(-1 - i, sz[0] - 1 - i), sz[0])
-                          for i in num_aug]
+                          for i in range(num_aug)]
             rotate_idx = tf.stack(rotate_idx, axis=0)
             rotate_V = tf.transpose(tf.reshape(
                 tf.gather(V, tf.reshape(rotate_idx, [-1]), axis=0),
@@ -617,7 +631,8 @@ class Model(object):
             with tf.name_scope('{}_classification_loss'.format(key)):
                 gt = self.batch['{}_selection_gt'.format(key)]
                 num_used_box = self.batch['{}_num_used_box'.format(key)]
-                used_mask = tf.sequence_mask(num_used_box, dtype=tf.float32)
+                used_mask = tf.sequence_mask(num_used_box, maxlen=num_b,
+                                             dtype=tf.float32)
                 self.mid_result['{}_used_mask'.format(key)] = used_mask
 
                 if key == 'attribute':
@@ -645,8 +660,8 @@ class Model(object):
                                          offset=self.data_cfg.num_box)
         desc_box_V_ft_flat = tf.gather(V_ft_flat, tf.reshape(desc_box_idx, [-1]))
         desc_box_V_ft = tf.reshape(desc_box_V_ft_flat, [-1, num_desc_box, V_DIM])
-        self.mid_result['region_visbox'] = tf.gather(
-            visbox_flat, tf.reshape(desc_box_idx, [-1]))
+        self.mid_result['region_visbox'] = tf.reshape(tf.gather(
+            visbox_flat, tf.reshape(desc_box_idx, [-1])), [-1, num_desc_box, 4])
 
         # Metric learning
         desc = self.batch['desc']
@@ -686,7 +701,8 @@ class Model(object):
 
         with tf.name_scope('LR_classification_loss'):
             num_used_desc = self.batch['num_used_desc']
-            used_desc_mask = tf.sequence_mask(num_used_desc, dtype=tf.float32)
+            used_desc_mask = tf.sequence_mask(
+                num_used_desc, maxlen=num_desc_box, dtype=tf.float32)
             self.mid_result['lr_used_desc_mask'] = used_desc_mask
 
             loss, acc, top_k_acc = self.n_way_classification_loss(
@@ -707,7 +723,7 @@ class Model(object):
                               [-1, num_desc_box, ir_num_k, V_DIM])
         ir_gt = self.batch['ir_gt']
         self.mid_result['retrieval_I_visbox'] = tf.reshape(tf.gather(
-            visbox_flat, tf.reshape(ir_box_V_ft_flat, [-1])),
+            visbox_flat, tf.reshape(ir_box_idx_flat, [-1])),
             [-1, num_desc_box, ir_num_k, 4])
 
         if self.num_aug_retrieval > 0:
@@ -722,7 +738,8 @@ class Model(object):
 
         with tf.name_scope('IR_classification_loss'):
             num_used_desc = self.batch['num_used_desc']
-            used_desc_mask = tf.sequence_mask(num_used_desc, dtype=tf.float32)
+            used_desc_mask = tf.sequence_mask(
+                num_used_desc, maxlen=num_desc_box, dtype=tf.float32)
             self.mid_result['ir_used_desc_mask'] = used_desc_mask
 
             loss, acc, top_k_acc = self.n_way_classification_loss(
@@ -782,7 +799,6 @@ class Model(object):
             desc_used_mask = tf.sequence_mask(
                 num_used_desc, maxlen=num_desc_box, dtype=tf.float32)
             self.mid_result['desc_used_mask'] = desc_used_mask
-
             loss = self.flat_description_loss(
                 logits_flat, desc_flat, desc_len_flat + 1, desc_used_mask)
             pred_token_acc, pred_seq_acc = self.flat_description_accuracy(
@@ -806,8 +822,10 @@ class Model(object):
                         self.batch['image'],
                         self.mid_result['{}_visbox'.format(key)],
                         self.mid_result['{}_logits'.format(key)],
-                        self.mid_result['{}_selection_gt'.format(key)],
-                        self.mid_result['{}_candidate_name'.format(key)],
+                        self.batch['{}_selection_gt'.format(key)],
+                        self.batch['{}_candidate'.format(key)],
+                        self.batch['{}_candidate_len'.format(key)],
+                        self.batch['{}_candidate_name'.format(key)],
                         self.mid_result['{}_used_mask'.format(key)],
                         vis_numbox=VIS_NUMBOX, line_width=LINE_WIDTH)
 
@@ -868,12 +886,16 @@ class Model(object):
 
         # scalar summary
         for key, val in self.report.items():
-            tf.summary.scalar('train/{}'.format(key), val, collections=['train'])
-            tf.summary.scalar('val/{}'.format(key), val, collections=['val'])
+            tf.summary.scalar('train/{}'.format(key), val,
+                              collections=['heavy_train', 'train'])
+            tf.summary.scalar('val/{}'.format(key), val,
+                              collections=['heavy_val', 'val'])
 
         # image summary
         for key, val in self.vis_image.items():
-            tf.summary.image('train-{}'.format(key), val, collections=['train'])
-            tf.summary.image('val-{}'.format(key), val, collections=['val'])
+            tf.summary.image('train-{}'.format(key), val, max_outputs=10,
+                             collections=['heavy_train'])
+            tf.summary.image('val-{}'.format(key), val, max_outputs=10,
+                             collections=['heavy_val'])
 
         return self.loss

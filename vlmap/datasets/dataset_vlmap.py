@@ -24,6 +24,7 @@ MAX_BOX_PER_ENTRY = {
     'relationship': 10
 }
 
+
 class Dataset(object):
 
     def __init__(self, ids, dataset_path, image_dir, vocab_path, is_train=True,
@@ -83,8 +84,8 @@ class Dataset(object):
         config.image_width = IMAGE_WIDTH
         config.image_height = IMAGE_HEIGHT
         config.num_k = NUM_K
-        config.ir_k = IMAGE_RETRIEVAL_K
-        config.lr_k = IMAGE_RETRIEVAL_K
+        config.ir_num_k = IMAGE_RETRIEVAL_K
+        config.lr_num_k = LANGUAGE_RETRIEVAL_K
         config.num_box = MAX_USED_BOX
         config.num_entry_box = {
             'region': MAX_BOX_PER_ENTRY['region'],
