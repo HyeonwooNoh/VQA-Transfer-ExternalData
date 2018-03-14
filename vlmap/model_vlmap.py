@@ -494,9 +494,9 @@ class Model(object):
         n_tn = tf.reduce_sum(tn)  # true negative
         n_fn = tf.reduce_sum(fn)  # false negative
 
-        acc = (n_tp + n_tn) / (n_tp + n_fp + n_tn + n_fn)
-        recall = (n_tp) / (n_tp + n_fn)
-        precision = (n_tp) / (n_tp + n_fp)
+        acc = (n_tp + n_tn) / (n_tp + n_fp + n_tn + n_fn + 1e-12)
+        recall = (n_tp) / (n_tp + n_fn + 1e-12)
+        precision = (n_tp) / (n_tp + n_fp + 1e-12)
 
         return loss, acc, recall, precision
 
@@ -549,6 +549,7 @@ class Model(object):
             tf.reduce_all(tf.equal(pred_flat * mask_int,
                                    desc_flat * mask_int), axis=-1),
             tf.equal(desc_len_flat, pred_len_flat))
+        used_mask_flat = tf.squeeze(used_mask_flat, axis=-1)
         seq_acc = tf.reduce_sum(tf.to_float(seq_acc) * used_mask_flat) / \
             tf.reduce_sum(used_mask_flat)
         return token_acc, seq_acc
