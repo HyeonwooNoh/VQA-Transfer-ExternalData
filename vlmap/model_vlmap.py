@@ -134,7 +134,8 @@ class Model(object):
 
 
     def vis_retrieval_I(self, image, ir_visbox, desc, desc_len,
-                        num_aug, ir_num_k, ir_logits, ir_gt, used_mask):
+                        num_aug, ir_num_k, ir_logits, ir_gt, used_mask,
+                        vis_numbox, line_width):
         ir_gt_idx = tf.cast(tf.argmax(ir_gt, axis=-1), tf.int32)
         probs = tf.nn.softmax(ir_logits, axis=-1)
         top_k_prob, top_k_pred = tf.nn.top_k(probs, k=TOP_K)
@@ -143,6 +144,7 @@ class Model(object):
                                 bb_used_mask):
             # b_ : batch
             # bb_ : [batch, box]
+            # bdb : [batch, description, box]
             import textwrap
             from PIL import Image, ImageDraw, ImageFont
             font = ImaegFont.load_default()
@@ -160,11 +162,78 @@ class Model(object):
                     t_draw.text((2, 2 + l * 15), line, font=font,
                                 fill=(10, 10, 50))
                 return np.array(pil_text).astype(np.float32) / 255.0
+            b_image_with_box = []
+            for image, b_ir_box in zip(b_image, bb_ir_box):
+                desc_image_with_box = []
+                for i in range(min(vis_numbox, len(b_desc))):
+                    pil_image = Image.fromarray(image.astype(np.uint8))
+                    draw = ImageDraw.Draw(pil_image)
+                    for ir_box in b_ir_box[i]:
+                        (x1, y1, x2, y2) = ir_box
+                        for w in line_width:
+                            draw.rectangle([x1 - w, y1 - w, x2 + w, y2 + w],
+                                           outline=(0, 0, 0))
+                    desc_image_with_box.append(np.array(pil_image))
+                b_image_with_box.append(desc_image_with_box)
 
             bb_image_with_text = []
-            # TODO(hyeonwoonoh): Start implementing from this line
-            pass
-
+            for b, (image, b_ir_box, b_desc, b_desc_len, b_gt_idx,
+                    b_top_k_prob, b_top_k_pred, b_used_mask) \
+                in enumerate(zip(b_image, bb_ir_box, bb_desc, bb_desc_len,
+                                 bb_gt_idx, bb_top_k_prob, bb_top_k_pred,
+                                 bb_used_mask)):
+                b_image_with_text = []
+                for i in range(min(vis_numbox, len(b_desc))):
+                    target_images = []
+                    target_images.append(b_image_with_box[b][i])
+                    for j in num_aug:
+                        target_images.append(b_image_with_box[b - j][i])
+                    gt_idx = b_gt_idx[i]
+                    gt_b = int(gt_idx / ir_num_k)
+                    gt_i = int(gt_idx) % ir_num_k
+                    gt_box = bb_ir_box[b - gt_b, gt_i]
+                    gt_img = target_images[gt_b]
+                    pil_gt_img = Image.fromarray(gt_img.copy())
+                    gt_draw = ImageDraw.Draw(pil_gt_img)
+                    (x1, y1, x2, y2) = gt_box
+                    for w in line_width:
+                        gt_draw.rectangle([x1 - w, y1 - w, x2 + w, y2 + w],
+                                          outline=(0, 0, 255))
+                    gt_draw.text((x1 + 2, y1 + 2), 'GT', font=font,
+                                 fill=(0, 0, 255))
+                    target_images[gt_b] = np.array(pil_gt_img)
+                    for k in TOP_K:
+                        prob = top_k_prob[b][i][k]
+                        pred = top_k_pred[b][i][k]
+                        if pred == gt_idx: color = (0, 255 - (k * 20), 0)
+                        else: color = (255 - (k * 20), 0, 0)
+                        p_b = int(pred / ir_num_k)
+                        p_i = int(pred) % ir_num_k
+                        p_box = bb_ir_box[b - p_b, b_i]
+                        p_img = target_images[p_b]
+                        pil_p_img = Image.fromarray(p_img.copy())
+                        p_draw = ImageDraw.Draw(pil_p_img)
+                        (x1, y1, x2, y2) = p_box
+                        for w in line_width:
+                            p_draw.rectangle([x1 - w, y1 - w, x2 + w, y2 + w],
+                                             outline=color)
+                        p_draw.text((x1 + 2, y1 + 2),
+                                    'Top-{} ({:.5f})'.format(k, prob),
+                                    font=font, fill=color)
+                        target_images[p_b] = np.array(pil_p_img)
+                    box_vis_img = np.concatenate(
+                        target_images, axis=1).astype(np.float32) / 255.0
+                    description = intseq2str(b_desc[i][:b_desc_len[i]])
+                    string_img = string2image('desc: {}'.format(description))
+                    b_image_with_text.append(
+                        np.concatenate([box_vis_img, string_img], axis=0))
+                num_i = len(b_image_with_text)
+                if num_i < vis_numbox:
+                    b_image_with_text.extend(
+                        [b_image_with_text[-1]] * (vis_num_box - num_i))
+                bb_image_with_text.append(
+                    np.concatenate(b_image_with_text, axis=0))
+            return np.stack(bb_image_with_text, axis=0)
         return tf.py_func(
             add_result2image_fn,
             inp=[image, ir_visbox, desc, desc_len, ir_gt_idx,
