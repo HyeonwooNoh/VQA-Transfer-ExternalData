@@ -21,3 +21,6 @@ data/preprocessed
 # Training results
 train_dir
 experiments
+
+# Temporary files
+temp_*
