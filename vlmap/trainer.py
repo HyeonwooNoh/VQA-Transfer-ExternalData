@@ -236,7 +236,7 @@ def main():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     # paths
     parser.add_argument('--vocab_path', type=str,
-                        default='data/preprocessed/vocab50.json', help=' ')
+                        default='data/preprocessed/new_vocab50.json', help=' ')
     parser.add_argument('--glove_path', type=str,
                         default='data/preprocessed/glove.new_vocab50.300d.hdf5',
                         help=' ')
@@ -244,7 +244,7 @@ def main():
                         default='data/VisualGenome/VG_100K', help=' ')
     parser.add_argument('--dataset_path', type=str,
                         default='data/preprocessed/visualgenome'
-                        '/merged_by_image_vocab50', help=' ')
+                        '/merged_by_image_new_vocab50_min_region20', help=' ')
     # log
     parser.add_argument('--log_step', type=int, default=10)
     parser.add_argument('--val_sample_step', type=int, default=100)
@@ -255,7 +255,7 @@ def main():
     parser.add_argument('--learning_rate', type=float, default=0.001, help=' ')
     parser.add_argument('--lr_weight_decay', action='store_true', default=False)
     # model parameters
-    parser.add_argument('--batch_size', type=int, default=2, help=' ')
+    parser.add_argument('--batch_size', type=int, default=3, help=' ')
     # vlmap: separate vision and language mapping
     # vljoint: having vision-language joint embedding space and learn v2j, l2j
     parser.add_argument('--model_type', type=str, default='vlmap', help=' ',
@@ -274,7 +274,7 @@ def main():
     parser.add_argument('--no_V_grad_enc_L', action='store_true', default=False,
                         help=' ')  # only for description_task == blank-fill
     parser.add_argument('--num_aug_retrieval', type=int, default=2,
-                        help-'Augment retrieval with interbatch data')
+                        help='Augment retrieval with interbatch data')
 
     config = parser.parse_args()
     check_config(config)
