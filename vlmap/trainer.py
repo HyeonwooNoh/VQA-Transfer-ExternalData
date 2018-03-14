@@ -52,8 +52,8 @@ class Trainer(object):
         with tf.name_scope('datasets'):
             self.target_split = tf.placeholder(tf.string)
 
-        with tf.name_scope('datasets/batches'):
-            vlmap_batches = {
+        with tf.name_scope('datasets/batch'):
+            vlmap_batch = {
                 'train': input_ops_vlmap.create(
                     dataset['train'], self.batch_size, is_train=True,
                     scope='train_ops', shuffle=True),
@@ -61,14 +61,14 @@ class Trainer(object):
                     dataset['val'], self.batch_size, is_train=True,
                     scope='val_ops', shuffle=False)}
             self.batch = tf.case(
-                {tf.equal(self.target_split, 'train'): lambda: vlmap_batches['train'],
-                 tf.equal(self.target_split, 'val'): lambda: vlmap_batches['val']},
-                default=lambda: vlmap_batches['train'], exclusive=True)
+                {tf.equal(self.target_split, 'train'): lambda: vlmap_batch['train'],
+                 tf.equal(self.target_split, 'val'): lambda: vlmap_batch['val']},
+                default=lambda: vlmap_batch['train'], exclusive=True)
 
         # Model
         Model = self.get_model_class(config.model_type)
         log.infov('using model class: {}'.format(Model))
-        self.model = Model(self.batches, config, is_train=True)
+        self.model = Model(self.batch, config, is_train=True)
 
         # Optimizer
         self.global_step = tf.train.get_or_create_global_step(graph=None)
