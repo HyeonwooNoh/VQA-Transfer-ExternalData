@@ -357,6 +357,86 @@ class Model(object):
                  top_k_prob, top_k_pred, used_mask],
             Tout=tf.float32)
 
+    def vis_binary_image_classification(self, image, visbox, logits, labels,
+                                        intseqs, intseqs_len, names,
+                                        used_mask, vis_numbox, line_width):
+        num_label = tf.cast(tf.reduce_sum(labels, axis=-1), tf.int32)
+        probs = tf.nn.sigmoid(logits)
+        top_k_prob, top_k_pred = tf.nn.top_k(probs, k=TOP_K)
+
+        def add_result2image_fn(b_image, bb_box, bb_num_label,
+                                bb_top_k_prob, bb_top_k_pred,
+                                bb_intseqs, bb_intseqs_len, bb_names,
+                                bb_used_mask):
+            # b_ : batch
+            # bb_ : [batch, box]
+            import textwrap
+            from PIL import Image, ImageDraw, ImageFont
+            font = ImageFont.load_default()
+            bb_image_with_text = []
+            for image, b_box, b_num_label, b_top_k_prob, b_top_k_pred,\
+                b_intseqs, b_intseqs_len, b_names,\
+                b_used_mask in zip(b_image, bb_box, bb_num_label,
+                                   bb_top_k_prob, bb_top_k_pred,
+                                   bb_intseqs, bb_intseqs_len,
+                                   bb_names, bb_used_mask):
+                b_image_with_text = []
+                for i in range(min(vis_numbox, len(b_box))):
+                    # Draw box and attach text image
+                    pil_image = Image.fromarray(image.astype(np.uint8))
+                    draw = ImageDraw.Draw(pil_image)
+                    (x1, y1, x2, y2) = b_box[i]
+                    for w in range(line_width):
+                        draw.rectangle([x1 - w, y1 - w, x2 + w, y2 + w],
+                                       outline=(255, 0, 0))
+                    box_image = np.array(pil_image).astype(np.float32) / 255.0
+
+                    text_image = np.zeros([35, image.shape[1], 3],
+                                          dtype=np.uint8) + 220
+                    pil_text = Image.fromarray(text_image)
+                    t_draw = ImageDraw.Draw(pil_text)
+                    intseqs = b_intseqs[i]
+                    intseqs_len = b_intseqs_len[i]
+                    names = b_names[i]
+                    string = ''
+                    if not b_used_mask[i]: string += '[not_used], '
+                    string += '[gt]: ({}) '.format(b_num_label[i])
+                    for n in range(b_num_label[i]):
+                        string += '{}, '.format(
+                            ' '.join([self.vocab['vocab'][t]
+                                      for t in
+                                      intseqs[n][:intseqs_len[n]]]))
+                    string += '[pred]: '
+                    for prob, pred in zip(b_top_k_prob[i], b_top_k_pred[i]):
+                        string += '{}'.format(
+                            ' '.join([self.vocab['vocab'][t]
+                                      for t in
+                                      intseqs[pred][:intseqs_len[pred]]]))
+                        string += '({:.5f}), '.format(prob)
+                    for l, line in enumerate(textwrap.wrap(string, width=90)):
+                        t_draw.text((2, 2 + l * 15), line, font=font,
+                                    fill=(10, 10, 50))
+                    text_image = np.array(pil_text).astype(np.float32) / 255.0
+
+                    image_with_text = np.concatenate([box_image, text_image],
+                                                     axis=0)
+                    b_image_with_text.append(image_with_text)
+                num_i = len(b_image_with_text)
+                if num_i < vis_numbox:
+                    b_image_with_text.extend(
+                        [b_image_with_text[-1]] * (vis_numbox - num_i))
+                bb_image_with_text.append(
+                    np.concatenate(b_image_with_text, axis=1))
+            return np.stack(bb_image_with_text, axis=0)
+        return tf.py_func(
+            add_result2image_fn,
+            inp=[image, visbox, num_label, top_k_prob,
+                 top_k_pred, intseqs, intseqs_len, names, used_mask],
+            Tout=tf.float32)
+
+
+
+
     def vis_n_way_image_classification(self, image, visbox, logits, labels,
                                        intseqs, intseqs_len, names,
                                        used_mask, vis_numbox, line_width):
@@ -818,17 +898,30 @@ class Model(object):
 
         with tf.name_scope('prepare_summary'):
             for key in self.target_entry:
-                self.vis_image['{}_classification'.format(key)] =\
-                    self.vis_n_way_image_classification(
-                        self.batch['image'],
-                        self.mid_result['{}_visbox'.format(key)],
-                        self.mid_result['{}_logits'.format(key)],
-                        self.batch['{}_selection_gt'.format(key)],
-                        self.batch['{}_candidate'.format(key)],
-                        self.batch['{}_candidate_len'.format(key)],
-                        self.batch['{}_candidate_name'.format(key)],
-                        self.mid_result['{}_used_mask'.format(key)],
-                        vis_numbox=VIS_NUMBOX, line_width=LINE_WIDTH)
+                if key == 'attribute':
+                    self.vis_image['{}_classification'.format(key)] =\
+                        self.vis_binary_image_classification(
+                            self.batch['image'],
+                            self.mid_result['{}_visbox'.format(key)],
+                            self.mid_result['{}_logits'.format(key)],
+                            self.batch['{}_selection_gt'.format(key)],
+                            self.batch['{}_candidate'.format(key)],
+                            self.batch['{}_candidate_len'.format(key)],
+                            self.batch['{}_candidate_name'.format(key)],
+                            self.mid_result['{}_used_mask'.format(key)],
+                            vis_numbox=VIS_NUMBOX, line_width=LINE_WIDTH)
+                else:
+                    self.vis_image['{}_classification'.format(key)] =\
+                        self.vis_n_way_image_classification(
+                            self.batch['image'],
+                            self.mid_result['{}_visbox'.format(key)],
+                            self.mid_result['{}_logits'.format(key)],
+                            self.batch['{}_selection_gt'.format(key)],
+                            self.batch['{}_candidate'.format(key)],
+                            self.batch['{}_candidate_len'.format(key)],
+                            self.batch['{}_candidate_name'.format(key)],
+                            self.mid_result['{}_used_mask'.format(key)],
+                            vis_numbox=VIS_NUMBOX, line_width=LINE_WIDTH)
 
             self.vis_image['retrieval_L'] = self.vis_retrieval_L(
                 self.batch['image'],
