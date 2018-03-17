@@ -801,7 +801,7 @@ class Model(object):
         ir_num_k = self.data_cfg.ir_num_k
         ir_box_idx_flat = modules.batch_box(
             tf.reshape(self.batch['ir_box_idx'], [-1, num_desc_box * ir_num_k]),
-            offset=num_desc_box)
+            offset=self.data_cfg.num_box)
         ir_box_V_ft_flat = tf.gather(V_ft_flat,
                                      tf.reshape(ir_box_idx_flat, [-1]))
         ir_box_V = tf.reshape(ir_box_V_ft_flat,
