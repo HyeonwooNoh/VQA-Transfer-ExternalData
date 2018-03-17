@@ -46,17 +46,25 @@ class Model(object):
         if self.use_relation: self.target_entry.append('relationship')
 
         if self.decoder_type == 'glove_et':
+            self.decoder_embed_map = self.glove_map
             pred_embed = modules.embed_transform(
                 self.glove_map, L_DIM, L_DIM, is_train=is_train)
             self.word_predictor = modules.WordPredictor(
                 pred_embed, trainable=is_train)
             self.decoder_dim = L_DIM
         elif self.decoder_type == 'glove':
+            self.decoder_embed_map = self.glove_map
             pred_embed = self.glove_map
             self.word_predictor = modules.WordPredictor(
                 pred_embed, trainable=is_train)
             self.decoder_dim = W_DIM
         elif self.decoder_type == 'dense':
+            self.decoder_embed_map = self.glove_map
+            self.word_predictor = tf.layers.Dense(
+                len(self.vocab['vocab']), use_bias=True, name='WordPredictor')
+            self.decoder_dim = L_DIM
+        elif self.decoder_type == 'dense_n_le':
+            self.decoder_embed_map = modules.LearnedVector(self.vocab)
             self.word_predictor = tf.layers.Dense(
                 len(self.vocab['vocab']), use_bias=True, name='WordPredictor')
             self.decoder_dim = L_DIM
@@ -860,7 +868,7 @@ class Model(object):
         desc_len_flat = tf.reshape(desc_len, [-1])
 
         logits_flat, pred_flat, pred_len_flat = modules.decode_L(
-            in_L_flat, self.decoder_dim, self.glove_map,
+            in_L_flat, self.decoder_dim, self.decoder_embed_map,
             self.vocab['dict']['<s>'], unroll_type='teacher_forcing',
             seq=desc_flat, seq_len=desc_len_flat + 1,
             output_layer=self.word_predictor, is_train=is_train)
@@ -870,7 +878,7 @@ class Model(object):
             pred_len_flat, [-1, num_desc_box])
 
         _, greedy_flat, greedy_len_flat = modules.decode_L(
-            in_L_flat, self.decoder_dim, self.glove_map,
+            in_L_flat, self.decoder_dim, self.decoder_embed_map,
             self.vocab['dict']['<s>'], unroll_type='greedy',
             end_token=self.vocab['dict']['<e>'],
             max_seq_len=self.data_cfg.max_len['region'] + 1,

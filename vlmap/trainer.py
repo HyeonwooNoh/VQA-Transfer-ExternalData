@@ -274,7 +274,8 @@ def main():
     # glove: direct matching with glove vector
     # dense: not using glove vector, but using dense prediction layer
     parser.add_argument('--decoder_type', type=str, default='glove_et',
-                        choices=['glove_et', 'glove', 'dense'], help=' ')
+                        choices=['glove_et', 'glove', 'dense',
+                                 'dense_n_le'], help=' ')
     # generation: generating description using visual feature directlry
     # blank-fill: using visual feature only for filling blanks
     parser.add_argument('--description_task', type=str, default='blank-fill',

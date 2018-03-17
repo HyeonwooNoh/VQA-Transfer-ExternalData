@@ -257,6 +257,16 @@ def GloVe(glove_path, scope='GloVe', reuse=tf.AUTO_REUSE):
         return embed_map
 
 
+def LearnedVector(vocab, scope='LearnedVector', reuse=tf.AUTO_REUSE):
+    with tf.variable_scope(scope, reuse=reuse) as scope:
+        log.warning(scope.name)
+        embed_map = tf.get_variable(
+            name='learn', shape=[len(vocab['vocab']), 300],
+            initializer=tf.random_uniform_initializer(
+                minval=-0.01, maxval=0.01))
+        return embed_map
+
+
 def embed_transform(embed_map, enc_dim, out_dim, is_train=True,
                     scope='embed_transform', reuse=tf.AUTO_REUSE):
     with tf.variable_scope(scope, reuse=reuse) as scope:
