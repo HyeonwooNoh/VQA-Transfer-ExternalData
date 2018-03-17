@@ -123,7 +123,8 @@ class Trainer(object):
 
         self.saver = tf.train.Saver(max_to_keep=100)
         self.enc_I_saver = tf.train.Saver(var_list=enc_I_vars, max_to_keep=1)
-        self.pretrain_saver = tf.train.Saver(max_to_keep=1)
+        self.checkpoint_saver = tf.train.Saver(max_to_keep=1)
+        self.pretrain_saver = tf.train.Saver(var_list=all_vars, max_to_keep=1)
         self.summary_writer = tf.summary.FileWriter(self.train_dir)
         self.log_step = self.config.log_step
         self.heavy_summary_step = self.config.heavy_summary_step
@@ -158,8 +159,14 @@ class Trainer(object):
         self.ckpt_path = config.checkpoint
         if self.ckpt_path is not None:
             log.info('Checkpoint path: {}'.format(self.ckpt_path))
-            self.pretrain_saver.restore(self.session, self.ckpt_path)
-            log.info('Loaded the pretrained parameters')
+            self.checkpoint_saver.restore(self.session, self.ckpt_path)
+            log.info('Loaded the checkpoint')
+
+        self.pretrained_param_path = config.pretrained_param
+        if self.pretrained_param_path is not None:
+            log.info('Pre-trained param path: {}'.format(self.pretrained_param))
+            self.pretrain_saver.restore(self.session, self.pretrained_param_path)
+            log.info('Loaded the pre-trained parameters')
 
     def train(self):
         log.infov('Training starts')
@@ -237,6 +244,8 @@ def check_config(config):
         raise ValueError('Set no_V_grad_enc_L only for blank-fill task')
     if config.num_aug_retrieval >= config.batch_size:
         raise ValueError('Set num_aug_retrieval smaller than batch_size')
+    if config.checkpoint is not None and config.pretrained_param is not None:
+        raise ValueError('Do not set both checkpoint and pretrained_param')
 
 
 def main():
@@ -261,6 +270,7 @@ def main():
     # hyper parameters
     parser.add_argument('--prefix', type=str, default='default', help=' ')
     parser.add_argument('--checkpoint', type=str, default=None)
+    parser.add_argument('--pretrained_param', type=str, default=None)
     parser.add_argument('--learning_rate', type=float, default=0.001, help=' ')
     parser.add_argument('--lr_weight_decay', action='store_true', default=False)
     # model parameters
