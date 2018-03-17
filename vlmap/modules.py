@@ -26,7 +26,7 @@ def encode_L(seq, seq_len, dim=384, scope='encode_L',
         return final_state.h
 
 
-def encode_I(images, is_train=False, reuse=tf.AUTO_REUSE):
+def encode_I_full(images, is_train=False, reuse=tf.AUTO_REUSE):
     """
     Pre-trained model parameter is available here:
     https://github.com/tensorflow/models/tree/master/research/slim#Pretrained
@@ -40,6 +40,35 @@ def encode_I(images, is_train=False, reuse=tf.AUTO_REUSE):
     with slim.arg_scope(nets.resnet_v1.resnet_arg_scope()):
         enc_I, _ = nets.resnet_v1.resnet_v1_50(
             processed_I,
+            is_training=is_train,
+            global_pool=False,
+            output_stride=None,
+            reuse=reuse,
+            scope='resnet_v1_50')
+    return enc_I
+
+
+def encode_I_block3(images, is_train=False, reuse=tf.AUTO_REUSE):
+    """
+    Pre-trained model parameter is available here:
+    https://github.com/tensorflow/models/tree/master/research/slim#Pretrained
+    """
+    with tf.name_scope('enc_I_preprocess'):
+        channels = tf.split(axis=3, num_or_size_splits=3, value=images)
+        for i, mean in enumerate([ENC_I_R_MEAN, ENC_I_G_MEAN, ENC_I_B_MEAN]):
+            channels[i] -= mean
+        processed_I = tf.concat(axis=3, values=channels)
+
+    with slim.arg_scope(nets.resnet_v1.resnet_arg_scope()):
+        resnet_v1_block = nets.resnet_v1.resnet_v1_block
+        blocks = [
+            resnet_v1_block('block1', base_depth=64, num_units=3, stride=2),
+            resnet_v1_block('block2', base_depth=128, num_units=4, stride=2),
+            resnet_v1_block('block3', base_depth=256, num_units=6, stride=2),
+        ]
+        enc_I, _ = nets.resnet_v1.resnet_v1(
+            processed_I,
+            blocks,
             is_training=is_train,
             global_pool=False,
             output_stride=None,

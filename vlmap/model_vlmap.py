@@ -663,7 +663,7 @@ class Model(object):
         Visual features
         """
         # feat_V
-        enc_I = modules.encode_I(self.batch['image'],
+        enc_I = modules.encode_I_block3(self.batch['image'],
                                  is_train=self.ft_enc_I)
         if not self.ft_enc_I: enc_I = tf.stop_gradient(enc_I)
 
