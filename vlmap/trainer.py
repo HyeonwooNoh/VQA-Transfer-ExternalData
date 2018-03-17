@@ -24,8 +24,9 @@ class Trainer(object):
         dataset_str += '_' + '_'.join(config.dataset_path.replace(
             'data/preprocessed/visualgenome/', '').split('/'))
 
-        hyper_parameter_str = 'bs{}_lr{}'.format(
-            config.batch_size, config.learning_rate)
+        hyper_parameter_str = 'bs{}_lr{}_declw{}'.format(
+            config.batch_size, config.learning_rate,
+            config.decoder_loss_weight)
 
         if config.ft_enc_I:
             hyper_parameter_str += '_ft_enc_I'
@@ -280,6 +281,8 @@ def main():
     # blank-fill: using visual feature only for filling blanks
     parser.add_argument('--description_task', type=str, default='blank-fill',
                         choices=['generation', 'blank-fill'], help=' ')
+    parser.add_argument('--decoder_loss_weight', type=float, default=1.0,
+                        help=' ')
     parser.add_argument('--no_V_grad_enc_L', action='store_true', default=False,
                         help=' ')  # only for description_task == blank-fill
     parser.add_argument('--num_aug_retrieval', type=int, default=2,

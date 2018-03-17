@@ -41,6 +41,7 @@ class Model(object):
         self.description_task = config.description_task
         self.decoder_type = config.decoder_type
         self.num_aug_retrieval = max(config.num_aug_retrieval, 0)
+        self.decoder_loss_weight = config.decoder_loss_weight
 
         self.target_entry = ['object', 'attribute']
         if self.use_relation: self.target_entry.append('relationship')
@@ -900,6 +901,8 @@ class Model(object):
             greedy_token_acc, greedy_seq_acc = self.flat_description_accuracy(
                 greedy_flat, greedy_len_flat, desc_flat, desc_len_flat + 1,
                 desc_used_mask)
+
+            loss *= self.decoder_loss_weight
 
             self.losses['description'] = loss
             self.report['description_loss'] = loss
