@@ -57,6 +57,7 @@ else:
         'The directory {} already exists. Do not overwrite.'.format(
             config.save_split_dir))
 
+
 def intseq2str(intseq):
     return ' '.join([vocab['vocab'][i] for i in intseq])
 
@@ -227,8 +228,8 @@ RANDOM_STATE.shuffle(train_qids)
 RANDOM_STATE.shuffle(train_reserve_qids)
 RANDOM_STATE.shuffle(test_qids)
 
-train_80p = len(train_qids) * 80 / 100
-train_reserve_80p = len(train_reserve_qids) * 80 / 100
+train_90p = len(train_qids) * 90 / 100
+train_reserve_90p = len(train_reserve_qids) * 90 / 100
 test_80p = len(test_qids) * 80 / 100
 
 qid_splits = {}
@@ -239,14 +240,21 @@ log.infov('test: {}, test-val: {}'.format(
     len(qid_splits['test']), len(qid_splits['test-val'])))
 
 log.warn('Split train / val')
-qid_splits['val'] = train_qids[train_80p:]
-qid_splits['train'] = train_qids[:train_80p]
+qid_splits['val'] = train_qids[train_90p:]
+qid_splits['train'] = train_qids[:train_90p]
 log.infov('train: {}, val: {}'.format(
     len(qid_splits['train']), len(qid_splits['val'])))
-qid_splits['val-reserve'] = train_reserve_qids[train_reserve_80p:]
-qid_splits['train-reserve'] = train_reserve_qids[:train_reserve_80p]
+qid_splits['val-reserve'] = train_reserve_qids[train_reserve_90p:]
+qid_splits['train-reserve'] = train_reserve_qids[:train_reserve_90p]
 log.infov('train-reserve: {}, val-reserve: {}'.format(
     len(qid_splits['train-reserve']), len(qid_splits['val-reserve'])))
+
+# used image ids
+used_image_paths = []
+for anno in tqdm(qid2anno.values(), desc='construct used_image_ids'):
+    used_image_paths.append(anno['image_path'])
+used_image_paths = list(set(used_image_paths))
+log.infov('used_image_paths: {}'.format(len(used_image_paths)))
 
 """
 What to save:
@@ -255,11 +263,13 @@ What to save:
     - qa splits qids (train, val, train-reserve, val-reserve, test-val, test)
     - annotations: merged annotations is saved for evaluation / future usage
 """
-json.dump(qids, open(os.path.join(
-    config.save_split_dir, 'used_image_ids.json'), 'w'))
+with open(os.path.join(config.save_split_dir, 'used_image_path.txt'), 'w') as f:
+    for image_path in used_image_paths:
+        f.write(image_path + '\n')
 json.dump(objects_split, open(os.path.join(
     config.save_split_dir, 'object_split.json'), 'w'))
 json.dump(qid_splits, open(os.path.join(
     config.save_split_dir, 'qa_split.json'), 'w'))
 json.dump(qid2anno, open(os.path.join(
     config.save_split_dir, 'merged_annotations.json'), 'w'))
+log.warn('output saving is done.')
