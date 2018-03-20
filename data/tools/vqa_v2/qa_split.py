@@ -46,15 +46,16 @@ config = parser.parse_args()
 
 vocab = json.load(open(config.vocab_path, 'r'))
 
-config.save_split_dir += '_thres1{}'.format(config.occ_thres_1)
-config.save_split_dir += '_thres2{}'.format(config.occ_thres_2)
+config.save_split_dir += '_thres1_{}'.format(config.occ_thres_1)
+config.save_split_dir += '_thres2_{}'.format(config.occ_thres_2)
 
 if not os.path.exists(config.save_split_dir):
     log.warn('Create directory: {}'.format(config.save_split_dir))
     os.makedirs(config.save_split_dir)
 else:
-    raise ValueError('The directory {} already exists. Do not overwrite.'.format(
-        config.save_split_dir)
+    raise ValueError(
+        'The directory {} already exists. Do not overwrite.'.format(
+            config.save_split_dir))
 
 def intseq2str(intseq):
     return ' '.join([vocab['vocab'][i] for i in intseq])
@@ -226,23 +227,26 @@ RANDOM_STATE.shuffle(train_qids)
 RANDOM_STATE.shuffle(train_reserve_qids)
 RANDOM_STATE.shuffle(test_qids)
 
-train_80p = len(train_qids) * 100 / 80
-train_reserve_80p = len(train_reserve_qids) * 100 / 80
-test_80p = len(test_qids) * 100 / 80
+train_80p = len(train_qids) * 80 / 100
+train_reserve_80p = len(train_reserve_qids) * 80 / 100
+test_80p = len(test_qids) * 80 / 100
 
+qid_splits = {}
 log.warn('Split test-val / test')
-test_val_qids = test_qids[test_80p:]
-test_qids = test_qids[:test_80p]
-log.infov('test: {}, test-val: {}'.format(len(test_qids), len(test_val_qids)))
+qid_splits['test-val'] = test_qids[test_80p:]
+qid_splits['test'] = test_qids[:test_80p]
+log.infov('test: {}, test-val: {}'.format(
+    len(qid_splits['test']), len(qid_splits['test-val'])))
 
 log.warn('Split train / val')
-val_qids = train_qids[train_80p:]
-train_qids = train_qids[:train_80p]
-log.infov('train: {}, val: {}'.format(len(train_qids), len(val_qids)))
-val_reserve_qids = train_reserve_qids[train_reserve_80p:]
-train_reserve_qids = train_reserve_qids[:train_reserve_80p]
+qid_splits['val'] = train_qids[train_80p:]
+qid_splits['train'] = train_qids[:train_80p]
+log.infov('train: {}, val: {}'.format(
+    len(qid_splits['train']), len(qid_splits['val'])))
+qid_splits['val-reserve'] = train_reserve_qids[train_reserve_80p:]
+qid_splits['train-reserve'] = train_reserve_qids[:train_reserve_80p]
 log.infov('train-reserve: {}, val-reserve: {}'.format(
-    len(train_reserve_qids), len(val_reserve_qids))
+    len(qid_splits['train-reserve']), len(qid_splits['val-reserve'])))
 
 """
 What to save:
@@ -251,3 +255,11 @@ What to save:
     - qa splits qids (train, val, train-reserve, val-reserve, test-val, test)
     - annotations: merged annotations is saved for evaluation / future usage
 """
+json.dump(qids, open(os.path.join(
+    config.save_split_dir, 'used_image_ids.json'), 'w'))
+json.dump(objects_split, open(os.path.join(
+    config.save_split_dir, 'object_split.json'), 'w'))
+json.dump(qid_splits, open(os.path.join(
+    config.save_split_dir, 'qa_split.json'), 'w'))
+json.dump(qid2anno, open(os.path.join(
+    config.save_split_dir, 'merged_annotations.json'), 'w'))
