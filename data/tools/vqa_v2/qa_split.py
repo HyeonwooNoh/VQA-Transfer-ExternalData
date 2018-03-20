@@ -6,6 +6,7 @@ import re
 import numpy as np
 
 from tqdm import tqdm
+from util import log
 
 
 RANDOM_STATE = np.random.RandomState(123)
@@ -39,10 +40,21 @@ parser.add_argument('--occ_thres_2', type=int, default=50,
                     'this threshold are splited into train and test. If '
                     'occurrence is smaller, they are splited into train-reserve '
                     'and test.')
+parser.add_argument('--save_split_dir', type=str,
+                    default='data/preprocessed/vqa_v2/qa_split')
 config = parser.parse_args()
 
 vocab = json.load(open(config.vocab_path, 'r'))
 
+config.save_split_dir += '_thres1{}'.format(config.occ_thres_1)
+config.save_split_dir += '_thres2{}'.format(config.occ_thres_2)
+
+if not os.path.exists(config.save_split_dir):
+    log.warn('Create directory: {}'.format(config.save_split_dir))
+    os.makedirs(config.save_split_dir)
+else:
+    raise ValueError('The directory {} already exists. Do not overwrite.'.format(
+        config.save_split_dir)
 
 def intseq2str(intseq):
     return ' '.join([vocab['vocab'][i] for i in intseq])
@@ -90,7 +102,7 @@ for q in tqdm(merge_questions, desc='merge question and annotations'):
 def split_with_punctuation(string):
     return re.findall(r"[\w']+|[.,!?;]", string)
 
-for qid in tqdm(qid2anno.keys(), desc='tokenize QA':
+for qid in tqdm(qid2anno.keys(), desc='tokenize QA'):
     anno = qid2anno[qid]
     qid2anno[qid]['q_tokens'] = split_with_punctuation(
         anno['question'].lower())
@@ -111,17 +123,19 @@ def get_ngrams(tokens, n):
 
 occurrence = {name: 0 for name in objects}
 max_name_len = objects_intseq_len.max()
-for anno in tqdm(qid2anno.values(), desc='count object occurrence'):
+qid2ngrams = {}
+for qid, anno in tqdm(qid2anno.items(), desc='count object occurrence'):
     q_tokens = anno['q_tokens']
     a_tokens = anno['a_tokens']
-    grams = []
+    ngrams = []
     for n in range(1, min(len(q_tokens), max_name_len)):
-        grams.extend(get_ngrams(q_tokens, n))
+        ngrams.extend(get_ngrams(q_tokens, n))
     for n in range(1, min(len(a_tokens), max_name_len)):
-        grams.extend(get_ngrams(a_tokens, n))
-    grams = list(set(grams))
-    for gram in grams:
-        if gram in occurrence: occurrence[gram] += 1
+        ngrams.extend(get_ngrams(a_tokens, n))
+    ngrams = list(set(ngrams))
+    for ngram in ngrams:
+        if ngram in occurrence: occurrence[ngram] += 1
+    qid2ngrams[qid] = ngrams
 
 """
 How we could split object classes based on occurrence in questions and answers?
@@ -149,6 +163,7 @@ around 1167 classes are randomly splited into 'train' and 'test'
 around 3156 classes are randomly splited into 'train-reserve' and 'test'
 (train-reserve could be used for training or not, based on the experiment result)
 """
+log.warn('Split objects')
 obj_grp1 = [name for name, occ in occurrence.items()
             if occ >= config.occ_thres_1]
 obj_grp2 = [name for name, occ in occurrence.items()
@@ -165,9 +180,74 @@ objects_split = {
     'train-reserve': obj_grp3[:half3],
     'test': obj_grp2[half2:] + obj_grp3[half3:],
 }
+objects_split_set = {key: set(val) for key, val in objects_split.items()}
+log.infov('train object: {}'.format(len(objects_split['train'])))
+log.info('ex)')
+for obj in objects_split['train'][:5]: log.info(obj)
+
+log.infov('train-reserve object: {}'.format(len(objects_split['train-reserve'])))
+log.info('ex)')
+for obj in objects_split['train-reserve'][:5]: log.info(obj)
+
+log.infov('test object: {}'.format(len(objects_split['test'])))
+log.info('ex)')
+for obj in objects_split['test'][:5]: log.info(obj)
+
+
+def filter_qids_by_object_split(qids, split):
+    filtered_qids = []
+    for qid in tqdm(qids, desc='mark {} QA'.format(split)):
+        ngrams = qid2ngrams[qid]
+        is_target_split = False
+        for ngram in ngrams:
+            if ngram in objects_split_set[split]:
+                is_target_split = True
+                break
+        if is_target_split: filtered_qids.append(qid)
+    return filtered_qids
 
 qids = qid2anno.keys()
-print('Mark test QA')
-print('Mark train-reserve QA')
-print('Split test-val / test')
-print('Split train / val')
+
+log.warn('Mark test QA')
+test_qids = filter_qids_by_object_split(qids, 'test')
+left_qids = list(set(qids) - set(test_qids))
+log.infov('{} question ids are marked for test objects'.format(len(test_qids)))
+
+log.warn('Mark train-reserve QA')
+train_reserve_qids = filter_qids_by_object_split(left_qids, 'train-reserve')
+train_qids = list(set(left_qids) - set(train_reserve_qids))
+log.infov('{} question ids are marked for train-reserve objects'.format(
+    len(train_reserve_qids)))
+log.infov('{} question ids are marked for train objects'.format(
+    len(train_qids)))
+
+log.warn('Shuffle qids')
+RANDOM_STATE.shuffle(train_qids)
+RANDOM_STATE.shuffle(train_reserve_qids)
+RANDOM_STATE.shuffle(test_qids)
+
+train_80p = len(train_qids) * 100 / 80
+train_reserve_80p = len(train_reserve_qids) * 100 / 80
+test_80p = len(test_qids) * 100 / 80
+
+log.warn('Split test-val / test')
+test_val_qids = test_qids[test_80p:]
+test_qids = test_qids[:test_80p]
+log.infov('test: {}, test-val: {}'.format(len(test_qids), len(test_val_qids)))
+
+log.warn('Split train / val')
+val_qids = train_qids[train_80p:]
+train_qids = train_qids[:train_80p]
+log.infov('train: {}, val: {}'.format(len(train_qids), len(val_qids)))
+val_reserve_qids = train_reserve_qids[train_reserve_80p:]
+train_reserve_qids = train_reserve_qids[:train_reserve_80p]
+log.infov('train-reserve: {}, val-reserve: {}'.format(
+    len(train_reserve_qids), len(val_reserve_qids))
+
+"""
+What to save:
+    - used image ids (for efficient feature extraction)
+    - object splits (train , train-reserve, test)
+    - qa splits qids (train, val, train-reserve, val-reserve, test-val, test)
+    - annotations: merged annotations is saved for evaluation / future usage
+"""
