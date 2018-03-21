@@ -66,12 +66,16 @@ class Dataset(object):
                 box.astype(np.float32), [frac_x, frac_y]))
 
         split = image_path.split('/')[0]
+        image_id = image_path.replace('/', '-')
         box = preprocess_box(
-            self.densecap[split][image_path.replace('/', '-')].value)
+            self.densecap[split][image_id].value)
         box = box[:MAX_ROI_NUM]
         normal_box = box_utils.normalize_boxes_x1y1x2y2(
             box, self.width, self.height)
         num_box = np.array(box.shape[0], dtype=np.int32)
+
+        image_id = np.array(list(image_id), dtype=np.str)
+        image_id_len = len(image_id)
 
         """
         Returns:
@@ -80,12 +84,17 @@ class Dataset(object):
                 - box: all set of boxes used for roi pooling (x1y1x2y2 format)
                 - normal_box: normalized (y1x1y2x2 [0, 1]) box
                 - num_box: number of boxes
+                - image_id: list form of
+                  ex) train2014-COCO_train2014_00000045123.jpg
+                - image_id_len: length of image_id
         """
         returns = {
             'image': image,
             'box': box,
             'normal_box': normal_box,
-            'num_box': num_box
+            'num_box': num_box,
+            'image_id': image_id,
+            'image_id_len': image_id_len,
         }
         return returns
 
@@ -95,6 +104,8 @@ class Dataset(object):
             'box': [None, 4],
             'normal_box': [None, 4],
             'num_box': (),
+            'image_id': [None],
+            'image_id_len': (),
         }
         return data_shapes
 
@@ -104,6 +115,8 @@ class Dataset(object):
             'box': np.float32,
             'normal_box': np.float32,
             'num_box': np.int32,
+            'image_id': np.str,
+            'image_id_len': np.int32,
         }
         return data_types
 
