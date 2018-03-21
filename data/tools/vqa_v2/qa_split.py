@@ -102,7 +102,7 @@ for q in tqdm(merge_questions, desc='merge question and annotations'):
 
 
 def split_with_punctuation(string):
-    return re.findall(r"[\w']+|[.,!?;]", string)
+    return re.findall(r"'s+|[\w]+|[.,!?;-]", string)
 
 for qid in tqdm(qid2anno.keys(), desc='tokenize QA'):
     anno = qid2anno[qid]
