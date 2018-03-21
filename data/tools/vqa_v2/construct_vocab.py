@@ -15,6 +15,7 @@ parser.add_argument('--qa_split_dir', type=str,
                     default='data/preprocessed/vqa_v2'
                     '/qa_split_thres1_500_thres2_50', help=' ')
 parser.add_argument('--answer_set_limit', type=int, default=3000, help=' ')
+parser.add_argument('--max_answer_len', type=int, default=3, help=' ')
 config = parser.parse_args()
 
 log.info('loading merged_annotations..')
@@ -47,7 +48,10 @@ ans_in_order = list(zip(*answer_counts.most_common())[0])
 ans_in_order_glove = []
 for ans in ans_in_order:
     in_glove = True
-    for t in ans.split():
+    a_tokens = ans.split()
+    if len(a_tokens) > config.max_answer_len:
+        continue
+    for t in a_tokens:
         if t not in glove_vocab_set:
             in_glove = False
             break
@@ -57,14 +61,6 @@ for ans in ans_in_order:
 freq_ans = ans_in_order_glove[:config.answer_set_limit]
 freq_ans_set = set(freq_ans)
 
-"""
-For training set QA:
-    - if answer is not in freq_ans_set, ignore the example
-    - if the vocab is not in GloVe, mark it <unk>
-For testing set QA:
-    - if answer is not in freq_ans_set, mark it N+1-th answer
-    - if the vocab is not in GloVe, mark it <unk>
-"""
 q_vocab = set()
 for anno in tqdm(qid2anno.values(), desc='count q_vocab'):
     for t in anno['q_tokens']: q_vocab.add(t)
