@@ -2,7 +2,6 @@ import argparse
 import h5py
 import json
 import os
-import re
 import numpy as np
 
 from tqdm import tqdm
@@ -137,7 +136,7 @@ f.close()
 log.warn('write to id file')
 fid = open(config.id_path, 'w')
 for key in ['train', 'val', 'test-val', 'test']:
-    for qid in used_qid:
+    for qid in used_qid[key]:
         fid.write(str(qid) + '\n')
 fid.close()
 log.infov('data file is saved to: {}'.format(config.data_path))
