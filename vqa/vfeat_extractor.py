@@ -78,6 +78,9 @@ class Extractor(object):
             'image_id_len': self.batch['image_id_len']
         }
         f = h5py.File(self.save_path, 'w')
+        data_info = f.create_group('data_info')
+        data_info['pretrained_param_path'] = \
+            self.pretrained_param_path.replace('/', '-')
         for it in tqdm(range(self.num_iter), desc='extract feature'):
             try:
                 res = self.session.run(feed_dict)
