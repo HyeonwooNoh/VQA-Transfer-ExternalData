@@ -1,4 +1,6 @@
+import json
 import h5py
+import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
 import tensorflow.contrib.rnn as rnn
@@ -241,6 +243,25 @@ def learn_embedding_map(used_vocab, scope='learn_embedding_map', reuse=tf.AUTO_R
             name='learn', shape=[len(used_vocab['vocab']), 300],
             initializer=tf.random_uniform_initializer(
                 minval=-0.01, maxval=0.01))
+        return embed_map
+
+
+def GloVe_vocab(vocab, scope='GloVe', reuse=tf.AUTO_REUSE):
+    with tf.variable_scope(scope, reuse=reuse) as scope:
+        glove_vocab = json.load(open(GLOVE_VOCAB_PATH, 'r'))
+        used_vocab_idx = [glove_vocab['dict'][v] for v in vocab['vocab'][:-3]]
+
+        with h5py.File(GLOVE_EMBEDDING_PATH, 'r') as f:
+            glove_param = f['param'].value
+        subset_param = np.take(glove_param, used_vocab_idx, axis=1)
+
+        log.warning(scope.name)
+        fixed = tf.constant(subset_param.transpose())
+        learn = tf.get_variable(
+            name='learn', shape=[3, 300],
+            initializer=tf.random_uniform_initializer(
+                minval=-0.01, maxval=0.01))
+        embed_map = tf.concat([fixed, learn], axis=0)
         return embed_map
 
 
