@@ -24,6 +24,7 @@ def create(dataset,
 
     key_list = [
         'id',
+        'image',
         'box',
         'normal_box',
         'num_box',
@@ -49,7 +50,7 @@ def create(dataset,
         def load_py_func(id):
 
             data_types = dataset.get_data_types()
-            data_types['id'] = np.str
+            data_types['id'] = np.int32
 
             type_out = [np2tf_type(data_types[key]) for key in key_list]
 

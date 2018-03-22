@@ -68,14 +68,13 @@ class Dataset(object):
         split = image_path.split('/')[0]
         image_id = image_path.replace('/', '-')
         box = preprocess_box(
-            self.densecap[split][image_id].value)
-        box = box[:MAX_ROI_NUM]
+            self.densecap[split][image_id]['boxes'].value[:MAX_ROI_NUM])
         normal_box = box_utils.normalize_boxes_x1y1x2y2(
             box, self.width, self.height)
         num_box = np.array(box.shape[0], dtype=np.int32)
 
         image_id = np.array(list(image_id), dtype=np.str)
-        image_id_len = len(image_id)
+        image_id_len = np.array(len(image_id), dtype=np.int32)
 
         """
         Returns:
