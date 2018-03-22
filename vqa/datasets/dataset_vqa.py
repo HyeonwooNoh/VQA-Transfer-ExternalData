@@ -36,6 +36,8 @@ class Dataset(object):
         self.data = h5py.File(file_name, 'r')
         self.data_info = self.data['data_info']
 
+        self.num_answer_candidate = self.data_info['intseq_ans'].shape[0]
+
         self.vfeat = h5py.File(vfeat_path, 'r')
 
         log.info('Reading Done {}'.format(file_name))
@@ -68,6 +70,9 @@ class Dataset(object):
 
         q_intseq = entry['question_intseq'].value
         q_intseq_len = np.array(len(q_intseq), dtype=np.int32)
+
+        answer_intseq = self.data_info['intseq_ans'].value
+        answer_intseq_len = self.data_info['intseq_ans_len'].value
         answer_id = np.array(entry['answer_id'].value, dtype=np.int32)
 
         """
@@ -78,6 +83,8 @@ class Dataset(object):
             - V_ft: pre-extracted visual features [num_box x V_DIM]
             - q_intseq: intseq tokens of question
             - q_intseq_len: length of intseq question
+            - answer_intseq: intseq of answer candidates
+            - answer_intseq_len: length of answer candidates
             - answer_id: ground truth index in answer candidates
         """
         returns = {
@@ -87,9 +94,10 @@ class Dataset(object):
             'V_ft': V_ft,
             'q_intseq': q_intseq,
             'q_intseq_len': q_intseq_len,
+            'answer_intseq': answer_intseq,
+            'answer_intseq_len': answer_intseq_len,
             'answer_id': answer_id
         }
-
         return returns
 
     def get_data_shapes(self):
@@ -100,6 +108,8 @@ class Dataset(object):
             'V_ft': [None, 512],
             'q_intseq': [None],
             'q_intseq_len': (),
+            'answer_intseq': [self.num_answer_candidate, None],
+            'answer_intseq_len': [self.num_answer_candidate],
             'answer_id': (),
         }
         return data_shapes
@@ -112,6 +122,8 @@ class Dataset(object):
             'V_ft': np.float32,
             'q_intseq': np.int32,
             'q_intseq_len': np.int32,
+            'answer_intseq': np.int32,
+            'answer_intseq_len': np.int32,
             'answer_id': np.int32,
         }
         return data_types

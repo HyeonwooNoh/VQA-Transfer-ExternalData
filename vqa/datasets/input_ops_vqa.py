@@ -30,6 +30,8 @@ def create(dataset,
         'V_ft',
         'q_intseq',
         'q_intseq_len',
+        'answer_intseq',
+        'answer_intseq_len',
         'answer_id',
     ]
 
