@@ -11,7 +11,7 @@ import tensorflow.contrib.slim.nets as nets
 from util import log
 
 GLOVE_EMBEDDING_PATH = 'data/preprocessed/glove.6B.300d.hdf5'
-GLOVE_VOCAB_PATH = 'data/preprocessed/vocab.json'
+GLOVE_VOCAB_PATH = 'data/preprocessed/glove_vocab.json'
 ENC_I_R_MEAN = 123.68
 ENC_I_G_MEAN = 116.78
 ENC_I_B_MEAN = 103.94
@@ -25,12 +25,14 @@ def attention_pooling(memory, score, scope='attention_pooling'):
     Returns:
         - pooled_memory: [bs, dim]
     """
-    expanded_score = tf.expand_dims(score, axis=1)
-    # expanded_score shape is [bs, 1, len]
-    # memory shape is [bs, len, dim]
-    pooled_memory = tf.matmul(expanded_score, memory)
-    # pooled memory shape is [bs, 1, dim]
-    pooled_memory = tf.squeeze(pooled_memory, axis=1)
+    with tf.name_scope(scope):
+        log.warning(scope)
+        expanded_score = tf.expand_dims(score, axis=1)
+        # expanded_score shape is [bs, 1, len]
+        # memory shape is [bs, len, dim]
+        pooled_memory = tf.matmul(expanded_score, memory)
+        # pooled memory shape is [bs, 1, dim]
+        pooled_memory = tf.squeeze(pooled_memory, axis=1)
     return pooled_memory
 
 
@@ -43,8 +45,8 @@ def attention(memory, memory_len, query, scope='attention'):
     Returns:
         - score: [bs, len] (probability that sums to one)
     """
-    with tf.name_scope(scope) as scope:
-        log.warning(scope.name)
+    with tf.name_scope(scope):
+        log.warning(scope)
         with tf.name_scope('compute'):
             score = tf.reduce_sum(memory * tf.expand_dims(query, axis=1),
                                   axis=-1)
