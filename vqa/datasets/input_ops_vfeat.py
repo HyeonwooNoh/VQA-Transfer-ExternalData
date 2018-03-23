@@ -59,7 +59,7 @@ def create(dataset,
 
             return {key: py_func_out[i] for i, key in enumerate(key_list)}
 
-        tf_dataset = tf_dataset.map(load_py_func)
+        tf_dataset = tf_dataset.map(load_py_func, num_parallel_calls=4)
 
         def set_shape(entry):
             for key in key_list:
