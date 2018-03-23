@@ -74,9 +74,13 @@ RANDOM_STATE.shuffle(ids['val'])
 RANDOM_STATE.shuffle(ids['testval'])
 RANDOM_STATE.shuffle(ids['test'])
 
-sess = tf.Session()
-image_placeholder = tf.placeholder(tf.uint8)
-png_encoded = tf.image.encode_png(image_placeholder)
+session_config = tf.ConfigProto(
+    device_count={'CPU': 1, 'GPU': 0})
+sess = tf.Session(config=session_config)
+
+with tf.device('/cpu:0'):
+    image_placeholder = tf.placeholder(tf.uint8)
+    png_encoded = tf.image.encode_png(image_placeholder)
 
 log.warn('write tf_record of {} data: {}'.format(
     config.split, config.tf_record_dir))
