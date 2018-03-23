@@ -251,7 +251,7 @@ def main():
                         help=' ')
     parser.add_argument('--vocab_name', type=str, default='vocab.json', help=' ')
     # log
-    parser.add_argument('--log_step', type=int, default=10)
+    parser.add_argument('--log_step', type=int, default=1)
     parser.add_argument('--heavy_summary_step', type=int, default=1000)
     parser.add_argument('--val_sample_step', type=int, default=100)
     parser.add_argument('--write_summary_step', type=int, default=100)
