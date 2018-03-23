@@ -77,6 +77,7 @@ ans_dict = {ans: i for i, ans in enumerate(freq_ans)}
 data_info = f.create_group('data_info')
 data_info['intseq_ans'] = np_intseq_ans
 data_info['intseq_ans_len'] = np_intseq_ans_len
+data_info['max_ans_len'] = np.array(max_ans_len, dtype=np.int32)
 
 """
 For training set QA:
@@ -92,6 +93,7 @@ used_qid = {
     'test-val': [],
     'test': [],
 }
+max_q_len = 0
 for split in ['train', 'val']:
     for qid in tqdm(qa_split[split], desc='process {} qids'.format(split)):
         anno = qid2anno[str(qid)]
@@ -104,6 +106,7 @@ for split in ['train', 'val']:
         q_intseq = [vocab['dict'].get(t, unk_id) for t in anno['q_tokens']]
         q_intseq = np.array(q_intseq, dtype=np.int32)
         used_qid[split].append(qid)
+        max_q_len = max(max_q_len, len(q_intseq))
 
         grp = f.create_group(str(qid))
         grp['answer_id'] = ans_id
@@ -120,6 +123,7 @@ for split in ['test-val', 'test']:
         q_intseq = [vocab['dict'].get(t, unk_id) for t in anno['q_tokens']]
         q_intseq = np.array(q_intseq, dtype=np.int32)
         used_qid[split].append(qid)
+        max_q_len = max(max_q_len, len(q_intseq))
 
         grp = f.create_group(str(qid))
         grp['answer_id'] = ans_id
@@ -131,6 +135,7 @@ data_info['num_train'] = len(used_qid['train'])
 data_info['num_val'] = len(used_qid['val'])
 data_info['num_test-val'] = len(used_qid['test-val'])
 data_info['num_test'] = len(used_qid['test'])
+data_info['max_q_len'] = np.array(max_q_len, dtype=np.int32)
 f.close()
 
 log.warn('write to id file')
