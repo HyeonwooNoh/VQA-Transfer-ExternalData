@@ -1,6 +1,7 @@
 import argparse
 import h5py
 import os
+import numpy as np
 import tensorflow as tf
 
 from tqdm import tqdm
@@ -21,6 +22,7 @@ class Extractor(object):
 
     def __init__(self, config, dataset):
         self.config = config
+        self.data_cfg = dataset.get_config()
 
         self.save_path = config.save_path
         self.pretrained_param_path = config.pretrained_param_path
@@ -81,6 +83,8 @@ class Extractor(object):
         data_info = f.create_group('data_info')
         data_info['pretrained_param_path'] = \
             self.pretrained_param_path.replace('/', '-')
+        data_info['max_box_num'] = np.array(
+            self.data_cfg.max_roi_num, dtype=np.int32)
         for it in tqdm(range(self.num_iter), desc='extract feature'):
             try:
                 res = self.session.run(feed_dict)
