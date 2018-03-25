@@ -13,12 +13,6 @@ MAP_DIM = 512
 V_DIM = 512
 ENC_I_PARAM_PATH = 'data/nets/resnet_v1_50.ckpt'
 
-ROI_SZ = 5
-
-# Visualization
-VIS_NUMBOX = 5
-LINE_WIDTH = 2
-
 
 class Model(object):
 
@@ -165,7 +159,6 @@ class Model(object):
             inp=[image, box, num_box, att_score,
                  q_intseq, q_intseq_len, label, pred],
             Tout=tf.uint8)
-
 
     def build(self, is_train=True):
         """
