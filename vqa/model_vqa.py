@@ -103,6 +103,7 @@ class Model(object):
         Perform attention
         """
         att_score = modules.attention(V_ft, num_V_ft, q_map_V)
+        self.mid_result['att_score'] = att_score
         pooled_V_ft = modules.attention_pooling(V_ft, att_score)
         # [bs, L_DIM]
         pooled_map_L, _ = modules.V2L(pooled_V_ft, MAP_DIM, L_DIM,
