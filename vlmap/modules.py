@@ -61,6 +61,35 @@ def attention(memory, memory_len, query, scope='attention'):
         return score
 
 
+def hadamard_attention(memory, memory_len, query, is_train=True,
+                       scope='hadamard_attention', reuse=tf.AUTO_REUSE):
+    """
+    Args:
+        - memory: [bs, len, dim]
+        - memory_len: [bs]
+        - query: [bs, dim]
+    Returns:
+        - score: [bs, len] (probability that sums to one)
+    """
+    with tf.variable_scope(scope, reuse=reuse) as scope:
+        log.warning(scope.name)
+        with tf.variable_scope('compute', reuse=reuse):
+            score_feat = memory * tf.expand_dims(query, axis=1)
+            score = fc_layer(score_feat, 1, use_bias=True, use_bn=False,
+                             activation_fn=None, is_training=is_train,
+                             scope='score')
+            score = tf.squeeze(score, axis=-1)
+        with tf.name_scope('mask'):
+            score_mask_value = tf.as_dtype(score.dtype).as_numpy_dtype(-np.inf)
+            score_mask = tf.sequence_mask(
+                memory_len, maxlen=tf.shape(score)[1])
+            score_mask_values = score_mask_value * tf.ones_like(score)
+            score = tf.where(score_mask, score, score_mask_values)
+        with tf.name_scope('normalize'):
+            score = tf.nn.softmax(score, axis=-1)
+        return score
+
+
 def encode_L(seq, seq_len, dim=384, scope='encode_L',
              reuse=tf.AUTO_REUSE):
     with tf.variable_scope(scope, reuse=reuse) as scope:

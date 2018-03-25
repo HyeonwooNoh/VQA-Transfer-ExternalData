@@ -28,9 +28,6 @@ class Model(object):
         self.vocab = json.load(open(config.vocab_path, 'r'))
         self.glove_map = modules.GloVe_vocab(self.vocab)
 
-        # model parameters
-        self.ft_vlmap = config.ft_vlmap
-
         # answer candidates
         with h5py.File(os.path.join(config.dataset_dir, 'data.hdf5'), 'r') as f:
             self.answer_intseq_value = f['data_info']['intseq_ans'].value
@@ -46,24 +43,13 @@ class Model(object):
     def filter_train_vars(self, trainable_vars):
         train_vars = []
         for var in trainable_vars:
-            if var.name.split('/')[0] == 'V2L':
-                if self.ft_vlmap:
-                    train_vars.append(var)
-            elif var.name.split('/')[0] == 'L2V':
-                if self.ft_vlmap:
-                    train_vars.append(var)
-            else:
-                train_vars.append(var)
+            train_vars.append(var)
         return train_vars
 
     def filter_transfer_vars(self, all_vars):
         transfer_vars = []
         for var in all_vars:
-            if var.name.split('/')[0] == 'V2L':
-                transfer_vars.append(var)
-            elif var.name.split('/')[0] == 'L2V':
-                transfer_vars.append(var)
-            elif var.name.split('/')[0] == 'encode_L':
+            if var.name.split('/')[0] == 'encode_L':
                 transfer_vars.append(var)
             elif var.name.split('/')[0] == 'GloVe':
                 transfer_vars.append(var)
@@ -171,6 +157,12 @@ class Model(object):
         V_ft = self.batch['V_ft']  # [bs, num_box, V_DIM]
         num_V_ft = self.batch['num_box']  # [bs]
 
+        log.warning('v_linear_v')
+        v_linear_v = modules.fc_layer(
+            V_ft, V_DIM, use_bias=True, use_bn=False,
+            activation_fn=tf.tanh, is_training=is_train,
+            scope='v_linear_v')
+
         """
         Encode question
         """
@@ -179,50 +171,43 @@ class Model(object):
         q_L_ft = modules.encode_L(q_embed, self.batch['q_intseq_len'], L_DIM)
 
         # [bs, V_DIM}
-        q_map_V = modules.L2V(q_L_ft, MAP_DIM, V_DIM, is_train=is_train)
+        log.warning('q_linear_v')
+        q_linear_v = modules.fc_layer(
+            q_L_ft, V_DIM, use_bias=True, use_bn=False,
+            activation_fn=tf.tanh, is_training=is_train,
+            scope='q_linear_v')
 
         """
         Perform attention
         """
-        att_score = modules.attention(V_ft, num_V_ft, q_map_V)
+        att_score = modules.hadamard_attention(v_linear_v, num_V_ft, q_linear_v,
+                                               is_train=is_train)
         self.mid_result['att_score'] = att_score
         pooled_V_ft = modules.attention_pooling(V_ft, att_score)
-        # [bs, L_DIM]
-        pooled_map_L, _ = modules.V2L(pooled_V_ft, MAP_DIM, L_DIM,
-                                      is_train=is_train)
+
         """
         Answer classification
         """
-        answer_embed = tf.nn.embedding_lookup(self.glove_map, self.answer_intseq)
-        # [num_answer, L_DIM]
-        answer_ft = modules.encode_L(answer_embed, self.answer_intseq_len, L_DIM)
-
         # perform two layer feature encoding and predict output
         with tf.variable_scope('reasoning') as scope:
             log.warning(scope.name)
-            # layer 1
-            # answer_layer1: [1, num_answer, L_DIM]
-            # pooled_layer1: [bs, 1, L_DIM]
-            # q_layer1: [bs, 1, L_DIM]
-            # layer1: [bs, num_answer, L_DIM]
-            answer_layer1 = modules.fc_layer(
-                answer_ft, L_DIM, use_bias=False, use_bn=False,
-                activation_fn=None, is_training=is_train, scope='answer_layer1')
-            answer_layer1 = tf.expand_dims(answer_layer1, axis=0)
-            pooled_layer1 = modules.fc_layer(
-                pooled_map_L, L_DIM, use_bias=False, use_bn=False,
-                activation_fn=None, is_training=is_train, scope='pooled_layer1')
-            pooled_layer1 = tf.expand_dims(pooled_layer1, axis=1)
-            q_layer1 = modules.fc_layer(
+            # [bs, L_DIM]
+            log.warning('pooled_linear_l')
+            pooled_linear_l = modules.fc_layer(
+                pooled_V_ft, L_DIM, use_bias=True, use_bn=False,
+                activation_fn=tf.tanh, is_training=is_train,
+                scope='pooled_linear_l')
+
+            log.warning('q_linear_l')
+            q_linear_l = modules.fc_layer(
                 q_L_ft, L_DIM, use_bias=True, use_bn=False,
-                activation_fn=None, is_training=is_train, scope='q_layer1')
-            q_layer1 = tf.expand_dims(q_layer1, axis=1)
-            layer1 = tf.tanh(answer_layer1 + pooled_layer1 + q_layer1)
+                activation_fn=tf.tanh, is_training=is_train,
+                scope='q_linear_l')
 
             logit = modules.fc_layer(
-                layer1, 1, use_bias=True, use_bn=False,
+                pooled_linear_l * q_linear_l, self.num_answer,
+                use_bias=True, use_bn=False,
                 activation_fn=None, is_training=is_train, scope='classifier')
-            logit = tf.squeeze(logit, axis=-1)  # [bs, num_answer]
 
         """
         Compute loss and accuracy

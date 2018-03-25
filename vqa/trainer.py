@@ -13,6 +13,8 @@ class Trainer(object):
     def get_model_class(model_type='vqa'):
         if model_type == 'vqa':
             from vqa.model_vqa import Model
+        elif model_type == 'standard':
+            from vqa.model_standard import Model
         else:
             raise ValueError('Unknown model_type')
         return Model
@@ -275,7 +277,7 @@ def main():
     # model parameters
     parser.add_argument('--batch_size', type=int, default=3, help=' ')
     parser.add_argument('--model_type', type=str, default='vqa', help=' ',
-                        choices=['vqa'])
+                        choices=['vqa', 'standard'])
     parser.add_argument('--ft_vlmap', action='store_true', default=False)
     config = parser.parse_args()
     config.vocab_path = os.path.join(config.qa_split_dir, config.vocab_name)
