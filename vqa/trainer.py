@@ -4,7 +4,7 @@ import time
 import tensorflow as tf
 
 from util import log
-from vqa.datasets import dataset_vqa, input_ops_vqa
+from vqa.datasets import input_ops_vqa_tf_record
 
 
 class Trainer(object):
@@ -17,12 +17,15 @@ class Trainer(object):
             raise ValueError('Unknown model_type')
         return Model
 
-    def __init__(self, config, dataset):
+    def __init__(self, config):
         self.config = config
+        self.dataset_dir = config.dataset_dir
+        self.vfeat_path = config.vfeat_path
+        self.tf_record_dir = config.tf_record_dir
 
         dataset_str = 'd'
         dataset_str += '_' + '_'.join(config.qa_split_dir.replace(
-            'data/preprocessed/vqa_v2', '').split('/'))
+            'data/preprocessed/vqa_v2/', '').split('/'))
         dataset_str += '_' + config.vfeat_name.replace('.hdf5', '')
 
         hyper_parameter_str = 'bs{}_lr{}'.format(
@@ -44,17 +47,21 @@ class Trainer(object):
 
         with tf.name_scope('datasets/batch'):
             vqa_batch = {
-                'train': input_ops_vqa.create(
-                    dataset['train'], self.batch_size, is_train=True,
+                'train': input_ops_vqa_tf_record.create(
+                    self.batch_size, self.dataset_dir, self.vfeat_path,
+                    self.tf_record_dir, 'train', is_train=True,
                     scope='train_ops', shuffle=True),
-                'val': input_ops_vqa.create(
-                    dataset['val'], self.batch_size, is_train=True,
+                'val': input_ops_vqa_tf_record.create(
+                    self.batch_size, self.dataset_dir, self.vfeat_path,
+                    self.tf_record_dir, 'val', is_train=True,
                     scope='val_ops', shuffle=False),
-                'testval': input_ops_vqa.create(
-                    dataset['testval'], self.batch_size, is_train=True,
+                'testval': input_ops_vqa_tf_record.create(
+                    self.batch_size, self.dataset_dir, self.vfeat_path,
+                    self.tf_record_dir, 'testval', is_train=True,
                     scope='testval_ops', shuffle=False),
-                'test': input_ops_vqa.create(
-                    dataset['test'], self.batch_size, is_train=True,
+                'test': input_ops_vqa_tf_record.create(
+                    self.batch_size, self.dataset_dir, self.vfeat_path,
+                    self.tf_record_dir, 'test', is_train=True,
                     scope='test_ops', shuffle=False)
             }
             batch_opt = {
@@ -99,7 +106,7 @@ class Trainer(object):
             clip_gradients=20.0,
             variables=train_vars,
             increment_global_step=True,
-            name='v_optimizer')
+            name='optimizer')
 
         self.summary_ops = {
             'train': tf.summary.merge_all(key='train'),
@@ -249,6 +256,8 @@ def main():
     parser.add_argument('--dataset_name', type=str, default='data', help=' ')
     parser.add_argument('--vfeat_name', type=str, default='used_vfeat.hdf5',
                         help=' ')
+    parser.add_argument('--tf_record_dir_name', type=str, default='tf_record',
+                        help=' ')
     parser.add_argument('--vocab_name', type=str, default='vocab.json', help=' ')
     # log
     parser.add_argument('--log_step', type=int, default=1)
@@ -268,16 +277,13 @@ def main():
     parser.add_argument('--ft_vlmap', action='store_true', default=False)
     config = parser.parse_args()
     config.vocab_path = os.path.join(config.qa_split_dir, config.vocab_name)
-    config.dataset_path = os.path.join(config.qa_split_dir, config.dataset_name)
+    config.dataset_dir = os.path.join(config.qa_split_dir, config.dataset_name)
     config.vfeat_path = os.path.join(config.qa_split_dir, config.vfeat_name)
+    config.tf_record_dir = os.path.join(config.qa_split_dir,
+                                        config.tf_record_dir_name)
     check_config(config)
 
-    dataset = dataset_vqa.create_default_splits(
-        config.dataset_path, config.image_dir, config.vfeat_path,
-        config.vocab_path, is_train=True)
-    config.dataset_config = dataset['train'].get_config()
-
-    trainer = Trainer(config, dataset)
+    trainer = Trainer(config)
     trainer.train()
 
 if __name__ == '__main__':

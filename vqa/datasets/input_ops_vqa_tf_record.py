@@ -61,8 +61,15 @@ def create(batch_size,
             }
             return inputs
 
+        # TODO(hyeonwoonoh): fix map_and_batch.
+        # Due to the bug in map_and_batch, we temporarily code batch_size by
+        # placeholder_with_default.
+        # Remove this when the tf bug is fixed.
+        # ref: https://github.com/tensorflow/tensorflow/issues/17720
         dataset = dataset.apply(tf.contrib.data.map_and_batch(
-            map_func=parse_fn, batch_size=batch_size))
+            map_func=parse_fn,
+            batch_size=tf.placeholder_with_default(
+                tf.constant(batch_size, dtype=tf.int64), shape=())))
 
         dataset = dataset.prefetch(buffer_size=10)
 

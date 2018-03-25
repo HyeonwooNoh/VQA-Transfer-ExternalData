@@ -25,7 +25,6 @@ class Model(object):
     def __init__(self, batch, config, is_train=True):
         self.batch = batch
         self.config = config
-        self.data_cfg = config.dataset_config
 
         self.losses = {}
         self.report = {}
@@ -39,7 +38,7 @@ class Model(object):
         self.ft_vlmap = config.ft_vlmap
 
         # answer candidates
-        with h5py.File(os.path.join(config.dataset_path, 'data.hdf5'), 'r') as f:
+        with h5py.File(os.path.join(config.dataset_dir, 'data.hdf5'), 'r') as f:
             self.answer_intseq = tf.constant(
                 f['data_info']['intseq_ans'].value)  # [num_answer, len]
             self.answer_intseq_len = tf.constant(
@@ -90,7 +89,9 @@ class Model(object):
         """
         Encode question
         """
+        self.mid_result['q_intseq'] = self.batch['q_intseq']
         q_embed = tf.nn.embedding_lookup(self.glove_map, self.batch['q_intseq'])
+        self.mid_result['q_embed'] = q_embed
         # [bs, L_DIM]
         q_L_ft = modules.encode_L(q_embed, self.batch['q_intseq_len'], L_DIM)
 
