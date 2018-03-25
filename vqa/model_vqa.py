@@ -4,7 +4,7 @@ import os
 import numpy as np
 import tensorflow as tf
 
-from util import log
+from util import box_utils, log
 from vlmap import modules
 
 W_DIM = 300  # Word dimension
@@ -75,6 +75,52 @@ class Model(object):
 
     def get_enc_I_param_path(self):
         return ENC_I_PARAM_PATH
+
+    def visualize_vqa_result(self,
+                             image, box, num_box,
+                             att_score,
+                             q_intseq, q_intseq_len,
+                             label, pred):
+        def construct_visualization(b_image, bb_box, b_num_box,
+                                    bb_att_score,
+                                    b_q_intseq, b_q_intseq_len,
+                                    b_label, b_pred):
+            # b_ : batch
+            # bb_ : [batch, description]
+            import textwrap
+            from PIL import Image, ImageDraw, ImageFont
+            font = ImageFont.load_default()
+
+            def intseq2str(intseq):
+                return ' '.join([self.vocab['vocab'][i] for i in intseq])
+
+            def string2image(string, image_width=b_image.shape[1]):
+                pil_text = Image.fromarray(
+                    np.zeros([35, image_width, 3], dtype=np.uint8) + 220)
+                t_draw = ImageDraw.Draw(pil_text)
+                for l, line in enumerate(textwrap.wrap(string, width=90)):
+                    t_draw.text((2, 2 + l * 15), line, font=font,
+                                fill=(10, 10, 50))
+                return np.array(pil_text).astype(np.uint8)
+
+            for batch_idx, image in enumerate(b_image):
+                float_image = image.astype(np.float32)
+                att_mask = np.zeros_like(float_image)
+                att_mask = np
+                palette = Image.fromarray(zero_palette)
+                draw = ImageDraw.Draw(palette)
+                b_score = bb_att_score[batch_idx]
+                for box_idx in range(b_num_box[batch_idx]):
+                    box = bb_box[batch_idx][box_idx]
+                    draw.rectangle(box, fill=b_score[box_idx])
+                max_score_idx = np.argmax(b_score)
+                att_mask =
+                att_image =
+
+
+
+
+        pass
 
     def build(self, is_train=True):
         """
@@ -158,6 +204,13 @@ class Model(object):
             self.losses['answer'] = loss
             self.report['answer_loss'] = loss
             self.report['answer_accuracy'] = acc
+
+        """
+        Prepare image summary
+        """
+        with tf.name_scope('prepare_summary'):
+            self.vis_image['image_attention_qa'] = self.visualize_vqa_result(
+            )
 
         self.loss = self.losses['answer']
 
