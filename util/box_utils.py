@@ -287,10 +287,27 @@ def draw_x1y1x2y2(image, box, value):
 
     h, w, c = image.shape
     (x1, y1, x2, y2) = box
-    x1 = max(0, x1)
-    y1 = max(0, y1)
-    x2 = min(w - 1, x2)
-    y2 = min(h - 1, y2)
+    x1 = int(max(0, x1))
+    y1 = int(max(0, y1))
+    x2 = int(min(w - 1, x2))
+    y2 = int(min(h - 1, y2))
 
-    image[y1: y2, x1: x2, :] = value
-    return image
+    new_image = image.copy()
+    new_image[y1: y2, x1: x2, :] = value
+    return new_image
+
+
+def add_value_x1y1x2y2(image, box, value):
+    assert len(image.shape) == 3, 'image should have height, width, and channel'
+    assert image.shape[2] == 3, 'image should have 3 channels'
+
+    h, w, c = image.shape
+    (x1, y1, x2, y2) = box
+    x1 = int(max(0, x1))
+    y1 = int(max(0, y1))
+    x2 = int(min(w - 1, x2))
+    y2 = int(min(h - 1, y2))
+
+    new_image = image.copy()
+    new_image[y1: y2, x1: x2, :] += value
+    return new_image
