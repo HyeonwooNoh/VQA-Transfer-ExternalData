@@ -43,6 +43,7 @@ class Model(object):
                 f['data_info']['intseq_ans'].value)  # [num_answer, len]
             self.answer_intseq_len = tf.constant(
                 f['data_info']['intseq_ans_len'].value)  # [num_answer]
+            self.num_answer = self.answer_intseq.shape[0]
 
         self.build(is_train=is_train)
 
@@ -140,21 +141,18 @@ class Model(object):
                 activation_fn=None, is_training=is_train, scope='classifier')
             logit = tf.squeeze(logit, axis=-1)  # [bs, num_answer]
 
-            # concat inf
-            inf = tf.as_dtype(logit.dtype).as_numpy_dtype(-np.inf)
-            inf_column = tf.ones(
-                [tf.shape(logit)[0], 1], dtype=logit.dtype) * inf
-            logit = tf.concat([logit, inf_column], axis=1)  # [bs, num_answer + 1]
-
         """
         Compute loss and accuracy
         """
         with tf.name_scope('loss'):
-            label = self.batch['answer_id']
-            loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
-                labels=label, logits=logit))
-            pred = tf.argmax(logit, axis=-1)
-            acc = tf.reduce_mean(tf.to_float(pred == label))
+            label = tf.cast(self.batch['answer_id'], dtype=tf.int32)
+            loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
+                labels=tf.clip_by_value(label, 0, self.num_answer - 1),
+                logits=logit)
+            loss_mask = tf.to_float(tf.less(label, self.num_answer))
+            loss = tf.reduce_mean(loss * loss_mask)
+            pred = tf.cast(tf.argmax(logit, axis=-1), dtype=tf.int32)
+            acc = tf.reduce_mean(tf.to_float(tf.equal(pred, label)))
 
             self.losses['answer'] = loss
             self.report['answer_loss'] = loss

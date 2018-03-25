@@ -170,7 +170,8 @@ class Trainer(object):
             step, train_summary, loss, step_time = \
                 self.run_train_step(s % self.heavy_summary_step == 0)
             if s % self.log_step == 0:
-                self.log_step_message(step, loss, step_time, is_train=True)
+                self.log_step_message(step, loss, step_time,
+                                      split='train', is_train=True)
 
             # Periodic inference
             if s % self.val_sample_step == 0:
@@ -180,14 +181,14 @@ class Trainer(object):
                 self.summary_writer.add_summary(val_summary,
                                                 global_step=val_step)
                 self.log_step_message(val_step, val_loss, val_step_time,
-                                      is_train=False)
+                                      split='val', is_train=False)
                 testval_step, testval_summary, testval_loss, testval_step_time = \
                     self.run_val_step(s % self.heavy_summary_step == 0,
                                       target_split='testval')
                 self.summary_writer.add_summary(testval_summary,
                                                 global_step=testval_step)
                 self.log_step_message(testval_step, testval_loss, testval_step_time,
-                                      is_train=False)
+                                      split='testval', is_train=False)
 
             if s % self.write_summary_step == 0:
                 self.summary_writer.add_summary(train_summary,
@@ -223,14 +224,15 @@ class Trainer(object):
         _end_time = time.time()
         return step, summary, loss, (_end_time - _start_time)
 
-    def log_step_message(self, step, loss, step_time, is_train=True):
+    def log_step_message(self, step, loss, step_time, split='train',
+                         is_train=True):
         if step_time == 0: step_time = 0.001
         log_fn = (is_train and log.info or log.infov)
         log_fn((" [{split_mode:5s} step {step:4d}] " +
                 "Loss: {loss:.5f} " +
                 "({sec_per_batch:.3f} sec/batch, {instance_per_sec:.3f} " +
                 "instances/sec) "
-                ).format(split_mode=(is_train and 'train' or 'val'),
+                ).format(split_mode=split,
                          step=step,
                          loss=loss,
                          sec_per_batch=step_time,
