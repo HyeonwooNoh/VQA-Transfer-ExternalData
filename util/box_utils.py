@@ -138,6 +138,36 @@ def normalize_boxes_x1y1x2y2(boxes, width, height):
     return np.clip(new_boxes, 0, 1)
 
 
+def scale_boxes_x1y1x2y2(boxes, frac):
+    """
+    Rescale boxes to convert from one coordinate system to another.
+
+    Inputs:
+        - boxes: Tensor of shape (N, 4) giving coordinates of boxes in
+          (x1, y1, x2, y2) format.
+        - frac: Fraction by which to scale the boxes. For example
+          if boxes assume that the input image has size 800x600 but we want to
+          use them at 400x300 scale, then frac should be 0.5.
+          array [frac_x, frac_y] for using separate rescale
+
+    Returns:
+        - boxes_scaled: Tensor of shape (N, 4) giving rescaled box coordinates
+          in (x1, y1, x2, y2) format.
+    """
+    # bb is given as Nx4 tensor of x,y,w,h
+    # e.g. original width was 800 but now is 512, then frac will be 800/512 = 1.56
+    if isinstance(frac, list):
+        assert len(frac) == 2, 'only two dimension frac is possible for array input'
+        new_boxes = boxes.copy()
+        new_boxes[:, 0] *= frac[0]
+        new_boxes[:, 1] *= frac[1]
+        new_boxes[:, 2] *= frac[0]
+        new_boxes[:, 3] *= frac[1]
+    else:
+        new_boxes = boxes * float(frac)
+    return new_boxes
+
+
 def scale_boxes_xywh(boxes, frac):
     """
     Rescale boxes to convert from one coordinate system to another.
