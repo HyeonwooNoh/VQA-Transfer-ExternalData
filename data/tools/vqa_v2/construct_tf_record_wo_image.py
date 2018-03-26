@@ -10,8 +10,6 @@ from util import log, tf_util
 
 RANDOM_STATE = np.random.RandomState(123)
 
-MAX_ROI_NUM = 50
-
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--qa_split_dir', type=str,
@@ -25,6 +23,9 @@ parser.add_argument('--tf_record_dir', type=str, default='tf_record_wo_image', h
 parser.add_argument('--split', type=str, default='train',
                     choices=['train', 'val', 'testval', 'test'], help=' ')
 parser.add_argument('--num_record_per_shard', type=int, default=1024, help=' ')
+parser.add_argument('--start_shard_num', type=int, default=0, help=' ')
+parser.add_argument('--process_shard_num', type=int, default=-1,
+                    help='set -1 if you want to process all remaining ids')
 config = parser.parse_args()
 
 config.dataset_dir = os.path.join(config.qa_split_dir, config.dataset_name)
@@ -36,9 +37,6 @@ config.tf_record_dir = os.path.join(
 if not os.path.exists(config.tf_record_dir):
     log.warn('create directory: {}'.format(config.tf_record_dir))
     os.makedirs(config.tf_record_dir)
-else:
-    raise ValueError('The directory {} already exists. Do not overwrite.'.format(
-        config.tf_record_dir))
 
 data = h5py.File(os.path.join(config.dataset_dir, 'data.hdf5'), 'r')
 vfeat = h5py.File(config.vfeat_path, 'r')
@@ -74,12 +72,23 @@ log.warn('write tf_record of {} data: {}'.format(
 max_q_len = data['data_info']['max_q_len'].value
 max_box_num = vfeat['data_info']['max_box_num'].value
 num_shards = len(ids[config.split]) / config.num_record_per_shard + 1
-for i, id in enumerate(tqdm(ids[config.split], desc='{} ids'.format(config.split))):
+
+num_ids = len(ids[config.split])
+start_i = config.start_shard_num * config.num_record_per_shard
+if config.process_shard_num > 0:
+    end_i = min(
+        start_i + (config.process_shard_num * config.num_record_per_shard),
+        num_ids)
+else: end_i = num_ids
+for i in tqdm(range(start_i, end_i), desc='{} ids'.format(config.split)):
+    id = ids[config.split][i]
     if i % config.num_record_per_shard == 0:
         shard_id = int(i / config.num_record_per_shard)
         shard_name = '{}-{:05d}-of-{:05d}'.format(
             config.split, shard_id, num_shards)
         shard_path = os.path.join(config.tf_record_dir, shard_name)
+        if os.path.exists(shard_path):
+            raise ValueError('Existing shard path: {}'.format(shard_path))
         tf_record_writer = tf.python_io.TFRecordWriter(shard_path)
 
     entry = data[id]
