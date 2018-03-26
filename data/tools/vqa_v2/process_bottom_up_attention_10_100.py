@@ -52,6 +52,7 @@ f = h5py.File(config.vfeat_path, 'w')
 max_box_num = 0
 for file_name in BOTTOM_UP_FILE_NAMES:
     log.warn('process: {}'.format(file_name))
+
     tsv_in_file = open(os.path.join(config.bottom_up_dir, file_name), 'r+b')
 
     reader = csv.DictReader(tsv_in_file, delimiter='\t',
@@ -64,7 +65,7 @@ for file_name in BOTTOM_UP_FILE_NAMES:
                                         dtype=np.float32).reshape(
                                             (item['num_boxes'], -1))
         image_id = item['image_id']
-        image_path = image_id2path[image_id]
+        image_path = image_id3path[image_id]
         image_path_id = image_path.replace('/', '-')
 
         grp = f.create_group(image_path_id)
@@ -91,3 +92,4 @@ data_info = f.create_group('data_info')
 data_info['max_box_num'] = max_box_num
 data_info['pretrained_param_path'] = 'bottom_up_attention_10_100'
 f.close()
+log.warn('done')
