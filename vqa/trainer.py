@@ -4,7 +4,7 @@ import time
 import tensorflow as tf
 
 from util import log
-from vqa.datasets import input_ops_vqa_tf_record
+from vqa.datasets import input_ops_vqa_tf_record_wo_image as input_ops_vqa
 
 
 class Trainer(object):
@@ -49,19 +49,19 @@ class Trainer(object):
 
         with tf.name_scope('datasets/batch'):
             vqa_batch = {
-                'train': input_ops_vqa_tf_record.create(
+                'train': input_ops_vqa.create(
                     self.batch_size, self.dataset_dir, self.vfeat_path,
                     self.tf_record_dir, 'train', is_train=True,
                     scope='train_ops', shuffle=True),
-                'val': input_ops_vqa_tf_record.create(
+                'val': input_ops_vqa.create(
                     self.batch_size, self.dataset_dir, self.vfeat_path,
                     self.tf_record_dir, 'val', is_train=True,
                     scope='val_ops', shuffle=False),
-                'testval': input_ops_vqa_tf_record.create(
+                'testval': input_ops_vqa.create(
                     self.batch_size, self.dataset_dir, self.vfeat_path,
                     self.tf_record_dir, 'testval', is_train=True,
                     scope='testval_ops', shuffle=False),
-                'test': input_ops_vqa_tf_record.create(
+                'test': input_ops_vqa.create(
                     self.batch_size, self.dataset_dir, self.vfeat_path,
                     self.tf_record_dir, 'test', is_train=True,
                     scope='test_ops', shuffle=False)

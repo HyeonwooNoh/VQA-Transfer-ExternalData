@@ -19,6 +19,7 @@ class Model(object):
     def __init__(self, batch, config, is_train=True):
         self.batch = batch
         self.config = config
+        self.image_dir = config.image_dir
 
         self.losses = {}
         self.report = {}
@@ -73,11 +74,11 @@ class Model(object):
         return ENC_I_PARAM_PATH
 
     def visualize_vqa_result(self,
-                             image, box, num_box,
+                             image_id, box, num_box,
                              att_score,
                              q_intseq, q_intseq_len,
                              label, pred, line_width=2):
-        def construct_visualization(b_image, bb_box, b_num_box,
+        def construct_visualization(b_image_id, bb_box, b_num_box,
                                     bb_att_score,
                                     b_q_intseq, b_q_intseq_len,
                                     b_label, b_pred):
@@ -90,7 +91,7 @@ class Model(object):
             def intseq2str(intseq):
                 return ' '.join([self.vocab['vocab'][i] for i in intseq])
 
-            def string2image(string, image_width=b_image.shape[1]):
+            def string2image(string, image_width=1080):
                 pil_text = Image.fromarray(
                     np.zeros([15, image_width, 3], dtype=np.uint8) + 220)
                 t_draw = ImageDraw.Draw(pil_text)
@@ -100,7 +101,11 @@ class Model(object):
                 return np.array(pil_text).astype(np.uint8)
 
             batch_vis_image = []
-            for batch_idx, image in enumerate(b_image):
+            for batch_idx, image_id in enumerate(b_image_id):
+                image_path = os.path.join(self.image_dir,
+                                          image_id.replace('-', '/'))
+                image = Image.open(image_path)
+                image = np.array(image.resize([540, 540]).convert('RGB'))
                 float_image = image.astype(np.float32)
                 att_mask = np.zeros_like(float_image)
 
@@ -156,7 +161,7 @@ class Model(object):
             return batch_vis_image
         return tf.py_func(
             construct_visualization,
-            inp=[image, box, num_box, att_score,
+            inp=[image_id, box, num_box, att_score,
                  q_intseq, q_intseq_len, label, pred],
             Tout=tf.uint8)
 
@@ -248,7 +253,7 @@ class Model(object):
         """
         with tf.name_scope('prepare_summary'):
             self.vis_image['image_attention_qa'] = self.visualize_vqa_result(
-                self.batch['image'], self.batch['box'], self.batch['num_box'],
+                self.batch['image_id'], self.batch['box'], self.batch['num_box'],
                 self.mid_result['att_score'],
                 self.batch['q_intseq'], self.batch['q_intseq_len'],
                 self.batch['answer_id'], self.mid_result['pred'],
