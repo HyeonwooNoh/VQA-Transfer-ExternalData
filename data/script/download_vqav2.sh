@@ -33,3 +33,19 @@ rm train2014.zip
 rm val2014.zip
 rm test2015.zip
 cd ..
+
+mkdir bottom_up_attention_36
+cd bottom_up_attention_36
+wget https://storage.googleapis.com/bottom-up-attention/trainval_36.zip
+unzip trainval_36.zip
+mv trainval_36 trainval
+wget https://storage.googleapis.com/bottom-up-attention/test2015_36.zip
+unzip test2015_36.zip
+mv test2015_36 test2015
+cd ..
+
+mkdir bottom_up_attention_10_100
+cd bottom_up_attention_100_100
+wget https://storage.googleapis.com/bottom-up-attention/trainval.zip
+wget https://storage.googleapis.com/bottom-up-attention/test2015.zip
+cd ..
