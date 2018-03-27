@@ -50,21 +50,17 @@ class Trainer(object):
         with tf.name_scope('datasets/batch'):
             vqa_batch = {
                 'train': input_ops_vqa.create(
-                    self.batch_size, self.dataset_dir, self.vfeat_path,
-                    self.tf_record_dir, 'train', is_train=True,
-                    scope='train_ops', shuffle=True),
+                    self.batch_size, self.tf_record_dir, 'train',
+                    is_train=True, scope='train_ops', shuffle=True),
                 'val': input_ops_vqa.create(
-                    self.batch_size, self.dataset_dir, self.vfeat_path,
-                    self.tf_record_dir, 'val', is_train=True,
-                    scope='val_ops', shuffle=False),
+                    self.batch_size, self.tf_record_dir, 'val',
+                    is_train=True, scope='val_ops', shuffle=False),
                 'testval': input_ops_vqa.create(
-                    self.batch_size, self.dataset_dir, self.vfeat_path,
-                    self.tf_record_dir, 'testval', is_train=True,
-                    scope='testval_ops', shuffle=False),
+                    self.batch_size, self.tf_record_dir, 'testval',
+                    is_train=True, scope='testval_ops', shuffle=False),
                 'test': input_ops_vqa.create(
-                    self.batch_size, self.dataset_dir, self.vfeat_path,
-                    self.tf_record_dir, 'test', is_train=True,
-                    scope='test_ops', shuffle=False)
+                    self.batch_size, self.tf_record_dir, 'test',
+                    is_train=True, scope='test_ops', shuffle=False)
             }
             batch_opt = {
                 tf.equal(self.target_split, 'train'): lambda: vqa_batch['train'],

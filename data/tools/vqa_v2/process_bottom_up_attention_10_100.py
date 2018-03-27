@@ -36,8 +36,8 @@ if os.path.exists(config.vfeat_path):
     raise ValueError('The file exists. Do not overwrite: {}'.format(
         config.vfeat_path))
 config.anno_path = os.path.join(config.qa_split_dir, 'merged_annotations.json')
+log.infov('processing anno ...')
 qid2anno = json.load(open(config.anno_path, 'r'))
-log.infov('processing anno')
 image_id2path = {}
 for anno in qid2anno.values():
     image_id2path[anno['image_id']] = anno['image_path']

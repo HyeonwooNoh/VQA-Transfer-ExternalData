@@ -2,21 +2,19 @@ import h5py
 import os
 import tensorflow as tf
 
-FEAT_DIM = 2048
 
 def create(batch_size,
-           dataset_dir,
-           vfeat_path,
            tf_record_dir,
            split,
            is_train=True,
            scope='vqa_tf_record',
            shuffle=True):
-    with h5py.File(os.path.join(dataset_dir, 'data.hdf5'), 'r') as data:
-        max_q_len = data['data_info']['max_q_len'].value
 
-    with h5py.File(vfeat_path, 'r') as vfeat:
-        max_box_num = vfeat['data_info']['max_box_num'].value
+    tf_record_info_path = os.path.join(tf_record_dir, 'data_info.hdf5')
+    with h5py.File(tf_record_info_path, 'r') as f:
+        max_q_len = int(f['data_info']['max_q_len'].value)
+        max_box_num = int(f['data_info']['max_box_num'].value)
+        vfeat_dim = int(f['data_info']['vfeat_dim'].value)
 
     tf_record_path = os.path.join(tf_record_dir, split, '{}-*'.format(split))
     with tf.device('/cpu:0'):
@@ -36,7 +34,7 @@ def create(batch_size,
                 'box/list': tf.FixedLenFeature([max_box_num, 4], tf.float32),
                 'box/shape': tf.FixedLenFeature([2], tf.int64),
                 'num_box': tf.FixedLenFeature((), tf.int64, -1),
-                'V_ft/list': tf.FixedLenFeature([max_box_num, FEAT_DIM], tf.float32),
+                'V_ft/list': tf.FixedLenFeature([max_box_num, vfeat_dim], tf.float32),
                 'V_ft/shape': tf.FixedLenFeature([2], tf.int64),
                 'q_intseq/list': tf.FixedLenFeature([max_q_len], tf.int64),
                 'q_intseq/len': tf.FixedLenFeature((), tf.int64),
