@@ -85,6 +85,7 @@ class Extractor(object):
             self.pretrained_param_path.replace('/', '-')
         data_info['max_box_num'] = np.array(
             self.data_cfg.max_roi_num, dtype=np.int32)
+        vfeat_dim = 0
         for it in tqdm(range(self.num_iter), desc='extract feature'):
             try:
                 res = self.session.run(feed_dict)
@@ -104,7 +105,8 @@ class Extractor(object):
                     grp['vfeat'] = vfeat
                     grp['box'] = box
                     grp['normal_box'] = normal_box
-
+                    vfeat_dim = vfeat.shape[1]
+        data_info['vfeat_dim'] = np.array(vfeat_dim, dtype=np.int32)
         log.infov('iteration terminated at [{}/{}] iter'.format(
             it + 1, self.num_iter))
         f.close()

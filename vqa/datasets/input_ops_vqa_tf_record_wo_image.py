@@ -2,8 +2,7 @@ import h5py
 import os
 import tensorflow as tf
 
-V_DIM = 512
-
+FEAT_DIM = 2048
 
 def create(batch_size,
            dataset_dir,
@@ -37,7 +36,7 @@ def create(batch_size,
                 'box/list': tf.FixedLenFeature([max_box_num, 4], tf.float32),
                 'box/shape': tf.FixedLenFeature([2], tf.int64),
                 'num_box': tf.FixedLenFeature((), tf.int64, -1),
-                'V_ft/list': tf.FixedLenFeature([max_box_num, V_DIM], tf.float32),
+                'V_ft/list': tf.FixedLenFeature([max_box_num, FEAT_DIM], tf.float32),
                 'V_ft/shape': tf.FixedLenFeature([2], tf.int64),
                 'q_intseq/list': tf.FixedLenFeature([max_q_len], tf.int64),
                 'q_intseq/len': tf.FixedLenFeature((), tf.int64),
