@@ -67,6 +67,9 @@ RANDOM_STATE.shuffle(ids['val'])
 RANDOM_STATE.shuffle(ids['testval'])
 RANDOM_STATE.shuffle(ids['test'])
 
+log.warn('split: {}'.format(config.split))
+log.infov(ids[config.split][:5])
+
 log.warn('write tf_record of {} data: {}'.format(
     config.split, config.tf_record_dir))
 max_q_len = data['data_info']['max_q_len'].value
