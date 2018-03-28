@@ -4,7 +4,7 @@ import time
 import tensorflow as tf
 
 from util import log
-from vqa.datasets import input_ops_vqa_tf_record_wo_image as input_ops_vqa
+from vqa.datasets import input_ops_vqa_tf_record_memft as input_ops_vqa
 
 
 class Trainer(object):
@@ -21,13 +21,13 @@ class Trainer(object):
 
     def __init__(self, config):
         self.config = config
-        self.dataset_dir = config.dataset_dir
         self.vfeat_path = config.vfeat_path
         self.tf_record_dir = config.tf_record_dir
 
         dataset_str = 'd'
         dataset_str += '_' + '_'.join(config.qa_split_dir.replace(
             'data/preprocessed/vqa_v2/', '').split('/'))
+        dataset_str += '_' + config.tf_record_dir_name
         dataset_str += '_' + config.vfeat_name.replace('.hdf5', '')
 
         hyper_parameter_str = 'bs{}_lr{}'.format(
@@ -252,12 +252,11 @@ def main():
                         help=' ')
     parser.add_argument('--qa_split_dir', type=str,
                         default='data/preprocessed/vqa_v2'
-                        '/qa_split_thres1_500_thres2_50', help=' ')
-    parser.add_argument('--dataset_name', type=str, default='data', help=' ')
-    parser.add_argument('--vfeat_name', type=str, default='used_vfeat.hdf5',
-                        help=' ')
-    parser.add_argument('--tf_record_dir_name', type=str, default='tf_record',
-                        help=' ')
+                        '/new_qa_split_thres1_500_thres2_50', help=' ')
+    parser.add_argument('--tf_record_dir_name', type=str,
+                        default='tf_record_memft', help=' ')
+    parser.add_argument('--vfeat_name', type=str,
+                        default='vfeat_bottomup_36.hdf5', help=' ')
     parser.add_argument('--vocab_name', type=str, default='vocab.json', help=' ')
     # log
     parser.add_argument('--log_step', type=int, default=1)
@@ -277,10 +276,9 @@ def main():
     parser.add_argument('--ft_vlmap', action='store_true', default=False)
     config = parser.parse_args()
     config.vocab_path = os.path.join(config.qa_split_dir, config.vocab_name)
-    config.dataset_dir = os.path.join(config.qa_split_dir, config.dataset_name)
-    config.vfeat_path = os.path.join(config.qa_split_dir, config.vfeat_name)
     config.tf_record_dir = os.path.join(config.qa_split_dir,
                                         config.tf_record_dir_name)
+    config.vfeat_path = os.path.join(config.tf_record_dir, config.vfeat_name)
     check_config(config)
 
     trainer = Trainer(config)
