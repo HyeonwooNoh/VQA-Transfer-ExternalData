@@ -40,7 +40,8 @@ csv.field_size_limit(sys.maxsize)
 int_field = ['image_id', 'image_w', 'image_h', 'num_boxes']
 np_field = ['boxes', 'features']
 
-config.vfeat_path = os.path.join(config.tf_record_memft_dir, 'vfeat.hdf5')
+config.vfeat_path = os.path.join(config.tf_record_memft_dir,
+                                 'vfeat_bottomup_36.hdf5')
 f = h5py.File(config.vfeat_path, 'w')
 
 image_features = f.create_dataset(
