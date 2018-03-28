@@ -180,7 +180,6 @@ for split in ['train']:
 
         image_id = anno['image_path'].replace('/', '-')
         image_idx = image_id2idx[image_id]
-
         tf_example = tf.train.Example(features=tf.train.Features(feature={
             'qid': tf_util.int64_feature(int(qid)),
             'image_id': tf_util.bytes_feature(str(image_id)),
@@ -241,6 +240,7 @@ for split in ['val', 'testval', 'test']:
             'answers/ids': tf_util.int64_feature(answer_ids),
             'answers/scores': tf_util.float_feature(answer_scores),
         }))
+        tf_record_writer.write(tf_example.SerializeToString())
 
 
 log.warn('write to data_info')
