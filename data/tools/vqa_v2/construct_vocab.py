@@ -13,7 +13,7 @@ parser.add_argument('--glove_vocab_path', type=str,
                     default='data/preprocessed/glove_vocab.json', help=' ')
 parser.add_argument('--qa_split_dir', type=str,
                     default='data/preprocessed/vqa_v2'
-                    '/qa_split_thres1_500_thres2_50', help=' ')
+                    '/new_qa_split_thres1_500_thres2_50', help=' ')
 parser.add_argument('--answer_set_limit', type=int, default=3000, help=' ')
 parser.add_argument('--max_answer_len', type=int, default=3, help=' ')
 config = parser.parse_args()

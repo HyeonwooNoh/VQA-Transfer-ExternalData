@@ -334,11 +334,11 @@ train_reserve_90p = len(train_reserve_qids) * 90 / 100
 test_80p = len(test_qids) * 80 / 100
 
 qid_splits = {}
-log.warn('Split test-val / test')
-qid_splits['test-val'] = test_qids[test_80p:]
+log.warn('Split testval / test')
+qid_splits['testval'] = test_qids[test_80p:]
 qid_splits['test'] = test_qids[:test_80p]
-log.infov('test: {}, test-val: {}'.format(
-    len(qid_splits['test']), len(qid_splits['test-val'])))
+log.infov('test: {}, testval: {}'.format(
+    len(qid_splits['test']), len(qid_splits['testval'])))
 
 log.warn('Split train / val')
 qid_splits['val'] = train_qids[train_90p:]
@@ -361,7 +361,7 @@ log.infov('used_image_paths: {}'.format(len(used_image_paths)))
 What to save:
     - used image ids (for efficient feature extraction)
     - object splits (train , train-reserve, test)
-    - qa splits qids (train, val, train-reserve, val-reserve, test-val, test)
+    - qa splits qids (train, val, train-reserve, val-reserve, testval, test)
     - annotations: merged annotations is saved for evaluation / future usage
 """
 with open(os.path.join(config.save_split_dir, 'used_image_path.txt'), 'w') as f:
