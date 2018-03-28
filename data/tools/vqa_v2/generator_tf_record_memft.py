@@ -49,11 +49,15 @@ image_id2idx = {image_path.replace('/', '-'): i for i, image_path in enumerate(
     used_image_paths)}
 image_path2idx = {image_path: i for i, image_path in enumerate(
     used_image_paths)}
+image_num2path = {}
+for anno in qid2anno.values():
+    image_num2path[anno['image_id']] = anno['image_path']
 
 image_info = {
     'used_image_paths': used_image_paths,
     'image_id2idx': image_id2idx,
     'image_path2idx': image_path2idx,
+    'image_num2path': image_num2path,
 }
 image_info_path = os.path.join(config.data_dir, 'image_info.json')
 json.dump(image_info, open(image_info_path, 'w'))
