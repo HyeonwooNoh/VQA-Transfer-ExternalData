@@ -110,16 +110,17 @@ class Model(object):
                 b_score = bb_att_score[batch_idx]
                 max_score_idx = np.argmax(b_score)
                 for box_idx in range(b_num_box[batch_idx]):
-                    b_normal_box = # TODO(hyeonwoonoh): implementing this
-                    normal_box = bb_normal_box[batch_idx][box_idx]
-                    box = box_utils.scale_boxes_x1y1x2y2(normal_box, [540, 540])
+                    b_normal_box = bb_normal_box[batch_idx]
+                    b_box = box_utils.scale_boxes_x1y1x2y2(b_normal_box, [540, 540])
+                    box = b_box[box_idx]
                     att_mask = box_utils.add_value_x1y1x2y2(
                         image=att_mask, box=box, value=b_score[box_idx])
                 att_image = Image.fromarray(
                         (float_image * att_mask).astype(np.uint8))
                 draw = ImageDraw.Draw(att_image)
-                normal_box = bb_normal_box[batch_idx][max_score_idx]
-                (x1, y1, x2, y2) = '?????????????????????????'
+                b_normal_box = bb_normal_box[batch_idx]
+                b_box = box_utils.scale_boxes_x1y1x2y2(b_normal_box, [540, 540])
+                (x1, y1, x2, y2) = b_box[max_score_idx]
                 for w in range(line_width):
                     draw.rectangle([x1 - w, y1 - w, x2 + w, y2 + w],
                                    outline=(255, 0, 0))

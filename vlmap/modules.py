@@ -336,7 +336,8 @@ def LearnGloVe(vocab, scope='LearnGloVe', reuse=tf.AUTO_REUSE):
             glove_param = np.array(f.get('param')).transpose()
         weights = np.zeros([len(vocab['vocab']), 300], dtype=np.float32)
         for i, w in enumerate(vocab['vocab']):
-            if w in glove_vocab['dict']:
+            if w in glove_vocab['dict'] and \
+                    glove_vocab['dict'][w] < glove_param.shape[0]:
                 weights[i, :] = glove_param[glove_vocab['dict'][w], :]
             else: pass  # initialize to zero
         init = tf.constant_initializer(weights)

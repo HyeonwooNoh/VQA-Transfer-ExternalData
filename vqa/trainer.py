@@ -1,6 +1,7 @@
 import argparse
 import os
 import time
+import numpy as np
 import tensorflow as tf
 
 from util import log
@@ -25,9 +26,8 @@ class Trainer(object):
         self.tf_record_dir = config.tf_record_dir
 
         dataset_str = 'd'
-        dataset_str += '_' + '_'.join(config.qa_split_dir.replace(
+        dataset_str += '_' + '_'.join(config.tf_record_dir.replace(
             'data/preprocessed/vqa_v2/', '').split('/'))
-        dataset_str += '_' + config.tf_record_dir_name
         dataset_str += '_' + config.vfeat_name.replace('.hdf5', '')
 
         hyper_parameter_str = 'bs{}_lr{}'.format(
@@ -36,7 +36,7 @@ class Trainer(object):
         if config.ft_vlmap:
             hyper_parameter_str += '_ft_vlmap'
 
-        self.train_dir = './train_dir/{}_{}_{}_{}_{}'.format(
+        self.train_dir = './train_dir/vqa_{}_{}_{}_{}_{}'.format(
             config.model_type, dataset_str, config.prefix, hyper_parameter_str,
             time.strftime("%Y%m%d-%H%M%S"))
         if not os.path.exists(self.train_dir): os.makedirs(self.train_dir)
@@ -106,6 +106,18 @@ class Trainer(object):
             increment_global_step=True,
             name='optimizer')
 
+        self.avg_report = {
+            'train': {},
+            'val': {},
+            'testval': {},
+        }
+        for split in ['train', 'val', 'testval']:
+            for key in self.model.report.keys():
+                self.avg_report[split][key] = tf.placeholder(tf.float32)
+                tf.summary.scalar('average_{}/{}'.format(split, key),
+                                  self.avg_report[split][key],
+                                  collections=['average_{}'.format(split)])
+
         self.summary_ops = {
             'train': tf.summary.merge_all(key='train'),
             'val': tf.summary.merge_all(key='val'),
@@ -113,6 +125,10 @@ class Trainer(object):
             'heavy_train': tf.summary.merge_all(key='heavy_train'),
             'heavy_val': tf.summary.merge_all(key='heavy_val'),
             'heavy_testval': tf.summary.merge_all(key='heavy_testval'),
+            'average_train': tf.summary.merge_all(key='average_train'),
+            'average_val': tf.summary.merge_all(key='average_val'),
+            'average_testval': tf.summary.merge_all(key='average_testval'),
+            'no_op': tf.no_op(),
         }
 
         all_vars = tf.global_variables()
@@ -122,10 +138,11 @@ class Trainer(object):
         self.checkpoint_loader = tf.train.Saver(max_to_keep=1)
         self.pretrain_loader = tf.train.Saver(var_list=transfer_vars, max_to_keep=1)
         self.summary_writer = tf.summary.FileWriter(self.train_dir)
-        self.log_step = self.config.log_step
+        self.train_average_iter = self.config.train_average_iter
+        self.val_average_iter = self.config.val_average_iter
         self.heavy_summary_step = self.config.heavy_summary_step
-        self.val_sample_step = self.config.val_sample_step
-        self.write_summary_step = self.config.write_summary_step
+        self.validation_step = self.config.validation_step
+        self.checkpoint_step = self.config.checkpoint_step
 
         self.supervisor = tf.train.Supervisor(
             logdir=self.train_dir,
@@ -162,81 +179,131 @@ class Trainer(object):
         log.infov('Training starts')
 
         max_steps = 1000000
-        ckpt_save_steps = 5000
+        ckpt_save_steps = self.checkpoint_step
+
+        # initialize average report (put 0 to escape average over empty list)
+        avg_step_time = [0]
+        avg_train_report = {key: [0] for key in self.avg_report['train']}
 
         for s in range(max_steps):
-            step, train_summary, loss, step_time = \
+            """
+            write average summary and print log
+            """
+            if s % self.train_average_iter == 0:
+                step, avg_train_summary = self.write_average_summary(
+                    avg_train_report, split='train')
+                self.summary_writer.add_summary(
+                    avg_train_summary, global_step=step)
+                self.log_message(step, avg_train_report, avg_step_time,
+                                 split='train', is_train=True)
+                for key in avg_train_report: avg_train_report[key] = []
+                avg_step_time = []
+
+            """
+            Periodic inference on validation set
+            """
+            if s % self.validation_step == 0:
+                # val
+                avg_val_report = {key: [] for key in self.avg_report['val']}
+                avg_val_step_time = []
+                for i in range(self.val_average_iter):
+                    step, summary, loss, report, step_time = self.run_val_step(
+                        i == (self.val_average_iter - 1), split='val')
+                    for key in avg_val_report:
+                        avg_val_report[key].append(report[key])
+                    avg_val_step_time.append(step_time)
+                self.summary_writer.add_summary(summary, global_step=step)
+                step, avg_val_summary = self.write_average_summary(
+                    avg_val_report, split='val')
+                self.summary_writer.add_summary(avg_val_summary, global_step=step)
+                self.log_message(step, avg_val_report, avg_val_step_time,
+                                 split='val', is_train=False)
+
+                # testval
+                avg_val_report = {key: [] for key in self.avg_report['testval']}
+                avg_val_step_time = []
+                for i in range(self.val_average_iter):
+                    step, summary, loss, report, step_time = self.run_val_step(
+                        i == (self.val_average_iter - 1), split='testval')
+                    for key in avg_val_report:
+                        avg_val_report[key].append(report[key])
+                    avg_val_step_time.append(step_time)
+                self.summary_writer.add_summary(summary, global_step=step)
+                step, avg_val_summary = self.write_average_summary(
+                    avg_val_report, split='testval')
+                self.summary_writer.add_summary(avg_val_summary, global_step=step)
+                self.log_message(step, avg_val_report, avg_val_step_time,
+                                 split='testval', is_train=False)
+
+            """
+            Run TRAINING step
+            """
+            step, train_summary, loss, train_report, step_time = \
                 self.run_train_step(s % self.heavy_summary_step == 0)
-            if s % self.log_step == 0:
-                self.log_step_message(step, loss, step_time,
-                                      split='train', is_train=True)
+            for key in avg_train_report:
+                avg_train_report[key].append(train_report[key])
+            avg_step_time.append(step_time)
+            if s % self.heavy_summary_step == 0:
+                self.summary_writer.add_summary(train_summary, global_step=step)
 
-            # Periodic inference
-            if s % self.val_sample_step == 0:
-                val_step, val_summary, val_loss, val_step_time = \
-                    self.run_val_step(s % self.heavy_summary_step == 0,
-                                      target_split='val')
-                self.summary_writer.add_summary(val_summary,
-                                                global_step=val_step)
-                self.log_step_message(val_step, val_loss, val_step_time,
-                                      split='val', is_train=False)
-                testval_step, testval_summary, testval_loss, testval_step_time = \
-                    self.run_val_step(s % self.heavy_summary_step == 0,
-                                      target_split='testval')
-                self.summary_writer.add_summary(testval_summary,
-                                                global_step=testval_step)
-                self.log_step_message(testval_step, testval_loss, testval_step_time,
-                                      split='testval', is_train=False)
-
-            if s % self.write_summary_step == 0:
-                self.summary_writer.add_summary(train_summary,
-                                                global_step=step)
-
+            """
+            Save Checkpoint
+            """
             if s % ckpt_save_steps == 0:
                 log.infov('Saved checkpoint at {}'.format(step))
                 self.saver.save(
                     self.session, os.path.join(self.train_dir, 'model'),
                     global_step=step)
 
+    def write_average_summary(self, avg_report, split='train'):
+        feed_dict = {
+            self.avg_report[split][key]:
+            np.array(avg_report[key], dtype=np.float32).mean()
+            for key in self.avg_report[split]}
+        summary_op = self.summary_ops['average_{}'.format(split)]
+        step, avg_summary = self.session.run([self.global_step, summary_op],
+                                             feed_dict=feed_dict)
+        return step, avg_summary
+
     def run_train_step(self, use_heavy_summary):
-        if use_heavy_summary: summary_key = 'heavy_train'
-        else: summary_key = 'train'
+        if use_heavy_summary:
+            summary_op = self.summary_ops['heavy_train']
+        else: summary_op = self.summary_ops['no_op']
+
         _start_time = time.time()
-        fetch = [self.global_step, self.summary_ops[summary_key],
-                 self.model.loss, self.optimizer]
+        fetch = [self.global_step, summary_op,
+                 self.model.loss, self.model.report, self.optimizer]
         fetch_values = self.session.run(fetch,
                                         feed_dict={self.target_split: 'train'})
-        [step, summary, loss] = fetch_values[:3]
+        [step, summary, loss, report] = fetch_values[:4]
         _end_time = time.time()
-        return step, summary, loss, (_end_time - _start_time)
+        return step, summary, loss, report, (_end_time - _start_time)
 
-    def run_val_step(self, use_heavy_summary, target_split):
-        if use_heavy_summary: summary_key = 'heavy_{}'.format(target_split)
-        else: summary_key = target_split
+    def run_val_step(self, use_heavy_summary, split):
+        if use_heavy_summary:
+            summary_op = self.summary_ops['heavy_{}'.format(split)]
+        else: summary_op = self.summary_ops['no_op']
+
         _start_time = time.time()
-        fetch = [self.global_step, self.summary_ops[summary_key],
-                 self.model.loss]
+        fetch = [self.global_step, summary_op, self.model.loss, self.model.report]
         fetch_values = self.session.run(
-            fetch, feed_dict={self.target_split: target_split})
-        [step, summary, loss] = fetch_values[:3]
+            fetch, feed_dict={self.target_split: split})
+        [step, summary, loss, report] = fetch_values[:4]
         _end_time = time.time()
-        return step, summary, loss, (_end_time - _start_time)
+        return step, summary, loss, report, (_end_time - _start_time)
 
-    def log_step_message(self, step, loss, step_time, split='train',
-                         is_train=True):
+    def log_message(self, step, avg_report, avg_step_time, split='train', is_train=True):
+        step_time = np.array(avg_step_time, dtype=np.float32).mean()
         if step_time == 0: step_time = 0.001
-        log_fn = (is_train and log.info or log.infov)
-        log_fn((" [{split_mode:5s} step {step:4d}] " +
-                "Loss: {loss:.5f} " +
-                "({sec_per_batch:.3f} sec/batch, {instance_per_sec:.3f} " +
-                "instances/sec) "
-                ).format(split_mode=split,
-                         step=step,
-                         loss=loss,
-                         sec_per_batch=step_time,
-                         instance_per_sec=self.batch_size / step_time
-                         )
-               )
+        log_str = ''
+        log_str += '[{:5s} step {:4d} '.format(split, step)
+        log_str += '({:.3f} sec/batch, {:.3f} instances/sec)]\n'.format(
+            step_time, self.batch_size / step_time)
+        for key in sorted(avg_report.keys()):
+            report = np.array(avg_report[key], dtype=np.float32).mean()
+            log_str += '  * {}: {:.5f}\n'.format(key, report)
+        log_fn = (log.info if is_train else log.infov)
+        log_fn(log_str)
 
 
 def check_config(config):
@@ -250,19 +317,19 @@ def main():
     # paths
     parser.add_argument('--image_dir', type=str, default='data/VQA_v2/images',
                         help=' ')
-    parser.add_argument('--qa_split_dir', type=str,
+    parser.add_argument('--tf_record_dir', type=str,
                         default='data/preprocessed/vqa_v2'
-                        '/new_qa_split_thres1_500_thres2_50', help=' ')
-    parser.add_argument('--tf_record_dir_name', type=str,
-                        default='tf_record_memft', help=' ')
+                        '/new_qa_split_thres1_500_thres2_50/tf_record_memft',
+                        help=' ')
     parser.add_argument('--vfeat_name', type=str,
                         default='vfeat_bottomup_36.hdf5', help=' ')
     parser.add_argument('--vocab_name', type=str, default='vocab.json', help=' ')
     # log
-    parser.add_argument('--log_step', type=int, default=1)
-    parser.add_argument('--heavy_summary_step', type=int, default=1000)
-    parser.add_argument('--val_sample_step', type=int, default=100)
-    parser.add_argument('--write_summary_step', type=int, default=100)
+    parser.add_argument('--train_average_iter', type=int, default=200)
+    parser.add_argument('--val_average_iter', type=int, default=419)  # 419 for 1 epoch
+    parser.add_argument('--heavy_summary_step', type=int, default=800)  # 867 for 1 epoch
+    parser.add_argument('--validation_step', type=int, default=800)
+    parser.add_argument('--checkpoint_step', type=int, default=4000)
     # hyper parameters
     parser.add_argument('--prefix', type=str, default='default', help=' ')
     parser.add_argument('--checkpoint', type=str, default=None)
@@ -275,9 +342,7 @@ def main():
                         choices=['vqa', 'standard'])
     parser.add_argument('--ft_vlmap', action='store_true', default=False)
     config = parser.parse_args()
-    config.vocab_path = os.path.join(config.qa_split_dir, config.vocab_name)
-    config.tf_record_dir = os.path.join(config.qa_split_dir,
-                                        config.tf_record_dir_name)
+    config.vocab_path = os.path.join(config.tf_record_dir, config.vocab_name)
     config.vfeat_path = os.path.join(config.tf_record_dir, config.vfeat_name)
     check_config(config)
 
