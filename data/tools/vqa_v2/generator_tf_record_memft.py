@@ -260,3 +260,15 @@ for key in ['train', 'val', 'testval', 'test']:
 fid.close()
 log.infov('data file is saved to: {}'.format(config.data_path))
 log.infov('id file is saved to: {}'.format(config.id_path))
+
+vocab_path = os.path.join(config.data_dir, 'vocab.json')
+json.dump(vocab, open(vocab_path, 'w'))
+log.infov('vocab is saved to: {}'.format(vocab_path))
+
+answer_dict_path = os.path.join(config.data_dir, 'answer_dict.json')
+answer_dict = {
+    'vocab': ans_list,
+    'dict': ans_dict
+}
+json.dump(answer_dict, open(answer_dict_path, 'w'))
+log.infov('answer_dict is saved to: {}'.format(answer_dict_path))
