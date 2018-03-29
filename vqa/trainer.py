@@ -270,7 +270,7 @@ def main():
     parser.add_argument('--learning_rate', type=float, default=0.001, help=' ')
     parser.add_argument('--lr_weight_decay', action='store_true', default=False)
     # model parameters
-    parser.add_argument('--batch_size', type=int, default=3, help=' ')
+    parser.add_argument('--batch_size', type=int, default=512, help=' ')
     parser.add_argument('--model_type', type=str, default='vqa', help=' ',
                         choices=['vqa', 'standard'])
     parser.add_argument('--ft_vlmap', action='store_true', default=False)
