@@ -319,6 +319,23 @@ def learn_embedding_map(used_vocab, scope='learn_embedding_map', reuse=tf.AUTO_R
         return embed_map
 
 
+def LearnGloVe(vocab, scope='LearnGloVe', reuse=tf.AUTO_REUSE):
+    with tf.variable_scope(scope, reuse=reuse) as scope:
+        glove_vocab = json.load(open(GLOVE_VOCAB_PATH, 'r'))
+        with h5py.File(GLOVE_EMBEDDING_PATH, 'r') as f:
+            glove_param = np.array(f.get('param')).transpose()
+        weights = np.zeros([len(vocab['vocab']), 300], dtype=np.float32)
+        for i, w in enumerate(vocab['vocab']):
+            if w in glove_vocab['dict']:
+                weights[i, :] = glove_param[glove_vocab['dict'][w], :]
+            else: pass  # initialize to zero
+        init = tf.constant_initializer(weights)
+        embed_map = tf.get_variable(
+            name='embed_map', shape=[len(vocab['vocab']), 300],
+            initializer=init)
+        return embed_map
+
+
 def GloVe_vocab(vocab, scope='GloVe', reuse=tf.AUTO_REUSE):
     with tf.variable_scope(scope, reuse=reuse) as scope:
         glove_vocab = json.load(open(GLOVE_VOCAB_PATH, 'r'))

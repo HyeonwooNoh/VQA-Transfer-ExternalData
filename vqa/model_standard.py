@@ -27,23 +27,13 @@ class Model(object):
         self.vis_image = {}
 
         self.vocab = json.load(open(config.vocab_path, 'r'))
-        self.glove_map = modules.GloVe_vocab(self.vocab)
+        self.glove_map = modules.LearnGloVe(self.vocab)
 
         # answer candidates
-        log.infov('loading answer candidates...')
+        log.infov('loading answer info..')
         with h5py.File(os.path.join(config.tf_record_dir,
                                     'data_info.hdf5'), 'r') as f:
-            self.answer_intseq_value = f['data_info']['intseq_ans'].value
-            self.answer_intseq_len_value = f['data_info']['intseq_ans_len'].value
             self.num_answer = int(f['data_info']['num_answers'].value)
-
-            with tf.device('/cpu:0'):
-                self.answer_intseq = tf.convert_to_tensor(
-                    self.answer_intseq_value, dtype=tf.int32,
-                    name='answer_intseq')  # [num_answer, len]
-                self.answer_intseq_len = tf.convert_to_tensor(
-                    self.answer_intseq_len_value, dtype=tf.int32,
-                    name='answer_intseq_len')  # [num_answer]
         log.infov('done')
 
         log.infov('loading image features...')
