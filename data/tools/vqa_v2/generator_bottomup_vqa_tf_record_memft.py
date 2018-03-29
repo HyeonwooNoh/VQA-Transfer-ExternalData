@@ -116,7 +116,7 @@ y2 = spatials[:, :, 3]
 normal_boxes = np.stack([x1, y1, x2, y2], axis=-1)
 vfeat_h5['normal_boxes'] = normal_boxes
 
-num_boxes = np.zeros([num_feat['total']], dtype=np.int32)
+num_boxes = np.zeros([num_feat['total']], dtype=np.int32) + NUM_BOXES
 vfeat_h5['num_boxes'] = num_boxes
 
 vfeat_data_info = vfeat_h5.create_group('data_info')
