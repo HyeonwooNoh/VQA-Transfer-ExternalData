@@ -73,7 +73,8 @@ class Model(object):
                              image_id, normal_box, num_box,
                              att_score,
                              q_intseq, q_intseq_len,
-                             answer_target, pred, line_width=2):
+                             answer_target, pred,
+                             max_batch_num=20, line_width=2):
         def construct_visualization(b_image_id, bb_normal_box, b_num_box,
                                     bb_att_score,
                                     b_q_intseq, b_q_intseq_len,
@@ -97,7 +98,8 @@ class Model(object):
                 return np.array(pil_text).astype(np.uint8)
 
             batch_vis_image = []
-            for batch_idx, image_id in enumerate(b_image_id):
+            for batch_idx in range(min(len(b_image_id), max_batch_num)):
+                image_id = b_image_id[batch_idx]
                 image_path = os.path.join(self.image_dir,
                                           image_id.replace('-', '/'))
                 image = Image.open(image_path)
@@ -108,13 +110,16 @@ class Model(object):
                 b_score = bb_att_score[batch_idx]
                 max_score_idx = np.argmax(b_score)
                 for box_idx in range(b_num_box[batch_idx]):
+                    b_normal_box = # TODO(hyeonwoonoh): implementing this
                     normal_box = bb_normal_box[batch_idx][box_idx]
+                    box = box_utils.scale_boxes_x1y1x2y2(normal_box, [540, 540])
                     att_mask = box_utils.add_value_x1y1x2y2(
                         image=att_mask, box=box, value=b_score[box_idx])
                 att_image = Image.fromarray(
                         (float_image * att_mask).astype(np.uint8))
                 draw = ImageDraw.Draw(att_image)
-                (x1, y1, x2, y2) = bb_normal_box[batch_idx][max_score_idx]
+                normal_box = bb_normal_box[batch_idx][max_score_idx]
+                (x1, y1, x2, y2) = '?????????????????????????'
                 for w in range(line_width):
                     draw.rectangle([x1 - w, y1 - w, x2 + w, y2 + w],
                                    outline=(255, 0, 0))
@@ -130,25 +135,21 @@ class Model(object):
                     [self.vocab['vocab'][t] for t in q_intseq[:q_intseq_len]])
                 question_image = string2image('Q: ' + question_str,
                                               image_width=width)
-                label = b_label[batch_idx]
-                if label < self.num_answer:
-                    a_intseq = self.answer_intseq_value[label]
-                    a_intseq_len = self.answer_intseq_len_value[label]
-                    label_answer_str = ' '.join(
-                        [self.vocab['vocab'][t] for t in a_intseq[:a_intseq_len]])
+                answer_target = b_answer_target[batch_idx]
+                gt_idx_list = np.where(answer_target > 0)
+                if len(gt_idx_list) > 0:
+                    for ans_i in gt_idx_list:
+                        label_answer_str += '{}({:.1f})'.format(
+                            self.answer_dict['vocab'][ans_i], answer_target[ans_i])
                 else:
-                    label_answer_str = '<infrequent answer>'
+                    label_answer_str = '<no frequent answer>'
                 label_answer_image = string2image('GT: ' + label_answer_str,
                                                   image_width=width)
 
                 pred = b_pred[batch_idx]
-                a_intseq = self.answer_intseq_value[pred]
-                a_intseq_len = self.answer_intseq_len_value[pred]
-                pred_answer_str = ' '.join(
-                    [self.vocab['vocab'][t] for t in a_intseq[:a_intseq_len]])
+                pred_answer_str = self.answer_dict['vocab'][pred]
                 pred_answer_image = string2image('PRED: ' + pred_answer_str,
                                                  image_width=width)
-
                 vis_image = np.concatenate(
                     [vis_image, question_image,
                      label_answer_image, pred_answer_image], axis=0)
@@ -186,7 +187,7 @@ class Model(object):
 
         log.warning('v_linear_v')
         v_linear_v = modules.fc_layer(
-            V_ft, V_DIM, use_bias=True, use_bn=False,
+            V_ft, V_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=is_train,
             scope='v_linear_v')
 
@@ -201,7 +202,7 @@ class Model(object):
         # [bs, V_DIM}
         log.warning('q_linear_v')
         q_linear_v = modules.fc_layer(
-            q_L_ft, V_DIM, use_bias=True, use_bn=False,
+            q_L_ft, V_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=is_train,
             scope='q_linear_v')
 
@@ -209,7 +210,7 @@ class Model(object):
         Perform attention
         """
         att_score = modules.hadamard_attention(v_linear_v, num_V_ft, q_linear_v,
-                                               is_train=is_train)
+                                               use_ln=False, is_train=is_train)
         self.mid_result['att_score'] = att_score
         pooled_V_ft = modules.attention_pooling(V_ft, att_score)
 
@@ -222,25 +223,25 @@ class Model(object):
             # [bs, L_DIM]
             log.warning('pooled_linear_l')
             pooled_linear_l = modules.fc_layer(
-                pooled_V_ft, L_DIM, use_bias=True, use_bn=False,
+                pooled_V_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
                 activation_fn=tf.nn.relu, is_training=is_train,
                 scope='pooled_linear_l')
 
             log.warning('q_linear_l')
             q_linear_l = modules.fc_layer(
-                q_L_ft, L_DIM, use_bias=True, use_bn=False,
+                q_L_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
                 activation_fn=tf.nn.relu, is_training=is_train,
                 scope='q_linear_l')
 
             joint = modules.fc_layer(
                 pooled_linear_l * q_linear_l, 2048,
-                use_bias=True, use_bn=False,
+                use_bias=True, use_bn=False, use_ln=True,
                 activation_fn=tf.nn.relu, is_training=is_train, scope='joint_fc')
             joint = tf.nn.dropout(joint, 0.5)
 
             logit = modules.fc_layer(
                 joint, self.num_answer,
-                use_bias=True, use_bn=False,
+                use_bias=True, use_bn=False, use_ln=False,
                 activation_fn=None, is_training=is_train, scope='classifier')
 
         """
@@ -274,7 +275,7 @@ class Model(object):
                 self.mid_result['att_score'],
                 self.batch['q_intseq'], self.batch['q_intseq_len'],
                 self.batch['answer_target'], self.mid_result['pred'],
-                line_width=2)
+                max_batch_num=20, line_width=2)
         """
 
         self.loss = self.losses['answer']

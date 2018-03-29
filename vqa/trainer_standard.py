@@ -283,8 +283,8 @@ def main():
     parser.add_argument('--vocab_name', type=str, default='vocab.json', help=' ')
     # log
     parser.add_argument('--train_average_iter', type=int, default=200)
-    parser.add_argument('--val_average_iter', type=int, default=100)
-    parser.add_argument('--heavy_summary_step', type=int, default=800)
+    parser.add_argument('--val_average_iter', type=int, default=419)  # 419 for 1 epoch
+    parser.add_argument('--heavy_summary_step', type=int, default=800)  # 867 for 1 epoch
     parser.add_argument('--validation_step', type=int, default=800)
     parser.add_argument('--checkpoint_step', type=int, default=4000)
     # hyper parameters

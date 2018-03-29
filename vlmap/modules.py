@@ -61,7 +61,7 @@ def attention(memory, memory_len, query, scope='attention'):
         return score
 
 
-def hadamard_attention(memory, memory_len, query, is_train=True,
+def hadamard_attention(memory, memory_len, query, use_ln=False, is_train=True,
                        scope='hadamard_attention', reuse=tf.AUTO_REUSE):
     """
     Args:
@@ -75,7 +75,9 @@ def hadamard_attention(memory, memory_len, query, is_train=True,
         log.warning(scope.name)
         with tf.variable_scope('compute', reuse=reuse):
             score_feat = memory * tf.expand_dims(query, axis=1)
+            score_feat = tf.nn.dropout(score_feat, 0.8)
             score = fc_layer(score_feat, 1, use_bias=True, use_bn=False,
+                             use_ln=use_ln,
                              activation_fn=None, is_training=is_train,
                              scope='score')
             score = tf.squeeze(score, axis=-1)
@@ -468,7 +470,7 @@ def conv2d(input, dim, kernel_size, pad='same', use_bias=False, use_bn=False,
         return out
 
 
-def fc_layer(input, dim, use_bias=False, use_bn=False, activation_fn=None,
+def fc_layer(input, dim, use_bias=False, use_bn=False, use_ln=False, activation_fn=None,
              is_training=True, scope='fc_layer', reuse=tf.AUTO_REUSE):
     with tf.variable_scope(scope, reuse=reuse) as scope:
         log.warning(scope.name)
@@ -484,6 +486,8 @@ def fc_layer(input, dim, use_bias=False, use_bn=False, activation_fn=None,
             out = layers.batch_norm(out, center=True, scale=True, decay=0.9,
                                     is_training=is_training,
                                     updates_collections=None)
+        if use_ln:
+            out = layers.layer_norm(out)
         if activation_fn is not None:
             out = activation_fn(out)
         return out
