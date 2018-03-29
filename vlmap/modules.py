@@ -91,14 +91,22 @@ def hadamard_attention(memory, memory_len, query, is_train=True,
 
 
 def encode_L(seq, seq_len, dim=384, scope='encode_L',
-             reuse=tf.AUTO_REUSE):
+             reuse=tf.AUTO_REUSE, cell_type='LSTM'):
     with tf.variable_scope(scope, reuse=reuse) as scope:
         log.warning(scope.name)
-        cell = rnn.BasicLSTMCell(num_units=dim, state_is_tuple=True)
+        if cell_type == 'LSTM':
+            cell = rnn.BasicLSTMCell(num_units=dim, state_is_tuple=True)
+        elif cell_type == 'GRU':
+            cell = rnn.GRUCell(num_units=dim)
+        else: raise ValueError('Unknown cell_type')
         _, final_state = tf.nn.dynamic_rnn(
             cell=cell, dtype=tf.float32, sequence_length=seq_len,
             inputs=seq)
-        return final_state.h
+        if cell_type == 'LSTM':
+            out = final_state.h
+        elif cell_type == 'GRU':
+            out = final_state
+        return out
 
 
 def encode_I_full(images, is_train=False, reuse=tf.AUTO_REUSE):

@@ -90,7 +90,7 @@ class Trainer(object):
             global_step=self.global_step,
             learning_rate=self.learning_rate,
             optimizer=tf.train.AdamOptimizer,
-            clip_gradients=20.0,
+            clip_gradients=0.25,
             variables=train_vars,
             increment_global_step=True,
             name='optimizer')
@@ -123,6 +123,7 @@ class Trainer(object):
         self.val_average_iter = self.config.val_average_iter
         self.heavy_summary_step = self.config.heavy_summary_step
         self.validation_step = self.config.validation_step
+        self.checkpoint_step = self.config.checkpoint_step
 
         self.supervisor = tf.train.Supervisor(
             logdir=self.train_dir,
@@ -153,7 +154,7 @@ class Trainer(object):
         log.infov('Training starts')
 
         max_steps = 1000000
-        ckpt_save_steps = 5000
+        ckpt_save_steps = self.checkpoint_step
 
         # initialize average report (put 0 to escape average over empty list)
         avg_step_time = [0]
@@ -177,7 +178,7 @@ class Trainer(object):
             Periodic inference on validation set
             """
             if s % self.validation_step == 0:
-                avg_val_report ={key: [] for key in self.avg_report['val']}
+                avg_val_report = {key: [] for key in self.avg_report['val']}
                 avg_val_step_time = []
 
                 for i in range(self.val_average_iter):
@@ -281,17 +282,18 @@ def main():
                         default='vfeat_bottomup_36.hdf5', help=' ')
     parser.add_argument('--vocab_name', type=str, default='vocab.json', help=' ')
     # log
-    parser.add_argument('--train_average_iter', type=int, default=500)
+    parser.add_argument('--train_average_iter', type=int, default=200)
     parser.add_argument('--val_average_iter', type=int, default=100)
-    parser.add_argument('--heavy_summary_step', type=int, default=5000)
-    parser.add_argument('--validation_step', type=int, default=5000)
+    parser.add_argument('--heavy_summary_step', type=int, default=800)
+    parser.add_argument('--validation_step', type=int, default=800)
+    parser.add_argument('--checkpoint_step', type=int, default=4000)
     # hyper parameters
     parser.add_argument('--prefix', type=str, default='default', help=' ')
     parser.add_argument('--checkpoint', type=str, default=None)
     parser.add_argument('--learning_rate', type=float, default=0.001, help=' ')
     parser.add_argument('--lr_weight_decay', action='store_true', default=False)
     # model parameters
-    parser.add_argument('--batch_size', type=int, default=3, help=' ')
+    parser.add_argument('--batch_size', type=int, default=512, help=' ')
     parser.add_argument('--model_type', type=str, default='standard', help=' ',
                         choices=['standard'])
     config = parser.parse_args()

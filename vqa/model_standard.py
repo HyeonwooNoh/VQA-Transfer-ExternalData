@@ -8,9 +8,8 @@ from util import box_utils, log
 from vlmap import modules
 
 W_DIM = 300  # Word dimension
-L_DIM = 512  # Language dimension
-MAP_DIM = 512
-V_DIM = 512
+L_DIM = 1024  # Language dimension
+V_DIM = 1024
 ENC_I_PARAM_PATH = 'data/nets/resnet_v1_50.ckpt'
 
 
@@ -27,6 +26,8 @@ class Model(object):
         self.vis_image = {}
 
         self.vocab = json.load(open(config.vocab_path, 'r'))
+        self.answer_dict = json.load(open(
+            os.path.join(config.tf_record_dir, 'answer_dict.json'), 'r'))
         self.glove_map = modules.LearnGloVe(self.vocab)
 
         # answer candidates
@@ -69,14 +70,14 @@ class Model(object):
         return ENC_I_PARAM_PATH
 
     def visualize_vqa_result(self,
-                             image_id, box, num_box,
+                             image_id, normal_box, num_box,
                              att_score,
                              q_intseq, q_intseq_len,
-                             label, pred, line_width=2):
-        def construct_visualization(b_image_id, bb_box, b_num_box,
+                             answer_target, pred, line_width=2):
+        def construct_visualization(b_image_id, bb_normal_box, b_num_box,
                                     bb_att_score,
                                     b_q_intseq, b_q_intseq_len,
-                                    b_label, b_pred):
+                                    b_answer_target, b_pred):
             # b_ : batch
             # bb_ : [batch, description]
             import textwrap
@@ -107,13 +108,13 @@ class Model(object):
                 b_score = bb_att_score[batch_idx]
                 max_score_idx = np.argmax(b_score)
                 for box_idx in range(b_num_box[batch_idx]):
-                    box = bb_box[batch_idx][box_idx]
+                    normal_box = bb_normal_box[batch_idx][box_idx]
                     att_mask = box_utils.add_value_x1y1x2y2(
                         image=att_mask, box=box, value=b_score[box_idx])
                 att_image = Image.fromarray(
                         (float_image * att_mask).astype(np.uint8))
                 draw = ImageDraw.Draw(att_image)
-                (x1, y1, x2, y2) = bb_box[batch_idx][max_score_idx]
+                (x1, y1, x2, y2) = bb_normal_box[batch_idx][max_score_idx]
                 for w in range(line_width):
                     draw.rectangle([x1 - w, y1 - w, x2 + w, y2 + w],
                                    outline=(255, 0, 0))
@@ -156,8 +157,8 @@ class Model(object):
             return batch_vis_image
         return tf.py_func(
             construct_visualization,
-            inp=[image_id, box, num_box, att_score,
-                 q_intseq, q_intseq_len, label, pred],
+            inp=[image_id, normal_box, num_box, att_score,
+                 q_intseq, q_intseq_len, answer_target, pred],
             Tout=tf.uint8)
 
     def build(self, is_train=True):
@@ -178,11 +179,15 @@ class Model(object):
             V_ft.set_shape([None, 36, 2048])
             num_V_ft = tf.gather(self.num_boxes, self.batch['image_idx'],
                                  name='gather_num_V_ft', axis=0)
+            self.mid_result['num_V_ft'] = num_V_ft
+            normal_boxes = tf.gather(self.normal_boxes, self.batch['image_idx'],
+                                     name='gather_normal_boxes', axis=0)
+            self.mid_result['normal_boxes'] = normal_boxes
 
         log.warning('v_linear_v')
         v_linear_v = modules.fc_layer(
             V_ft, V_DIM, use_bias=True, use_bn=False,
-            activation_fn=tf.tanh, is_training=is_train,
+            activation_fn=tf.nn.relu, is_training=is_train,
             scope='v_linear_v')
 
         """
@@ -190,13 +195,14 @@ class Model(object):
         """
         q_embed = tf.nn.embedding_lookup(self.glove_map, self.batch['q_intseq'])
         # [bs, L_DIM]
-        q_L_ft = modules.encode_L(q_embed, self.batch['q_intseq_len'], L_DIM)
+        q_L_ft = modules.encode_L(q_embed, self.batch['q_intseq_len'], L_DIM,
+                                  cell_type='GRU')
 
         # [bs, V_DIM}
         log.warning('q_linear_v')
         q_linear_v = modules.fc_layer(
             q_L_ft, V_DIM, use_bias=True, use_bn=False,
-            activation_fn=tf.tanh, is_training=is_train,
+            activation_fn=tf.nn.relu, is_training=is_train,
             scope='q_linear_v')
 
         """
@@ -217,17 +223,23 @@ class Model(object):
             log.warning('pooled_linear_l')
             pooled_linear_l = modules.fc_layer(
                 pooled_V_ft, L_DIM, use_bias=True, use_bn=False,
-                activation_fn=tf.tanh, is_training=is_train,
+                activation_fn=tf.nn.relu, is_training=is_train,
                 scope='pooled_linear_l')
 
             log.warning('q_linear_l')
             q_linear_l = modules.fc_layer(
                 q_L_ft, L_DIM, use_bias=True, use_bn=False,
-                activation_fn=tf.tanh, is_training=is_train,
+                activation_fn=tf.nn.relu, is_training=is_train,
                 scope='q_linear_l')
 
+            joint = modules.fc_layer(
+                pooled_linear_l * q_linear_l, 2048,
+                use_bias=True, use_bn=False,
+                activation_fn=tf.nn.relu, is_training=is_train, scope='joint_fc')
+            joint = tf.nn.dropout(joint, 0.5)
+
             logit = modules.fc_layer(
-                pooled_linear_l * q_linear_l, self.num_answer,
+                joint, self.num_answer,
                 use_bias=True, use_bn=False,
                 activation_fn=None, is_training=is_train, scope='classifier')
 
@@ -238,7 +250,7 @@ class Model(object):
             answer_target = self.batch['answer_target']
             loss = tf.nn.sigmoid_cross_entropy_with_logits(
                 labels=answer_target, logits=logit)
-            loss = tf.reduce_mean(loss)
+            loss = tf.reduce_mean(tf.reduce_sum(loss, axis=-1))
             pred = tf.cast(tf.argmax(logit, axis=-1), dtype=tf.int32)
             one_hot_pred = tf.one_hot(pred, depth=self.num_answer,
                                       dtype=tf.float32)
@@ -257,10 +269,11 @@ class Model(object):
         """
         with tf.name_scope('prepare_summary'):
             self.vis_image['image_attention_qa'] = self.visualize_vqa_result(
-                self.batch['image_id'], self.batch['box'], self.batch['num_box'],
+                self.batch['image_id'],
+                self.mid_result['normal_boxes'], self.mid_result['num_V_ft'],
                 self.mid_result['att_score'],
                 self.batch['q_intseq'], self.batch['q_intseq_len'],
-                self.batch['answer_id'], self.mid_result['pred'],
+                self.batch['answer_target'], self.mid_result['pred'],
                 line_width=2)
         """
 
