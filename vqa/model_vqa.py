@@ -33,14 +33,31 @@ class Model(object):
         self.ft_vlmap = config.ft_vlmap
 
         # answer candidates
-        with h5py.File(os.path.join(config.dataset_dir, 'data.hdf5'), 'r') as f:
+        log.infov('loading answer info..')
+        with h5py.File(os.path.join(config.tf_record_dir,
+                                    'data_info.hdf5'), 'r') as f:
             self.answer_intseq_value = f['data_info']['intseq_ans'].value
             self.answer_intseq_len_value = f['data_info']['intseq_ans_len'].value
             self.answer_intseq = tf.constant(
                 self.answer_intseq_value)  # [num_answer, len]
             self.answer_intseq_len = tf.constant(
                 self.answer_intseq_len_value)  # [num_answer]
-            self.num_answer = self.answer_intseq_value.shape[0]
+            self.num_answer = int(f['data_info']['num_answers'].value)
+        log.infov('done')
+
+        log.infov('loading image features...')
+        with h5py.File(config.vfeat_path, 'r') as f:
+            self.features = np.array(f.get('image_features'))
+            log.infov('feature done')
+            self.spatials = np.array(f.get('spatial_features'))
+            log.infov('spatials done')
+            self.normal_boxes = np.array(f.get('normal_boxes'))
+            log.infov('normal_boxes done')
+            self.num_boxes = np.array(f.get('num_boxes'))
+            log.infov('num_boxes done')
+            self.max_box_num = int(f['data_info']['max_box_num'].value)
+            self.vfeat_dim = int(f['data_info']['vfeat_dim'].value)
+        log.infov('done')
 
         self.build(is_train=is_train)
 
@@ -173,8 +190,20 @@ class Model(object):
         """
         Visual features
         """
-        V_ft = self.batch['V_ft']  # [bs, num_box, V_DIM]
-        num_V_ft = self.batch['num_box']  # [bs]
+        with tf.device('/cpu:0'):
+            def load_feature(image_idx):
+                selected_features = np.take(self.features, image_idx, axis=0)
+                return selected_features
+            V_ft = tf.py_func(
+                load_feature, inp=[self.batch['image_idx']], Tout=tf.float32,
+                name='sample_features')
+            V_ft.set_shape([None, self.max_box_num, self.vfeat_dim])
+            num_V_ft = tf.gather(self.num_boxes, self.batch['image_idx'],
+                                 name='gather_num_V_ft', axis=0)
+            self.mid_result['num_V_ft'] = num_V_ft
+            normal_boxes = tf.gather(self.normal_boxes, self.batch['image_idx'],
+                                     name='gather_normal_boxes', axis=0)
+            self.mid_result['normal_boxes'] = normal_boxes
 
         """
         Encode question
@@ -233,14 +262,15 @@ class Model(object):
         Compute loss and accuracy
         """
         with tf.name_scope('loss'):
-            label = tf.cast(self.batch['answer_id'], dtype=tf.int32)
-            loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
-                labels=tf.clip_by_value(label, 0, self.num_answer - 1),
-                logits=logit)
-            loss_mask = tf.to_float(tf.less(label, self.num_answer))
-            loss = tf.reduce_mean(loss * loss_mask)
+            answer_target = self.batch['answer_target']
+            loss = tf.nn.sigmoid_cross_entropy_with_logits(
+                labels=answer_target, logits=logit)
+            loss = tf.reduce_mean(tf.reduce_sum(loss, axis=-1))
             pred = tf.cast(tf.argmax(logit, axis=-1), dtype=tf.int32)
-            acc = tf.reduce_mean(tf.to_float(tf.equal(pred, label)))
+            one_hot_pred = tf.one_hot(pred, depth=self.num_answer,
+                                      dtype=tf.float32)
+            acc = tf.reduce_mean(
+                tf.reduce_sum(one_hot_pred * answer_target, axis=-1))
 
             self.mid_result['pred'] = pred
 
@@ -251,6 +281,7 @@ class Model(object):
         """
         Prepare image summary
         """
+        """
         with tf.name_scope('prepare_summary'):
             self.vis_image['image_attention_qa'] = self.visualize_vqa_result(
                 self.batch['image_id'], self.batch['box'], self.batch['num_box'],
@@ -258,6 +289,7 @@ class Model(object):
                 self.batch['q_intseq'], self.batch['q_intseq_len'],
                 self.batch['answer_id'], self.mid_result['pred'],
                 line_width=2)
+        """
 
         self.loss = self.losses['answer']
 
