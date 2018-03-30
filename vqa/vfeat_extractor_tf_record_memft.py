@@ -17,6 +17,8 @@ class Extractor(object):
     def get_model_class(model_type='vfeat'):
         if model_type == 'vfeat':
             from vqa.model_vfeat import Model
+        elif model_type == 'resnet':
+            from vqa.model_vfeat_resnet import Model
         else:
             raise ValueError('Unknown model_type')
         return Model
@@ -45,7 +47,7 @@ class Extractor(object):
                 shuffle=False)
 
         # Model
-        Model = self.get_model_class()
+        Model = self.get_model_class(config.model_type)
         log.infov('using model class: {}'.format(Model))
         self.model = Model(self.batch, config, is_train=False)
 
@@ -171,6 +173,8 @@ def main():
                         required=True)
     # model parameters
     parser.add_argument('--batch_size', type=int, default=96, help=' ')
+    parser.add_argument('--model_type', type=str, default='vfeat', help=' ',
+                        choices=['vfeat', 'resnet'])
 
     config = parser.parse_args()
 
