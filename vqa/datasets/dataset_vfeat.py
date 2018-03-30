@@ -131,14 +131,7 @@ class Dataset(object):
         return 'Dataset ({}, {} examples)'.format(self.name, len(self))
 
 
-def create_dataset(used_image_path, image_dir, densecap_dir, is_train=True):
-    image_paths = all_ids(used_image_path, is_train=is_train)
-
+def create_dataset(image_paths, image_dir, densecap_dir, is_train=True):
     dataset = Dataset(image_paths, image_dir, densecap_dir,
                       is_train=is_train, name='dataset')
     return dataset
-
-
-def all_ids(used_image_path, is_train=True):
-    image_paths = open(used_image_path, 'r').read().splitlines()
-    return image_paths

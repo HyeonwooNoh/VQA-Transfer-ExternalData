@@ -47,6 +47,8 @@ class Model(object):
             log.infov('normal_boxes done')
             self.num_boxes = np.array(f.get('num_boxes'))
             log.infov('num_boxes done')
+            self.max_box_num = int(f['data_info']['max_box_num'].value)
+            self.vfeat_dim = int(f['data_info']['vfeat_dim'].value)
         log.infov('done')
 
         self.build(is_train=is_train)
@@ -139,6 +141,7 @@ class Model(object):
                 answer_target = b_answer_target[batch_idx]
                 gt_idx_list = np.where(answer_target > 0)
                 if len(gt_idx_list) > 0:
+                    label_answer_str = ''
                     for ans_i in gt_idx_list:
                         label_answer_str += '{}({:.1f})'.format(
                             self.answer_dict['vocab'][ans_i], answer_target[ans_i])
@@ -178,7 +181,7 @@ class Model(object):
             V_ft = tf.py_func(
                 load_feature, inp=[self.batch['image_idx']], Tout=tf.float32,
                 name='sample_features')
-            V_ft.set_shape([None, 36, 2048])
+            V_ft.set_shape([None, self.max_box_num, self.vfeat_dim])
             num_V_ft = tf.gather(self.num_boxes, self.batch['image_idx'],
                                  name='gather_num_V_ft', axis=0)
             self.mid_result['num_V_ft'] = num_V_ft
