@@ -119,7 +119,7 @@ class Extractor(object):
                             'normal_boxes',
                             (len(self.image_id2idx), max_roi_num, 4), 'f')
                         num_boxes = np.zeros(
-                            [len(self.image_id2idx)], dtype=np.int32)
+                            [len(self.image_id2idx)], dtype=np.int32) + num_box
                         spatial_features = f.create_dataset(
                             'spatial_features',
                             (len(self.image_id2idx), max_roi_num, 6), 'f')

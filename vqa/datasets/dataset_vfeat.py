@@ -12,7 +12,7 @@ RANDOM_STATE = np.random.RandomState(123)
 IMAGE_WIDTH = 540
 IMAGE_HEIGHT = 540
 
-MAX_ROI_NUM = 36
+MAX_ROI_NUM = 50
 
 DENSECAP_FILENAME = 'results_original_size.hdf5'
 
