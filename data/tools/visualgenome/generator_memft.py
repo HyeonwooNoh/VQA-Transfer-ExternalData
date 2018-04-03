@@ -56,7 +56,7 @@ if config.max_description_length > 0:
     config.dir_name += '_maxlen{}'.format(config.max_description_length)
 
 if not os.path.exists(config.dir_name): os.makedirs(config.dir_name)
-#else: raise ValueError('Do not overwrite {}'.format(config.dir_name))
+else: raise ValueError('Do not overwrite {}'.format(config.dir_name))
 
 config.save_vocab_path = os.path.join(config.dir_name, 'vocab.pkl')
 config.save_answer_dict = os.path.join(config.dir_name, 'answer_dict.pkl')
@@ -71,6 +71,7 @@ vocab = json.load(open(config.vocab_path, 'r'))
 vocab_set = set(vocab['vocab'])
 
 cPickle.dump(vocab, open(config.save_vocab_path, 'wb'))
+
 
 def check_name(name):
     name = tools.clean_answer_word(name)
@@ -450,17 +451,7 @@ image_split = {
     'train': new_image_ids[:num_train],
     'val': new_image_ids[num_train:],
 }
-cPickle.dump(image_split, open(config.save_image_split, 'wb'))
-
 for split in ['train', 'val']:
-    split_image_ids = image_split[split]
-    split_image_id2idx = {id: i for i, id in enumerate(split_image_ids)}
-    split_image_info = {
-        'image_ids': split_image_ids,
-        'image_id2idx': split_image_id2idx,
-    }
-    cPickle.dump(split_image_info, open(
-        os.path.join(config.dir_name, '{}_image_info.pkl'.format(split)), 'wb'))
     processed = {}
     for image_id in tqdm(image_split[split], desc='processing {}'.format(split)):
         entry = image_id2processed[image_id]
@@ -579,3 +570,16 @@ for split in ['train', 'val']:
         }
     cPickle.dump(processed, open(
         os.path.join(config.dir_name, '{}_processed.pkl'.format(split)), 'wb'))
+
+    image_split[split] = processed.keys()  # used_image_ids
+    split_image_ids = image_split[split]
+    split_image_id2idx = {id: i for i, id in enumerate(split_image_ids)}
+    split_image_info = {
+        'image_ids': split_image_ids,
+        'image_id2idx': split_image_id2idx,
+    }
+    cPickle.dump(split_image_info, open(
+        os.path.join(config.dir_name, '{}_image_info.pkl'.format(split)), 'wb'))
+cPickle.dump(image_split, open(config.save_image_split, 'wb'))
+
+print('done')

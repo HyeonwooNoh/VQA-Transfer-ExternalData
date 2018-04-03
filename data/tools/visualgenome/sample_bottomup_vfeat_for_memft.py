@@ -15,9 +15,9 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--bottomup_data_dir', type=str,
                     default='data/VisualGenome/bottomup_feature_36', help=' ')
-parser.add_argument('--target_dir', type=str,
+parser.add_argument('--dir_name', type=str,
                     default='data/preprocessed/visualgenome'
-                    '/memft_all_new_vocab50_obj3000_attr_1000_maxlen_10',
+                    '/memft_all_new_vocab50_obj3000_attr1000_maxlen10',
                     help=' ')
 config = parser.parse_args()
 
@@ -45,7 +45,7 @@ full_image_id2idx = full_image_info['image_id2idx']
 
 for split in ['train', 'val']:
     image_info = cPickle.load(open(
-        os.path.join(config.dir_name, '{}_image_info.pkl'.format(split)), 'wb'))
+        os.path.join(config.dir_name, '{}_image_info.pkl'.format(split)), 'rb'))
     image_id2idx = image_info['image_id2idx']
     f = h5py.File(
         os.path.join(config.dir_name, '{}_vfeat.hdf5'.format(split)), 'w')
@@ -55,7 +55,7 @@ for split in ['train', 'val']:
     f_data_info['pretrained_param_path'] = 'bottom_up_attention_36_{}'.format(
         split)
     image_features = f.create_dataset(
-        'image_features', (len(image_id2idx), max_box_num, FEATURE_DIM), 'f')
+        'image_features', (len(image_id2idx), max_box_num, vfeat_dim), 'f')
     normal_boxes = f.create_dataset(
         'normal_boxes', (len(image_id2idx), max_box_num, 4), 'f')
     num_boxes = np.zeros([len(image_id2idx)], dtype=np.int32)
