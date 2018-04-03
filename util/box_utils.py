@@ -128,6 +128,15 @@ def xcycwh_to_xywh(boxes):
     return boxes_xywh
 
 
+def normalize_box_x1y1x2y2(box, width, height):
+    box = box.copy().astype(np.float32)
+    box[0] /= float(width)
+    box[1] /= float(height)
+    box[2] /= float(width)
+    box[3] /= float(height)
+    return np.clip(box, 0, 1)
+
+
 def normalize_boxes_x1y1x2y2(boxes, width, height):
     boxes = boxes.astype(np.float32)
     x1 = boxes[:, 0] / width
@@ -136,6 +145,36 @@ def normalize_boxes_x1y1x2y2(boxes, width, height):
     y2 = boxes[:, 3] / height
     new_boxes = np.stack([y1, x1, y2, x2], axis=1)
     return np.clip(new_boxes, 0, 1)
+
+
+def scale_box_x1y1x2y2(box, frac):
+    """
+    Rescale boxes to convert from one coordinate system to another.
+
+    Inputs:
+        - boxes: Tensor of shape (4) giving coordinates of a box in
+          (x1, y1, x2, y2) format.
+        - frac: Fraction by which to scale the boxes. For example
+          if boxes assume that the input image has size 800x600 but we want to
+          use them at 400x300 scale, then frac should be 0.5.
+          array [frac_x, frac_y] for using separate rescale
+
+    Returns:
+        - boxes_scaled: Tensor of shape (4) giving rescaled box coordinates
+          in (x1, y1, x2, y2) format.
+    """
+    # bb is given as Nx4 tensor of x,y,w,h
+    # e.g. original width was 800 but now is 512, then frac will be 800/512 = 1.56
+    if isinstance(frac, list):
+        assert len(frac) == 2, 'only two dimension frac is possible for array input'
+        new_box = box.copy()
+        new_box[0] *= frac[0]
+        new_box[1] *= frac[1]
+        new_box[2] *= frac[0]
+        new_box[3] *= frac[1]
+    else:
+        new_box = box * float(frac)
+    return new_box
 
 
 def scale_boxes_x1y1x2y2(boxes, frac):
@@ -279,6 +318,32 @@ def iou_matrix_by_iter(boxes1, boxes2):
     return M
 
 
+def is_inside_matrix(boxes1, boxes2):
+    """
+    Compute whether percentage of boxes1 that is inside of boxes2.
+    return is NXM [0, 1] matrix where boxes1: Nx4, boxes2: Mx4 in x1y1x2y2 format
+    """
+    # Make two NxMx4 matrices: box1 - row major, box2 - column major
+    n = boxes1.shape[0]
+    m = boxes2.shape[0]
+    tile_boxes1 = np.tile(np.expand_dims(boxes1, axis=1), [1, m, 1])
+    tile_boxes2 = np.tile(np.expand_dims(boxes2, axis=0), [n, 1, 1])
+
+    inter = np.concatenate([
+        np.maximum(tile_boxes1[:, :, :2], tile_boxes2[:, :, :2]),
+        np.minimum(tile_boxes1[:, :, 2:], tile_boxes2[:, :, 2:])], axis=2)
+    iw = inter[:, :, 2] - inter[:, :, 0]
+    ih = inter[:, :, 3] - inter[:, :, 1]
+    iw = iw.clip(min=0)
+    ih = ih.clip(min=0)
+    area_i = iw * ih
+
+    box1_w = tile_boxes1[:, :, 2] - tile_boxes1[:, :, 0]
+    box1_h = tile_boxes1[:, :, 3] - tile_boxes1[:, :, 1]
+    area_box1 = box1_w * box1_h
+    return area_i.astype(np.float32) / area_box1.astype(np.float32)
+
+
 def iou_matrix(boxes1, boxes2):
     """
     Compute pairwise NxM IOU matrix in Nx4, Mx4 array of boxes in x1y1x2y2 format
@@ -298,12 +363,15 @@ def iou_matrix(boxes1, boxes2):
     ih = ih.clip(min=0)
     area_i = iw * ih
 
-    union = np.concatenate([
-        np.minimum(tile_boxes1[:, :, :2], tile_boxes2[:, :, :2]),
-        np.maximum(tile_boxes1[:, :, 2:], tile_boxes2[:, :, 2:])], axis=2)
-    uw = union[:, :, 2] - union[:, :, 0]
-    uh = union[:, :, 3] - union[:, :, 1]
-    area_u = uw * uh
+    box1_w = tile_boxes1[:, :, 2] - tile_boxes1[:, :, 0]
+    box1_h = tile_boxes1[:, :, 3] - tile_boxes1[:, :, 1]
+    area_box1 = box1_w * box1_h
+
+    box2_w = tile_boxes2[:, :, 2] - tile_boxes2[:, :, 0]
+    box2_h = tile_boxes2[:, :, 3] - tile_boxes2[:, :, 1]
+    area_box2 = box2_w * box2_h
+
+    area_u = (area_box1 + area_box2) - area_i
     return area_i.astype(np.float32) / area_u.astype(np.float32)
 
 

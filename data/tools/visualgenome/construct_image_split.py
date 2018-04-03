@@ -2,8 +2,8 @@ import json
 import numpy as np
 
 
-IMAGE_INFO_FILE = 'VisualGenome/annotations/image_data.json'
-IMAGE_SPLIT_FILE = 'preprocessed/image_split.json'
+IMAGE_INFO_FILE = 'data/VisualGenome/annotations/image_data.json'
+IMAGE_SPLIT_FILE = 'data/preprocessed/visualgenome/image_split.json'
 
 NUM_TRAIN_IMAGE = 80000
 NUM_TEST_IMAGE = 18077
