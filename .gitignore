@@ -8,6 +8,7 @@
 *.json
 *.hdf5
 *.ckpt
+*.pkl
 
 # Ipython notebook
 .ipynb_checkpoints
