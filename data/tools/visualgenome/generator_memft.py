@@ -464,8 +464,8 @@ for split in ['train', 'val']:
             label = answer_dict['dict'][obj['processed_name']]
             item = {
                 'normal_box': normal_box,
-                'p_idx': p_idx,
-                'p_weight': p_weight,
+                'p_idx': list(p_idx),
+                'p_weight': list(p_weight),
                 'label': label,
             }
             object_predict.append(item)
@@ -477,8 +477,8 @@ for split in ['train', 'val']:
                 *[(i, s) for i, s in enumerate(att_score) if s > 0])
             w_tokens = [vocab['dict'][t] for t in obj_name.split()]
             item = {
-                's_idx': s_idx,
-                's_value': s_value,
+                's_idx': list(s_idx),
+                's_value': list(s_value),
                 'w_tokens': w_tokens,
             }
             object_attend.append(item)
@@ -494,8 +494,8 @@ for split in ['train', 'val']:
             object_label = answer_dict['dict'][attr['processed_name']]
             item = {
                 'normal_box': normal_box,
-                'p_idx': p_idx,
-                'p_weight': p_weight,
+                'p_idx': list(p_idx),
+                'p_weight': list(p_weight),
                 'labels': labels,
                 'object_label': object_label,
             }
@@ -508,8 +508,8 @@ for split in ['train', 'val']:
                 *[(i, s) for i, s in enumerate(att_score) if s > 0])
             w_tokens = [vocab['dict'][t] for t in attr_name.split()]
             item = {
-                's_idx': s_idx,
-                's_value': s_value,
+                's_idx': list(s_idx),
+                's_value': list(s_value),
                 'w_tokens': w_tokens,
             }
             attr_attend.append(item)
@@ -528,8 +528,8 @@ for split in ['train', 'val']:
                 fill = answer_dict['dict'][blank_fill['fill']]
                 item = {
                     'normal_box': normal_box,
-                    'p_idx': p_idx,
-                    'p_weight': p_weight,
+                    'p_idx': list(p_idx),
+                    'p_weight': list(p_weight),
                     'blank': blank,
                     'fill': fill,
                 }
@@ -540,8 +540,8 @@ for split in ['train', 'val']:
                 fill = answer_dict['dict'][blank_fill['fill']]
                 item = {
                     'normal_box': normal_box,
-                    'p_idx': p_idx,
-                    'p_weight': p_weight,
+                    'p_idx': list(p_idx),
+                    'p_weight': list(p_weight),
                     'blank': blank,
                     'fill': fill,
                 }
@@ -551,8 +551,8 @@ for split in ['train', 'val']:
                 *[(i, s) for i, s in enumerate(cap['is_inside']) if s > 0])
             w_tokens = [vocab['dict'][t] for t in cap['caption'].split()]
             item = {
-                's_idx': s_idx,
-                's_value': s_value,
+                's_idx': list(s_idx),
+                's_value': list(s_value),
                 'w_tokens': w_tokens,
             }
             caption_attend.append(item)
