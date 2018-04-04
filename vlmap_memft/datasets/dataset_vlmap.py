@@ -45,8 +45,8 @@ class Dataset(object):
         self.num_answers = len(self.answer_dict['vocab'])
         log.info('loading answer_dict done')
 
-        with h5py.File(os.path.join(
-            data_dir, '{}_vfeat.hdf5'.format(split)), 'r') as f:
+        with h5py.File(os.path.join(data_dir, '{}_vfeat.hdf5'.format(split)),
+                       'r') as f:
 
             self.vfeat_dim = int(f['data_info']['vfeat_dim'].value)
             self.max_box_num = int(f['data_info']['max_box_num'].value)
@@ -64,6 +64,13 @@ class Dataset(object):
 
     def get_config(self):
         config = collections.namedtuple('dataset_config', [])
+        config.n_obj_pred = NUM_CONFIG['obj_pred']
+        config.n_obj_att = NUM_CONFIG['obj_att']
+        config.n_attr_pred = NUM_CONFIG['attr_pred']
+        config.n_attr_att = NUM_CONFIG['attr_att']
+        config.n_attr_bf = NUM_CONFIG['attr_blank_fill']
+        config.n_obj_bf = NUM_CONFIG['obj_blank_fill']
+        config.n_cap_att = NUM_CONFIG['caption_att']
         return config
 
     def get_data(self, image_id):
@@ -145,7 +152,7 @@ class Dataset(object):
         while len(idx_list) < NUM_CONFIG['obj_att']:
             idx_list.append(idx_list[-1])
         maxlen = max([len(entry['object_attend'][idx]['w_tokens'])
-                        for idx in idx_list])
+                      for idx in idx_list])
         att_scores, word_tokens_len = [], []
         word_tokens = np.zeros([len(idx_list), maxlen], dtype=np.int32)
         for i, idx in enumerate(idx_list):
@@ -172,7 +179,7 @@ class Dataset(object):
         while len(idx_list) < NUM_CONFIG['attr_att']:
             idx_list.append(idx_list[-1])
         maxlen = max([len(entry['attr_attend'][idx]['w_tokens'])
-                        for idx in idx_list])
+                      for idx in idx_list])
         att_scores, word_tokens_len = [], []
         word_tokens = np.zeros([len(idx_list), maxlen], dtype=np.int32)
         for i, idx in enumerate(idx_list):
@@ -199,7 +206,7 @@ class Dataset(object):
         while len(idx_list) < NUM_CONFIG['obj_blank_fill']:
             idx_list.append(idx_list[-1])
         maxlen = max([len(entry['obj_blank_fill'][idx]['blank'])
-                        for idx in idx_list])
+                      for idx in idx_list])
         weights, normal_boxes, fills, blanks_len = [], [], [], []
         blanks = np.zeros([len(idx_list), maxlen], dtype=np.int32)
         for i, idx in enumerate(idx_list):
@@ -230,7 +237,7 @@ class Dataset(object):
         while len(idx_list) < NUM_CONFIG['attr_blank_fill']:
             idx_list.append(idx_list[-1])
         maxlen = max([len(entry['attr_blank_fill'][idx]['blank'])
-                        for idx in idx_list])
+                      for idx in idx_list])
         weights, normal_boxes, fills, blanks_len = [], [], [], []
         blanks = np.zeros([len(idx_list), maxlen], dtype=np.int32)
         for i, idx in enumerate(idx_list):
@@ -261,7 +268,7 @@ class Dataset(object):
         while len(idx_list) < NUM_CONFIG['caption_att']:
             idx_list.append(idx_list[-1])
         maxlen = max([len(entry['caption_attend'][idx]['w_tokens'])
-                        for idx in idx_list])
+                      for idx in idx_list])
         att_scores, word_tokens_len = [], []
         word_tokens = np.zeros([len(idx_list), maxlen], dtype=np.int32)
         for i, idx in enumerate(idx_list):
