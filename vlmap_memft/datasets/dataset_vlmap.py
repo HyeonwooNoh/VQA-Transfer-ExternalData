@@ -71,6 +71,8 @@ class Dataset(object):
         config.n_attr_bf = NUM_CONFIG['attr_blank_fill']
         config.n_obj_bf = NUM_CONFIG['obj_blank_fill']
         config.n_cap_att = NUM_CONFIG['caption_att']
+        config.vfeat_dim = self.vfeat_dim
+        config.max_box_num = self.max_box_num
         return config
 
     def get_data(self, image_id):

@@ -62,7 +62,8 @@ def attention(memory, memory_len, query, scope='attention'):
 
 
 def hadamard_attention(memory, memory_len, query, use_ln=False, is_train=True,
-                       scope='hadamard_attention', reuse=tf.AUTO_REUSE):
+                       scope='hadamard_attention', reuse=tf.AUTO_REUSE,
+                       normalizer='softmax'):
     """
     Args:
         - memory: [bs, len, dim]
@@ -88,7 +89,8 @@ def hadamard_attention(memory, memory_len, query, use_ln=False, is_train=True,
             score_mask_values = score_mask_value * tf.ones_like(score)
             score = tf.where(score_mask, score, score_mask_values)
         with tf.name_scope('normalize'):
-            score = tf.nn.softmax(score, axis=-1)
+            if normalizer == 'softmax':
+                score = normalizer(score, axis=-1)
         return score
 
 
@@ -326,6 +328,28 @@ def learn_embedding_map(used_vocab, scope='learn_embedding_map', reuse=tf.AUTO_R
             name='learn', shape=[len(used_vocab['vocab']), 300],
             initializer=tf.random_uniform_initializer(
                 minval=-0.01, maxval=0.01))
+        return embed_map
+
+
+def LearnAnswerGloVe(answer_dict, scope='LearnAnswerGloVe', reuse=tf.AUTO_REUSE):
+    with tf.variable_scope(scope, reuse=reuse) as scope:
+        glove_vocab = json.load(open(GLOVE_VOCAB_PATH, 'r'))
+        with h5py.File(GLOVE_EMBEDDING_PATH, 'r') as f:
+            glove_param = np.array(f.get('param')).transpose()
+        weights = np.zeros([len(answer_dict['vocab']), 300], dtype=np.float32)
+        for i, answer_word in enumerate(answer_dict['vocab']):
+            ws = []
+            for w in answer_word.split():
+                if w in glove_vocab['dict'] and \
+                        glove_vocab['dict'][w] < glove_param.shape[0]:
+                    ws.append(glove_param[glove_vocab['dict'][w], :])
+            if len(ws) > 0:
+                weights[i, :] = np.stack(ws, axis=0).mean(axis=0)
+            else: pass  # initialize to zero
+        init = tf.constant_initializer(weights)
+        embed_map = tf.get_variable(
+            name='embed_map', shape=[len(answer_dict['vocab']), 300],
+            initializer=init)
         return embed_map
 
 
