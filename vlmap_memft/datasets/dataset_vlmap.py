@@ -387,7 +387,6 @@ class Dataset(object):
 
 def create_ops(batch_size,
                dataset,
-               split,
                is_train=True,
                scope='vlmap_memft',
                shuffle=True):
