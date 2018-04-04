@@ -371,7 +371,9 @@ for image_id, image_idx in tqdm(image_id2idx.items(), desc='merge all'):
     for obj in processed_objs:
         name = obj['processed_name']
         if name in obj_name2score:
-            obj_name2score[name] = np.maximum(obj_name2score, obj['is_inside'])
+            obj_name2score[name] = \
+                np.maximum(obj_name2score[name],
+                           obj['is_inside'])
         else:
             obj_name2score[name] = obj['is_inside']
     obj_name2score = obj_name2score.items()
@@ -399,7 +401,9 @@ for image_id, image_idx in tqdm(image_id2idx.items(), desc='merge all'):
         for att in attr['processed_attributes']:
             name_attr = ' '.join([att, name])
             if name_attr in attr_name2score:
-                attr_name2score[name_attr] = np.maximum(attr_name2score, attr['is_inside'])
+                attr_name2score[name_attr] = \
+                    np.maximum(attr_name2score[name_attr],
+                               attr['is_inside'])
             else:
                 attr_name2score[name_attr] = attr['is_inside']
     attr_name2score = attr_name2score.items()
