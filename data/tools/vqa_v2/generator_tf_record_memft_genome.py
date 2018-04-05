@@ -146,7 +146,7 @@ for split in ['train']:
                 raise ValueError('Existing shard path: {}'.format(shard_path))
             tf_record_writer = tf.python_io.TFRecordWriter(shard_path)
 
-        anno = qid2anno[str(qid)]
+        anno = qid2anno[qid]
 
         answer_count = {}
         for answer in anno['processed_answers']:
@@ -198,7 +198,7 @@ for split in ['val', 'testval', 'test']:
                 raise ValueError('Existing shard path: {}'.format(shard_path))
             tf_record_writer = tf.python_io.TFRecordWriter(shard_path)
 
-        anno = qid2anno[str(qid)]
+        anno = qid2anno[qid]
 
         answer_count = {}
         for answer in anno['processed_answers']:
