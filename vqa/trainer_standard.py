@@ -280,7 +280,7 @@ def main():
                         '/bottomup_vqa_tf_record_memft', help=' ')
     parser.add_argument('--vfeat_name', type=str,
                         default='vfeat_bottomup_36.hdf5', help=' ')
-    parser.add_argument('--vocab_name', type=str, default='vocab.json', help=' ')
+    parser.add_argument('--vocab_name', type=str, default='vocab.pkl', help=' ')
     # log
     parser.add_argument('--train_average_iter', type=int, default=200)
     parser.add_argument('--val_average_iter', type=int, default=419)  # 419 for 1 epoch
