@@ -1,5 +1,8 @@
+import cPickle
 import json
 import h5py
+import math
+import os
 import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
@@ -92,6 +95,30 @@ def hadamard_attention(memory, memory_len, query, use_ln=False, is_train=True,
             if normalizer == 'softmax':
                 score = tf.nn.softmax(score, axis=-1)
         return score
+
+
+def encode_L_bidirection(seq, seq_len, dim=384, scope='encode_L_bi',
+                         reuse=tf.AUTO_REUSE, cell_type='LSTM'):
+    with tf.variable_scope(scope, reuse=reuse) as scope:
+        dim1 = int(math.ceil(dim / 2.0))
+        dim2 = int(math.floor(dim / 2.0))
+        log.warning(scope.name)
+        if cell_type == 'LSTM':
+            cell1 = rnn.BasicLSTMCell(num_units=dim1, state_is_tuple=True)
+            cell2 = rnn.BasicLSTMCell(num_units=dim2, state_is_tuple=True)
+        elif cell_type == 'GRU':
+            cell1 = rnn.GRUCell(num_units=dim1)
+            cell2 = rnn.GRUCell(num_units=dim2)
+        else: raise ValueError('Unknown cell_type')
+        bi_outputs, encoder_state = tf.nn.bidirectional_dynamic_rnn(
+            cell_fw=cell1, cell_bw=cell2, inputs=seq, sequence_length=seq_len,
+            dtype=tf.float32)
+        if cell_type == 'LSTM':
+            raise RuntimeError('Check how LSTM works with bidirectional rnn')
+        elif cell_type == 'GRU':
+            output = tf.concat(bi_outputs, -1)
+            output_state = tf.concat(encoder_state, -1)
+        return output, output_state
 
 
 def encode_L(seq, seq_len, dim=384, scope='encode_L',
@@ -353,6 +380,28 @@ def LearnAnswerGloVe(answer_dict, scope='LearnAnswerGloVe', reuse=tf.AUTO_REUSE)
         return embed_map
 
 
+def WordWeightEmbed(vocab, word_weight_dir, weight_name='v_word',
+                    scope='WordWeightEmbed', reuse=tf.AUTO_REUSE):
+    with tf.variable_scope(scope, reuse=reuse) as scope:
+        word_vocab_path = os.path.join(word_weight_dir, 'vocab.pkl')
+        word_vocab = cPickle.load(open(word_vocab_path, 'rb'))
+        word_weight_path = os.path.join(word_weight_dir, 'weights.hdf5')
+        with h5py.File(word_weight_path, 'r') as f:
+            word_weight = np.array(f.get(weight_name))
+        num_row = word_weight.shape[0]
+        w_dim = word_weight.shape[1]
+        weights = np.zeros([len(vocab['vocab']), w_dim], dtype=np.float32)
+        for i, w in enumerate(vocab['vocab']):
+            if w in word_vocab['dict'] and word_vocab['dict'][w] < num_row:
+                weights[i, :] = word_weight[word_vocab['dict'][w], :]
+            else: pass
+        init = tf.constant_initializer(weights)
+        embed_map = tf.get_variable(
+            name='embed_map', shape=[len(vocab['vocab']), w_dim],
+            initializer=init)
+        return embed_map
+
+
 def LearnGloVe(vocab, scope='LearnGloVe', reuse=tf.AUTO_REUSE):
     with tf.variable_scope(scope, reuse=reuse) as scope:
         glove_vocab = json.load(open(GLOVE_VOCAB_PATH, 'r'))
@@ -492,6 +541,41 @@ def conv2d(input, dim, kernel_size, pad='same', use_bias=False, use_bn=False,
                                     updates_collections=None)
         if activation_fn is not None:
             out = activation_fn(out)
+        return out
+
+
+def WordWeightAnswer(input, answer_dict, word_weight_dir,
+                     use_bias=False, is_training=True,
+                     scope='WordWeightAnswer', reuse=tf.AUTO_REUSE):
+    with tf.variable_scope(scope, reuse=reuse) as scope:
+        log.warning(scope.name)
+        word_answer_dict_path = os.path.join(word_weight_dir, 'answer_dict.pkl')
+        word_answer_dict = cPickle.load(open(word_answer_dict_path, 'rb'))
+        word_weight_path = os.path.join(word_weight_dir, 'weights.hdf5')
+        with h5py.File(word_weight_path, 'r') as f:
+            answer_weight = np.array(f.get('class_weights'))
+            answer_bias = np.array(f.get('class_biases'))
+        input_dim = input.get_shape().as_list()[-1]
+        dim = len(answer_dict['vocab'])
+        weights = np.zeros([input_dim, dim], dtype=np.float32)
+        biases = np.zeros([dim], dtype=np.float32)
+        for i, a in enumerate(answer_dict['vocab']):
+            if a in word_answer_dict['dict']:
+                weights[:, i] = answer_weight[:, word_answer_dict['dict'][a]]
+                biases[i] = answer_bias[word_answer_dict['dict'][a]]
+            else: pass  # initialize to zero
+        if use_bias:
+            out = layers.fully_connected(
+                input, dim, activation_fn=None,
+                weights_initializer=tf.constant_initializer(weights),
+                biases_initializer=tf.constant_initializer(biases),
+                reuse=reuse, trainable=is_training, scope='fc')
+        else:
+            out = layers.fully_connected(
+                input, dim, activation_fn=None,
+                weights_initializer=tf.constant_initializer(weights),
+                biases_initializer=None,
+                reuse=reuse, trainable=is_training, scope='fc')
         return out
 
 

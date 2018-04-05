@@ -16,6 +16,8 @@ class Trainer(object):
             from vqa.model_vqa import Model
         elif model_type == 'standard':
             from vqa.model_standard import Model
+        elif model_type == 'vlmap_only':
+            from vqa.model_vlmap_only import Model
         else:
             raise ValueError('Unknown model_type')
         return Model
@@ -171,6 +173,9 @@ class Trainer(object):
 
         self.pretrained_param_path = config.pretrained_param_path
         if self.pretrained_param_path is not None:
+            log.warn('Filtered transfer_vars (loaded from pre-trained param):')
+            tf.contrib.slim.model_analyzer.analyze_vars(transfer_vars, print_info=True)
+
             log.info('Pre-trained param path: {}'.format(self.pretrained_param_path))
             self.pretrain_loader.restore(self.session, self.pretrained_param_path)
             log.info('Loaded the pre-trained parameters')
@@ -339,7 +344,10 @@ def main():
     # model parameters
     parser.add_argument('--batch_size', type=int, default=512, help=' ')
     parser.add_argument('--model_type', type=str, default='vqa', help=' ',
-                        choices=['vqa', 'standard'])
+                        choices=['vqa', 'standard', 'vlmap_only'])
+    # model specific parameters
+    parser.add_argument('--vlmap_word_weight_dir', type=str, default=None,
+                        help=' ')
     parser.add_argument('--ft_vlmap', action='store_true', default=False)
     config = parser.parse_args()
     config.vocab_path = os.path.join(config.tf_record_dir, config.vocab_name)
