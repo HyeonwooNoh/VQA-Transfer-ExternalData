@@ -90,7 +90,7 @@ def hadamard_attention(memory, memory_len, query, use_ln=False, is_train=True,
             score = tf.where(score_mask, score, score_mask_values)
         with tf.name_scope('normalize'):
             if normalizer == 'softmax':
-                score = normalizer(score, axis=-1)
+                score = tf.nn.softmax(score, axis=-1)
         return score
 
 

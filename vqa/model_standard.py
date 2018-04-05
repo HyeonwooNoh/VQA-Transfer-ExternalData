@@ -1,4 +1,4 @@
-import json
+import cPickle
 import h5py
 import os
 import numpy as np
@@ -25,9 +25,9 @@ class Model(object):
         self.mid_result = {}
         self.vis_image = {}
 
-        self.vocab = json.load(open(config.vocab_path, 'r'))
-        self.answer_dict = json.load(open(
-            os.path.join(config.tf_record_dir, 'answer_dict.json'), 'r'))
+        self.vocab = cPickle.load(open(config.vocab_path, 'rb'))
+        self.answer_dict = cPickle.load(open(
+            os.path.join(config.tf_record_dir, 'answer_dict.pkl'), 'rb'))
         self.glove_map = modules.LearnGloVe(self.vocab)
 
         # answer candidates

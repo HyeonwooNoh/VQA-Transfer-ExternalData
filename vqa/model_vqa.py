@@ -1,4 +1,4 @@
-import json
+import cPickle
 import h5py
 import os
 import numpy as np
@@ -26,7 +26,7 @@ class Model(object):
         self.mid_result = {}
         self.vis_image = {}
 
-        self.vocab = json.load(open(config.vocab_path, 'r'))
+        self.vocab = cPickle.load(open(config.vocab_path, 'rb'))
         self.glove_map = modules.GloVe_vocab(self.vocab)
 
         # model parameters
