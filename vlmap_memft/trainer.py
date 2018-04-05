@@ -1,7 +1,10 @@
 import argparse
 import os
 import time
+import numpy as np
 import tensorflow as tf
+
+from tqdm import tqdm
 
 from util import log
 from vlmap_memft.datasets.dataset_vlmap import Dataset, create_ops
@@ -82,7 +85,7 @@ class Trainer(object):
             learning_rate=self.learning_rate,
             optimizer=tf.train.AdamOptimizer,
             clip_gradients=20.0,
-            variables=learn_v_vars,
+            variables=train_vars,
             increment_global_step=True,
             name='optimizer')
 
@@ -180,7 +183,7 @@ class Trainer(object):
                 # val
                 avg_val_report = {key: [] for key in self.avg_report['val']}
                 avg_val_step_time = []
-                for i in range(self.val_average_iter):
+                for i in tqdm(range(self.val_average_iter), desc='performing validation'):
                     step, summary, loss, report, step_time = self.run_val_step(
                         i == (self.val_average_iter - 1), split='val')
                     for key in avg_val_report:
@@ -281,25 +284,25 @@ def main():
                         default='data/VisualGenome/VG_100K', help=' ')
     # log
     parser.add_argument('--train_average_iter', type=int, default=10)
-    parser.add_argument('--val_average_iter', type=int, default=10)
+    parser.add_argument('--val_average_iter', type=int, default=100)
     parser.add_argument('--heavy_summary_step', type=int, default=800)
     parser.add_argument('--validation_step', type=int, default=800)
     parser.add_argument('--checkpoint_step', type=int, default=800)
     # hyper parameters
     parser.add_argument('--prefix', type=str, default='default', help=' ')
     parser.add_argument('--checkpoint', type=str, default=None)
-    parser.add_argument('--pretrained_param', type=str, default=None)
+    parser.add_argument('--pretrained_param_path', type=str, default=None)
     parser.add_argument('--learning_rate', type=float, default=0.001, help=' ')
     parser.add_argument('--lr_weight_decay', action='store_true', default=False)
     # model parameters
-    parser.add_argument('--batch_size', type=int, default=3, help=' ')
+    parser.add_argument('--batch_size', type=int, default=512, help=' ')
     parser.add_argument('--model_type', type=str, default='vlmap', help=' ',
                         choices=['vlmap'])
     config = parser.parse_args()
     check_config(config)
 
     dataset = {
-        'train': Dataset(config.data_dir, 'train'),
+        'train': Dataset(config.data_dir, 'train'),  # load val during debugging
         'val': Dataset(config.data_dir, 'val'),
     }
     config.data_cfg = dataset['train'].get_config()

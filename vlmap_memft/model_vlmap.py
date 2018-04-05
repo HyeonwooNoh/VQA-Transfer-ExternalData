@@ -67,8 +67,9 @@ class Model(object):
         self.build_caption_attention()
 
         self.loss = 0
-        for loss in self.losses.value():
+        for loss in self.losses.values():
             self.loss = self.loss + loss
+        self.report['total_loss'] = self.loss
 
         # scalar summary
         for key, val in self.report.items():
@@ -96,7 +97,7 @@ class Model(object):
             V_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='pooled_linear_l')
-        dummy_l = tf.zeros_like(self.batch['obj_pred/labels'])
+        dummy_l = tf.zeros_like(self.batch['obj_pred/labels'], dtype=tf.float32)
         dummy_l = tf.tile(tf.expand_dims(dummy_l, axis=-1), [1, 1, L_DIM])
         l_linear_l = modules.fc_layer(
             dummy_l, L_DIM, use_bias=True, use_bn=False, use_ln=True,
@@ -120,7 +121,8 @@ class Model(object):
                                    depth=self.num_answer)
             num_valid_entry = self.batch['obj_pred/num']
             valid_mask = tf.sequence_mask(
-                num_valid_entry, maxlen=config.n_obj_pred, dtype=tf.float32)
+                num_valid_entry, maxlen=self.data_cfg.n_obj_pred,
+                dtype=tf.float32)
             loss, acc, top_k_acc = \
                 self.n_way_classification_loss(logit, onehot_gt, valid_mask)
             self.losses['object_pred'] = loss
@@ -169,7 +171,8 @@ class Model(object):
             multilabel_gt = self.batch['attr_pred/labels']
             num_valid_entry = self.batch['attr_pred/num']
             valid_mask = tf.sequence_mask(
-                num_valid_entry, maxlen=config.n_attr_pred, dtype=tf.float32)
+                num_valid_entry, maxlen=self.data_cfg.n_attr_pred,
+                dtype=tf.float32)
             loss, acc, recall, precision, top_1_prec, top_k_recall = \
                 self.binary_classification_loss(logit, multilabel_gt, valid_mask,
                                                 depth=self.num_answer)
@@ -179,7 +182,7 @@ class Model(object):
             self.report['attr_pred_recall'] = recall
             self.report['attr_pred_precision'] = precision
             self.report['attr_pred_top_1_prec'] = top_1_prec
-            self.report['attr_pred_top_{}_recall'.format(NUM_K)] = top_k_recall
+            self.report['attr_pred_top_{}_recall'.format(TOP_K)] = top_k_recall
 
     def build_object_attention(self):
         """
@@ -207,11 +210,20 @@ class Model(object):
             pooled_w_L_ft, V_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='q_linear_v')
+
+        tile_v_linear_v = tf.tile(tf.expand_dims(v_linear_v, axis=1),
+                                  [1, self.data_cfg.n_obj_att, 1, 1])
+        flat_tile_v_linear_v = tf.reshape(tile_v_linear_v,
+                                          [-1, self.data_cfg.max_box_num, V_DIM])
+        tile_num_V_ft = tf.tile(tf.expand_dims(num_V_ft, axis=1),
+                                [1, self.data_cfg.n_obj_att])
+        flat_tile_num_V_ft = tf.reshape(tile_num_V_ft, [-1])
+
         flat_l_linear_v = tf.reshape(l_linear_v, [-1, V_DIM])
 
         # flat_att_logit: [bs * #obj, num_proposal]
         flat_att_logit = modules.hadamard_attention(
-            v_linear_v, num_V_ft, flat_l_linear_v,
+            flat_tile_v_linear_v, flat_tile_num_V_ft, flat_l_linear_v,
             use_ln=False, is_train=self.is_train, normalizer=None)
 
         n_entry = self.data_cfg.n_obj_att
@@ -223,7 +235,8 @@ class Model(object):
                 tf.greater(self.batch['obj_att/att_scores'], 0.5))
             num_valid_entry = self.batch['obj_att/num']
             valid_mask = tf.sequence_mask(
-                num_valid_entry, maxlen=config.n_obj_att, dtype=tf.float32)
+                num_valid_entry, maxlen=self.data_cfg.n_obj_att,
+                dtype=tf.float32)
             loss, acc, recall, precision, top_1_prec, top_k_recall = \
                 self.binary_classification_loss(logit, multilabel_gt, valid_mask,
                                                 depth=self.data_cfg.max_box_num)
@@ -233,7 +246,7 @@ class Model(object):
             self.report['object_att_recall'] = recall
             self.report['object_att_precision'] = precision
             self.report['object_att_top_1_prec'] = top_1_prec
-            self.report['object_att_top_{}_recall'.format(NUM_K)] = top_k_recall
+            self.report['object_att_top_{}_recall'.format(TOP_K)] = top_k_recall
 
     def build_attribute_attention(self):
         """
@@ -262,11 +275,20 @@ class Model(object):
             pooled_w_L_ft, V_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='q_linear_v')
+
+        tile_v_linear_v = tf.tile(tf.expand_dims(v_linear_v, axis=1),
+                                  [1, self.data_cfg.n_attr_att, 1, 1])
+        flat_tile_v_linear_v = tf.reshape(tile_v_linear_v,
+                                          [-1, self.data_cfg.max_box_num, V_DIM])
+        tile_num_V_ft = tf.tile(tf.expand_dims(num_V_ft, axis=1),
+                                [1, self.data_cfg.n_attr_att])
+        flat_tile_num_V_ft = tf.reshape(tile_num_V_ft, [-1])
+
         flat_l_linear_v = tf.reshape(l_linear_v, [-1, V_DIM])
 
-        # flat_att_logit: [bs * #obj, num_proposal]
+        # flat_att_logit: [bs * #attr, num_proposal]
         flat_att_logit = modules.hadamard_attention(
-            v_linear_v, num_V_ft, flat_l_linear_v,
+            flat_tile_v_linear_v, flat_tile_num_V_ft, flat_l_linear_v,
             use_ln=False, is_train=self.is_train, normalizer=None)
 
         n_entry = self.data_cfg.n_attr_att
@@ -278,7 +300,8 @@ class Model(object):
                 tf.greater(self.batch['attr_att/att_scores'], 0.5))
             num_valid_entry = self.batch['attr_att/num']
             valid_mask = tf.sequence_mask(
-                num_valid_entry, maxlen=config.n_attr_att, dtype=tf.float32)
+                num_valid_entry, maxlen=self.data_cfg.n_attr_att,
+                dtype=tf.float32)
             loss, acc, recall, precision, top_1_prec, top_k_recall = \
                 self.binary_classification_loss(logit, multilabel_gt, valid_mask,
                                                 depth=self.data_cfg.max_box_num)
@@ -288,7 +311,7 @@ class Model(object):
             self.report['attr_att_recall'] = recall
             self.report['attr_att_precision'] = precision
             self.report['attr_att_top_1_prec'] = top_1_prec
-            self.report['attr_att_top_{}_recall'.format(NUM_K)] = top_k_recall
+            self.report['attr_att_top_{}_recall'.format(TOP_K)] = top_k_recall
 
 
     def build_object_blank_fill(self):
@@ -309,7 +332,7 @@ class Model(object):
         blank_maxlen = tf.shape(blank_embed)[-2]
         flat_blank_ft = modules.encode_L(  # [bs * #proposal, L_DIM]
             tf.reshape(blank_embed, [-1, blank_maxlen, W_DIM]),
-            tf.reshape(blank_maxlen, [-1]), L_DIM,
+            tf.reshape(blank_len, [-1]), L_DIM,
             scope='encode_L_blank', cell_type='GRU')
         blank_ft = tf.reshape(
             flat_blank_ft, [-1, self.data_cfg.n_obj_bf, L_DIM])
@@ -336,7 +359,8 @@ class Model(object):
                                    depth=self.num_answer)
             num_valid_entry = self.batch['obj_blank_fill/num']
             valid_mask = tf.sequence_mask(
-                num_valid_entry, maxlen=config.n_obj_bf, dtype=tf.float32)
+                num_valid_entry, maxlen=self.data_cfg.n_obj_bf,
+                dtype=tf.float32)
             loss, acc, top_k_acc = \
                 self.n_way_classification_loss(logit, onehot_gt, valid_mask)
             self.losses['obj_blank_fill'] = loss
@@ -362,7 +386,7 @@ class Model(object):
         blank_maxlen = tf.shape(blank_embed)[-2]
         flat_blank_ft = modules.encode_L(  # [bs * #proposal, L_DIM]
             tf.reshape(blank_embed, [-1, blank_maxlen, W_DIM]),
-            tf.reshape(blank_maxlen, [-1]), L_DIM,
+            tf.reshape(blank_len, [-1]), L_DIM,
             scope='encode_L_blank', cell_type='GRU')
         blank_ft = tf.reshape(
             flat_blank_ft, [-1, self.data_cfg.n_obj_bf, L_DIM])
@@ -389,7 +413,8 @@ class Model(object):
                                    depth=self.num_answer)
             num_valid_entry = self.batch['attr_blank_fill/num']
             valid_mask = tf.sequence_mask(
-                num_valid_entry, maxlen=config.n_attr_bf, dtype=tf.float32)
+                num_valid_entry, maxlen=self.data_cfg.n_attr_bf,
+                dtype=tf.float32)
             loss, acc, top_k_acc = \
                 self.n_way_classification_loss(logit, onehot_gt, valid_mask)
             self.losses['attr_blank_fill'] = loss
@@ -423,11 +448,20 @@ class Model(object):
             pooled_w_L_ft, V_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='q_linear_v')
+
+        tile_v_linear_v = tf.tile(tf.expand_dims(v_linear_v, axis=1),
+                                  [1, self.data_cfg.n_cap_att, 1, 1])
+        flat_tile_v_linear_v = tf.reshape(tile_v_linear_v,
+                                          [-1, self.data_cfg.max_box_num, V_DIM])
+        tile_num_V_ft = tf.tile(tf.expand_dims(num_V_ft, axis=1),
+                                [1, self.data_cfg.n_cap_att])
+        flat_tile_num_V_ft = tf.reshape(tile_num_V_ft, [-1])
+
         flat_l_linear_v = tf.reshape(l_linear_v, [-1, V_DIM])
 
         # flat_att_logit: [bs * #obj, num_proposal]
         flat_att_logit = modules.hadamard_attention(
-            v_linear_v, num_V_ft, flat_l_linear_v,
+            flat_tile_v_linear_v, flat_tile_num_V_ft, flat_l_linear_v,
             use_ln=False, is_train=self.is_train, normalizer=None)
 
         n_entry = self.data_cfg.n_cap_att
@@ -439,7 +473,8 @@ class Model(object):
                 tf.greater(self.batch['cap_att/att_scores'], 0.5))
             num_valid_entry = self.batch['cap_att/num']
             valid_mask = tf.sequence_mask(
-                num_valid_entry, maxlen=config.n_cap_att, dtype=tf.float32)
+                num_valid_entry, maxlen=self.data_cfg.n_cap_att,
+                dtype=tf.float32)
             loss, acc, recall, precision, top_1_prec, top_k_recall = \
                 self.binary_classification_loss(logit, multilabel_gt, valid_mask,
                                                 depth=self.data_cfg.max_box_num)
@@ -449,7 +484,7 @@ class Model(object):
             self.report['caption_att_recall'] = recall
             self.report['caption_att_precision'] = precision
             self.report['caption_att_top_1_prec'] = top_1_prec
-            self.report['caption_att_top_{}_recall'.format(NUM_K)] = top_k_recall
+            self.report['caption_att_top_{}_recall'.format(TOP_K)] = top_k_recall
 
     def n_way_classification_loss(self, logits, labels, mask=None):
         # Loss
@@ -488,7 +523,7 @@ class Model(object):
         # Loss
         cross_entropy = tf.nn.sigmoid_cross_entropy_with_logits(
             labels=labels, logits=logits)
-        cross_entropy = tf.reduce_mean(cross_entropy, axis=-1)
+        cross_entropy = tf.reduce_sum(cross_entropy, axis=-1)  # sum over dim
         if mask is None:
             loss = tf.reduce_mean(cross_entropy)
         else:
@@ -510,7 +545,7 @@ class Model(object):
             top_k_hot_pred = tf.reduce_sum(
                 onehot_top_k_pred, axis=2)  # [bs, n, depth] n-hot vector
 
-            num_correct_1 = tf.reduce_sum(top_k_hot_pred, labels, axis=-1)
+            num_correct_1 = tf.reduce_sum(top_k_hot_pred * labels, axis=-1)
             num_label_1 = tf.minimum(
                 tf.reduce_sum(labels, axis=-1), TOP_K)
             top_k_recall = num_correct_1 / num_label_1
