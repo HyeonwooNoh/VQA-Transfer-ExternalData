@@ -35,17 +35,15 @@ class Model(object):
         self.vocab = cPickle.load(open(config.vocab_path, 'rb'))
         self.answer_dict = cPickle.load(open(
             os.path.join(config.tf_record_dir, 'answer_dict.pkl'), 'rb'))
+        self.num_answer = len(self.answer_dict['vocab'])
+        self.num_train_answer = self.answer_dict['num_train_answer']
+        self.train_answer_mask = tf.expand_dims(tf.sequence_mask(
+            self.num_train_answer, maxlen=self.num_answer, dtype=tf.float32),
+            axis=0)
 
         self.glove_map = modules.LearnGloVe(self.vocab)
         self.v_word_map = modules.WordWeightEmbed(
             self.vocab, self.word_weight_dir, 'v_word', scope='V_WordMap')
-
-        # answer candidates
-        log.infov('loading answer info..')
-        with h5py.File(os.path.join(config.tf_record_dir,
-                                    'data_info.hdf5'), 'r') as f:
-            self.num_answer = int(f['data_info']['num_answers'].value)
-        log.infov('done')
 
         log.infov('loading image features...')
         with h5py.File(config.vfeat_path, 'r') as f:
@@ -204,7 +202,10 @@ class Model(object):
             answer_target = self.batch['answer_target']
             loss = tf.nn.sigmoid_cross_entropy_with_logits(
                 labels=answer_target, logits=logit)
-            loss = tf.reduce_mean(tf.reduce_sum(loss, axis=-1))
+
+            train_loss = tf.reduce_mean(tf.reduce_sum(
+                loss * self.train_answer_mask, axis=-1))
+            report_loss = tf.reduce_mean(tf.reduce_sum(loss, axis=-1))
             pred = tf.cast(tf.argmax(logit, axis=-1), dtype=tf.int32)
             one_hot_pred = tf.one_hot(pred, depth=self.num_answer,
                                       dtype=tf.float32)
@@ -213,8 +214,9 @@ class Model(object):
 
             self.mid_result['pred'] = pred
 
-            self.losses['answer'] = loss
-            self.report['answer_loss'] = loss
+            self.losses['answer'] = train_loss
+            self.report['answer_train_loss'] = train_loss
+            self.report['answer_report_loss'] = report_loss
             self.report['answer_accuracy'] = acc
 
         """
