@@ -18,6 +18,8 @@ class Trainer(object):
             from vqa.model_standard import Model
         elif model_type == 'vlmap_only':
             from vqa.model_vlmap_only import Model
+        elif model_type == 'vlmap_finetune':
+            from vqa.model_vlmap_finetune import Model
         else:
             raise ValueError('Unknown model_type')
         return Model
@@ -344,7 +346,8 @@ def main():
     # model parameters
     parser.add_argument('--batch_size', type=int, default=512, help=' ')
     parser.add_argument('--model_type', type=str, default='vqa', help=' ',
-                        choices=['vqa', 'standard', 'vlmap_only'])
+                        choices=['vqa', 'standard', 'vlmap_only',
+                                 'vlmap_finetune'])
     # model specific parameters
     parser.add_argument('--vlmap_word_weight_dir', type=str, default=None,
                         help=' ')
