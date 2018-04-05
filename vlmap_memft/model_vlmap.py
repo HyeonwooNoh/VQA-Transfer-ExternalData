@@ -1,10 +1,7 @@
 import cPickle
-import json
 import os
-import numpy as np
 import tensorflow as tf
 
-from util import log
 from vlmap import modules
 
 TOP_K = 5
@@ -313,7 +310,6 @@ class Model(object):
             self.report['attr_att_top_1_prec'] = top_1_prec
             self.report['attr_att_top_{}_recall'.format(TOP_K)] = top_k_recall
 
-
     def build_object_blank_fill(self):
         """
         object_blank_fill
@@ -588,4 +584,3 @@ class Model(object):
         if depth is not None:
             ret.extend([top_1_prec, top_k_recall])
         return tuple(ret)
-
