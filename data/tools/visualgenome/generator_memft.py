@@ -258,6 +258,13 @@ answer_dict['vocab'] = list(obj_attr_set)
 answer_dict['dict'] = {v: i for i, v in enumerate(answer_dict['vocab'])}
 cPickle.dump(answer_dict, open(config.save_answer_dict, 'wb'))
 
+obj_list = list(freq_obj_set)
+cPickle.dump(obj_list,
+             open(os.path.join(config.dir_name, 'object_list.pkl'), 'wb'))
+attr_list = list(freq_attr_set)
+cPickle.dump(attr_list,
+             open(os.path.join(config.dir_name, 'attribute_list.pkl'), 'wb'))
+
 vocab2obj = {}
 for obj in freq_obj_set:
     for t in obj.split():
