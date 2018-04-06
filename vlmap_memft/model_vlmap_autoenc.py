@@ -109,10 +109,16 @@ class Model(object):
         label_vec = modules.fc_layer(
             label_embed, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.tanh, is_training=self.is_train,
-            scope='obj_pred/autoenc_latent')
-        self.vis_hist['obj_pred/label_vec'] = label_vec
+            scope='obj_pred/label_vec')
+        label_log_sigma_sq = modules.fc_layer(
+            label_embed, L_DIM, use_bias=True, use_bn=False, use_ln=False,
+            activation_fn=None, is_training=self.is_train,
+            scope='obj_pred/label_log_sigma_sq')
+        label_sigma = tf.sqrt(tf.exp(label_log_sigma_sq))
         noise = tf.random_normal(tf.shape(label_vec), mean=0, stddev=1, seed=123)
-        label_vec_noise = label_vec# + noise
+        label_vec_noise = label_vec + noise * label_sigma
+        self.vis_hist['obj_pred/label_vec'] = label_vec
+        self.vis_hist['obj_pred/label_sigma'] = label_sigma
 
         l_linear_l = modules.fc_layer(
             label_vec_noise, L_DIM, use_bias=True, use_bn=False, use_ln=True,
@@ -140,9 +146,7 @@ class Model(object):
                 dtype=tf.float32)
             loss, acc, top_k_acc = \
                 self.n_way_classification_loss(logit, onehot_gt, valid_mask)
-
-            latent_loss = 0.5 * tf.reduce_mean(
-                tf.reduce_sum(tf.square(label_vec), axis=-1))
+            latent_loss = self.latent_loss(label_vec, label_log_sigma_sq)
             self.losses['object_pred'] = loss
             self.losses['object_pred_latent'] = latent_loss
             self.report['object_pred_loss'] = loss
@@ -182,10 +186,16 @@ class Model(object):
         attr_vec = modules.fc_layer(
             attr_embed, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.tanh, is_training=self.is_train,
-            scope='attr_pred/attr_vector')
+            scope='attr_pred/attr_vec')
+        attr_log_sigma_sq = modules.fc_layer(
+            attr_embed, L_DIM, use_bias=True, use_bn=False, use_ln=False,
+            activation_fn=None, is_training=self.is_train,
+            scope='attr_pred/attr_log_sigma_sq')
+        attr_sigma = tf.sqrt(tf.exp(attr_log_sigma_sq))
         noise = tf.random_normal(tf.shape(attr_vec), mean=0, stddev=1, seed=123)
-        attr_vec_noise = attr_vec# + noise
+        attr_vec_noise = attr_vec + noise * attr_sigma
         self.vis_hist['attr_pred/attr_vec'] = attr_vec
+        self.vis_hist['attr_pred/attr_sigma'] = attr_sigma
 
         l_linear_l = modules.fc_layer(
             obj_vec + attr_vec_noise, L_DIM, use_bias=True, use_bn=False, use_ln=True,
@@ -213,8 +223,7 @@ class Model(object):
             loss, acc, recall, precision, top_1_prec, top_k_recall = \
                 self.binary_classification_loss(logit, multilabel_gt, valid_mask,
                                                 depth=self.num_answer)
-            latent_loss = 0.5 * tf.reduce_mean(
-                tf.reduce_sum(tf.square(attr_vec), axis=-1))
+            latent_loss = self.latent_loss(attr_vec, attr_log_sigma_sq)
             self.losses['attr_pred'] = loss
             self.losses['attr_pred_latent'] = latent_loss
             self.report['attr_pred_loss'] = loss
@@ -382,10 +391,16 @@ class Model(object):
         fill_vec = modules.fc_layer(
             fill_embed, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.tanh, is_training=self.is_train,
-            scope='obj_blank_fill/fill_vector')
+            scope='obj_blank_fill/fill_vec')
+        fill_log_sigma_sq = modules.fc_layer(
+            fill_embed, L_DIM, use_bias=True, use_bn=False, use_ln=False,
+            activation_fn=None, is_training=self.is_train,
+            scope='obj_blank_fill/fill_log_sigma_sq')
+        fill_sigma = tf.sqrt(tf.exp(fill_log_sigma_sq))
         noise = tf.random_normal(tf.shape(fill_vec), mean=0, stddev=1, seed=123)
-        fill_vec_noise = fill_vec# + noise
+        fill_vec_noise = fill_vec + noise * fill_sigma
         self.vis_hist['obj_blank_fill/fill_vec'] = fill_vec
+        self.vis_hist['obj_blank_fill/fill_sigma'] = fill_sigma
 
         l_linear_l = modules.fc_layer(
             blank_ft + fill_vec_noise, L_DIM, use_bias=True, use_bn=False, use_ln=True,
@@ -413,8 +428,7 @@ class Model(object):
                 dtype=tf.float32)
             loss, acc, top_k_acc = \
                 self.n_way_classification_loss(logit, onehot_gt, valid_mask)
-            latent_loss = 0.5 * tf.reduce_mean(
-                tf.reduce_sum(tf.square(fill_vec), axis=-1))
+            latent_loss = self.latent_loss(fill_vec, fill_log_sigma_sq)
             self.losses['obj_blank_fill'] = loss
             self.losses['obj_blank_fill_latent'] = latent_loss
             self.report['obj_blank_fill_loss'] = loss
@@ -450,13 +464,19 @@ class Model(object):
         fill_vec = modules.fc_layer(
             fill_embed, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.tanh, is_training=self.is_train,
-            scope='attr_blank_fill/fill_vector')
+            scope='attr_blank_fill/fill_vec')
+        fill_log_sigma_sq = modules.fc_layer(
+            fill_embed, L_DIM, use_bias=True, use_bn=False, use_ln=False,
+            activation_fn=None, is_training=self.is_train,
+            scope='attr_blank_fill/fill_log_sigma_sq')
+        fill_sigma = tf.sqrt(tf.exp(fill_log_sigma_sq))
         noise = tf.random_normal(tf.shape(fill_vec), mean=0, stddev=1, seed=123)
-        fill_vec_noise = fill_vec# + noise
+        fill_vec_noise = fill_vec + noise * fill_sigma
         self.vis_hist['attr_blank_fill/fill_vec'] = fill_vec
+        self.vis_hist['attr_blank_fill/fill_sigma'] = fill_sigma
 
         l_linear_l = modules.fc_layer(
-            blank_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
+            blank_ft + fill_vec_noise, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='q_linear_l')
 
@@ -481,8 +501,7 @@ class Model(object):
                 dtype=tf.float32)
             loss, acc, top_k_acc = \
                 self.n_way_classification_loss(logit, onehot_gt, valid_mask)
-            latent_loss = 0.5 * tf.reduce_mean(
-                tf.reduce_sum(tf.square(fill_vec), axis=-1))
+            latent_loss = self.latent_loss(fill_vec, fill_log_sigma_sq)
             self.losses['attr_blank_fill'] = loss
             self.losses['attr_blank_fill_latent'] = latent_loss
             self.report['attr_blank_fill_loss'] = loss
@@ -656,3 +675,9 @@ class Model(object):
         if depth is not None:
             ret.extend([top_1_prec, top_k_recall])
         return tuple(ret)
+
+    def latent_loss(self, z_mu, z_log_sigma_sq):
+        latent_loss = tf.reduce_sum(
+            1 + z_log_sigma_sq - tf.square(z_mu) - tf.exp(z_log_sigma_sq),
+            axis=-1)
+        return -0.5 * tf.reduce_mean(latent_loss)
