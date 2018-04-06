@@ -4,6 +4,8 @@ import time
 import numpy as np
 import tensorflow as tf
 
+from tqdm import tqdm
+
 from util import log
 from vqa.datasets import input_ops_vqa_tf_record_memft as input_ops_vqa
 
@@ -20,6 +22,8 @@ class Trainer(object):
             from vqa.model_vlmap_only import Model
         elif model_type == 'vlmap_finetune':
             from vqa.model_vlmap_finetune import Model
+        elif model_type == 'vlmap_answer':
+            from vqa.model_vlmap_answer import Model
         else:
             raise ValueError('Unknown model_type')
         return Model
@@ -213,7 +217,7 @@ class Trainer(object):
                 # val
                 avg_val_report = {key: [] for key in self.avg_report['val']}
                 avg_val_step_time = []
-                for i in range(self.val_average_iter):
+                for i in tqdm(range(self.val_average_iter), desc='eval val'):
                     step, summary, loss, report, step_time = self.run_val_step(
                         i == (self.val_average_iter - 1), split='val')
                     for key in avg_val_report:
@@ -229,7 +233,7 @@ class Trainer(object):
                 # testval
                 avg_val_report = {key: [] for key in self.avg_report['testval']}
                 avg_val_step_time = []
-                for i in range(self.val_average_iter):
+                for i in tqdm(range(self.val_average_iter), desc='eval testval'):
                     step, summary, loss, report, step_time = self.run_val_step(
                         i == (self.val_average_iter - 1), split='testval')
                     for key in avg_val_report:
@@ -347,7 +351,7 @@ def main():
     parser.add_argument('--batch_size', type=int, default=512, help=' ')
     parser.add_argument('--model_type', type=str, default='vqa', help=' ',
                         choices=['vqa', 'standard', 'vlmap_only',
-                                 'vlmap_finetune'])
+                                 'vlmap_finetune', 'vlmap_answer'])
     # model specific parameters
     parser.add_argument('--vlmap_word_weight_dir', type=str, default=None,
                         help=' ')
