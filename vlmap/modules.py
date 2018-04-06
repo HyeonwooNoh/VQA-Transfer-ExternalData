@@ -358,6 +358,16 @@ def learn_embedding_map(used_vocab, scope='learn_embedding_map', reuse=tf.AUTO_R
         return embed_map
 
 
+def BiasVariable(shape, initializer=None, scope='Bias', reuse=tf.AUTO_REUSE):
+    with tf.variable_scope(scope, reuse=reuse) as scope:
+        if initializer is None:
+            zeros = np.zeros(shape, dtype=np.float32)
+            initializer =tf.constant_initializer(zeros)
+        bias = tf.get_variable(
+            name='bias', shape=shape, initializer=initializer)
+        return bias
+
+
 def LearnAnswerGloVe(answer_dict, scope='LearnAnswerGloVe', reuse=tf.AUTO_REUSE):
     with tf.variable_scope(scope, reuse=reuse) as scope:
         glove_vocab = json.load(open(GLOVE_VOCAB_PATH, 'r'))
