@@ -16,6 +16,8 @@ class Trainer(object):
     def get_model_class(model_type='vlmap'):
         if model_type == 'vlmap':
             from vlmap_memft.model_vlmap import Model
+        elif model_type == 'vlmap_autoenc':
+            from vlmap_memft.model_vlmap_autoenc import Model
         return Model
 
     def __init__(self, config, dataset):
@@ -284,9 +286,9 @@ def main():
                         default='data/VisualGenome/VG_100K', help=' ')
     # log
     parser.add_argument('--train_average_iter', type=int, default=10)
-    parser.add_argument('--val_average_iter', type=int, default=100)
-    parser.add_argument('--heavy_summary_step', type=int, default=800)
-    parser.add_argument('--validation_step', type=int, default=800)
+    parser.add_argument('--val_average_iter', type=int, default=40)
+    parser.add_argument('--heavy_summary_step', type=int, default=200)
+    parser.add_argument('--validation_step', type=int, default=200)
     parser.add_argument('--checkpoint_step', type=int, default=800)
     # hyper parameters
     parser.add_argument('--prefix', type=str, default='default', help=' ')
@@ -297,7 +299,7 @@ def main():
     # model parameters
     parser.add_argument('--batch_size', type=int, default=512, help=' ')
     parser.add_argument('--model_type', type=str, default='vlmap', help=' ',
-                        choices=['vlmap'])
+                        choices=['vlmap', 'vlmap_autoenc'])
     config = parser.parse_args()
     check_config(config)
 
