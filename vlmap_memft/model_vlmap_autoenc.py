@@ -112,7 +112,7 @@ class Model(object):
             scope='obj_pred/autoenc_latent')
         self.vis_hist['obj_pred/label_vec'] = label_vec
         noise = tf.random_normal(tf.shape(label_vec), mean=0, stddev=1, seed=123)
-        label_vec_noise = label_vec + noise
+        label_vec_noise = label_vec# + noise
 
         l_linear_l = modules.fc_layer(
             label_vec_noise, L_DIM, use_bias=True, use_bn=False, use_ln=True,
@@ -184,7 +184,7 @@ class Model(object):
             activation_fn=tf.nn.tanh, is_training=self.is_train,
             scope='attr_pred/attr_vector')
         noise = tf.random_normal(tf.shape(attr_vec), mean=0, stddev=1, seed=123)
-        attr_vec_noise = attr_vec + noise
+        attr_vec_noise = attr_vec# + noise
         self.vis_hist['attr_pred/attr_vec'] = attr_vec
 
         l_linear_l = modules.fc_layer(
@@ -384,7 +384,7 @@ class Model(object):
             activation_fn=tf.nn.tanh, is_training=self.is_train,
             scope='obj_blank_fill/fill_vector')
         noise = tf.random_normal(tf.shape(fill_vec), mean=0, stddev=1, seed=123)
-        fill_vec_noise = fill_vec + noise
+        fill_vec_noise = fill_vec# + noise
         self.vis_hist['obj_blank_fill/fill_vec'] = fill_vec
 
         l_linear_l = modules.fc_layer(
@@ -452,7 +452,7 @@ class Model(object):
             activation_fn=tf.nn.tanh, is_training=self.is_train,
             scope='attr_blank_fill/fill_vector')
         noise = tf.random_normal(tf.shape(fill_vec), mean=0, stddev=1, seed=123)
-        fill_vec_noise = fill_vec + noise
+        fill_vec_noise = fill_vec# + noise
         self.vis_hist['attr_blank_fill/fill_vec'] = fill_vec
 
         l_linear_l = modules.fc_layer(
