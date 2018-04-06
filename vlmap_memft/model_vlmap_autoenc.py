@@ -28,8 +28,8 @@ class Model(object):
         self.global_step = tf.train.get_or_create_global_step(graph=None)
         self.latent_loss_weight = tf.train.piecewise_constant(
             self.global_step,
-            boundaries=[1300, 1400, 1500],
-            values=[0.0, 0.1, 0.5, 1.0],
+            boundaries=[400, 600, 1000, 1500, 2000],
+            values=[0.0, 0.001, 0.01, 0.1, 0.5, 1.0],
         )
         self.report['model_step'] = self.global_step
         self.report['latent_loss_weight'] = self.latent_loss_weight
@@ -124,7 +124,7 @@ class Model(object):
             activation_fn=None, is_training=self.is_train,
             scope='obj_pred/label_log_sigma_sq')
         label_sigma = tf.sqrt(tf.exp(label_log_sigma_sq))
-        noise = tf.random_normal(tf.shape(label_vec), mean=0, stddev=1, seed=123)
+        noise = tf.random_normal(tf.shape(label_vec), mean=0, stddev=0.1, seed=123)
         label_vec_noise = label_vec + noise * label_sigma
         self.vis_hist['obj_pred/label_vec'] = label_vec
         self.vis_hist['obj_pred/label_sigma'] = label_sigma
@@ -201,7 +201,7 @@ class Model(object):
             activation_fn=None, is_training=self.is_train,
             scope='attr_pred/attr_log_sigma_sq')
         attr_sigma = tf.sqrt(tf.exp(attr_log_sigma_sq))
-        noise = tf.random_normal(tf.shape(attr_vec), mean=0, stddev=1, seed=123)
+        noise = tf.random_normal(tf.shape(attr_vec), mean=0, stddev=0.1, seed=123)
         attr_vec_noise = attr_vec + noise * attr_sigma
         self.vis_hist['attr_pred/attr_vec'] = attr_vec
         self.vis_hist['attr_pred/attr_sigma'] = attr_sigma
@@ -406,7 +406,7 @@ class Model(object):
             activation_fn=None, is_training=self.is_train,
             scope='obj_blank_fill/fill_log_sigma_sq')
         fill_sigma = tf.sqrt(tf.exp(fill_log_sigma_sq))
-        noise = tf.random_normal(tf.shape(fill_vec), mean=0, stddev=1, seed=123)
+        noise = tf.random_normal(tf.shape(fill_vec), mean=0, stddev=0.1, seed=123)
         fill_vec_noise = fill_vec + noise * fill_sigma
         self.vis_hist['obj_blank_fill/fill_vec'] = fill_vec
         self.vis_hist['obj_blank_fill/fill_sigma'] = fill_sigma
@@ -479,7 +479,7 @@ class Model(object):
             activation_fn=None, is_training=self.is_train,
             scope='attr_blank_fill/fill_log_sigma_sq')
         fill_sigma = tf.sqrt(tf.exp(fill_log_sigma_sq))
-        noise = tf.random_normal(tf.shape(fill_vec), mean=0, stddev=1, seed=123)
+        noise = tf.random_normal(tf.shape(fill_vec), mean=0, stddev=0.1, seed=123)
         fill_vec_noise = fill_vec + noise * fill_sigma
         self.vis_hist['attr_blank_fill/fill_vec'] = fill_vec
         self.vis_hist['attr_blank_fill/fill_sigma'] = fill_sigma
