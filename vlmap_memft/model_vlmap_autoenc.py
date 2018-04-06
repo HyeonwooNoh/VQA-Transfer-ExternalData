@@ -25,6 +25,15 @@ class Model(object):
         self.mid_result = {}
         self.vis_image = {}
 
+        self.global_step = tf.train.get_or_create_global_step(graph=None)
+        self.latent_loss_weight = tf.train.piecewise_constant(
+            self.global_step,
+            boundaries=[1300, 1400, 1500],
+            values=[0, 0.1, 0.5, 1.0],
+        )
+        self.report['model_step'] = self.global_step
+        self.report['latent_loss_weight'] = self.latent_loss_weight
+
         vocab_path = os.path.join(self.data_dir, 'vocab.pkl')
         self.vocab = cPickle.load(open(vocab_path, 'rb'))
 
@@ -148,7 +157,7 @@ class Model(object):
                 self.n_way_classification_loss(logit, onehot_gt, valid_mask)
             latent_loss = self.latent_loss(label_vec, label_log_sigma_sq)
             self.losses['object_pred'] = loss
-            self.losses['object_pred_latent'] = latent_loss
+            self.losses['object_pred_latent'] = self.latent_loss_weight * latent_loss
             self.report['object_pred_loss'] = loss
             self.report['object_pred_latent_loss'] = latent_loss
             self.report['object_pred_acc'] = acc
@@ -225,7 +234,7 @@ class Model(object):
                                                 depth=self.num_answer)
             latent_loss = self.latent_loss(attr_vec, attr_log_sigma_sq)
             self.losses['attr_pred'] = loss
-            self.losses['attr_pred_latent'] = latent_loss
+            self.losses['attr_pred_latent'] = self.latent_loss_weight * latent_loss
             self.report['attr_pred_loss'] = loss
             self.report['attr_pred_latent_loss'] = latent_loss
             self.report['attr_pred_acc'] = acc
@@ -430,7 +439,7 @@ class Model(object):
                 self.n_way_classification_loss(logit, onehot_gt, valid_mask)
             latent_loss = self.latent_loss(fill_vec, fill_log_sigma_sq)
             self.losses['obj_blank_fill'] = loss
-            self.losses['obj_blank_fill_latent'] = latent_loss
+            self.losses['obj_blank_fill_latent'] = self.latent_loss_weight * latent_loss
             self.report['obj_blank_fill_loss'] = loss
             self.report['obj_blank_fill_latent_loss'] = latent_loss
             self.report['obj_blank_fill_acc'] = acc
@@ -503,7 +512,7 @@ class Model(object):
                 self.n_way_classification_loss(logit, onehot_gt, valid_mask)
             latent_loss = self.latent_loss(fill_vec, fill_log_sigma_sq)
             self.losses['attr_blank_fill'] = loss
-            self.losses['attr_blank_fill_latent'] = latent_loss
+            self.losses['attr_blank_fill_latent'] = self.latent_loss_weight * latent_loss
             self.report['attr_blank_fill_loss'] = loss
             self.report['attr_blank_fill_latent_loss'] = latent_loss
             self.report['attr_blank_fill_acc'] = acc
