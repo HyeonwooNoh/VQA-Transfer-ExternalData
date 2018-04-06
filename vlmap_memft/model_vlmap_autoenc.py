@@ -29,7 +29,7 @@ class Model(object):
         self.latent_loss_weight = tf.train.piecewise_constant(
             self.global_step,
             boundaries=[1300, 1400, 1500],
-            values=[0, 0.1, 0.5, 1.0],
+            values=[0.0, 0.1, 0.5, 1.0],
         )
         self.report['model_step'] = self.global_step
         self.report['latent_loss_weight'] = self.latent_loss_weight
