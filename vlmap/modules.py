@@ -362,7 +362,7 @@ def BiasVariable(shape, initializer=None, scope='Bias', reuse=tf.AUTO_REUSE):
     with tf.variable_scope(scope, reuse=reuse) as scope:
         if initializer is None:
             zeros = np.zeros(shape, dtype=np.float32)
-            initializer =tf.constant_initializer(zeros)
+            initializer = tf.constant_initializer(zeros)
         bias = tf.get_variable(
             name='bias', shape=shape, initializer=initializer)
         return bias
@@ -390,24 +390,24 @@ def LearnAnswerGloVe(answer_dict, scope='LearnAnswerGloVe', reuse=tf.AUTO_REUSE)
         return embed_map
 
 
-def WordWeightEmbed(vocab, word_weight_dir, weight_name='v_word',
+def WordWeightEmbed(vocab, word_weight_dir=None, weight_name='v_word',
                     scope='WordWeightEmbed', reuse=tf.AUTO_REUSE):
     with tf.variable_scope(scope, reuse=reuse) as scope:
-        word_vocab_path = os.path.join(word_weight_dir, 'vocab.pkl')
-        word_vocab = cPickle.load(open(word_vocab_path, 'rb'))
-        word_weight_path = os.path.join(word_weight_dir, 'weights.hdf5')
-        with h5py.File(word_weight_path, 'r') as f:
-            word_weight = np.array(f.get(weight_name))
-        num_row = word_weight.shape[0]
-        w_dim = word_weight.shape[1]
-        weights = np.zeros([len(vocab['vocab']), w_dim], dtype=np.float32)
-        for i, w in enumerate(vocab['vocab']):
-            if w in word_vocab['dict'] and word_vocab['dict'][w] < num_row:
-                weights[i, :] = word_weight[word_vocab['dict'][w], :]
-            else: pass
+        weights = np.zeros([len(vocab['vocab']), 300], dtype=np.float32)
+        if word_weight_dir is not None:
+            word_vocab_path = os.path.join(word_weight_dir, 'vocab.pkl')
+            word_vocab = cPickle.load(open(word_vocab_path, 'rb'))
+            word_weight_path = os.path.join(word_weight_dir, 'weights.hdf5')
+            with h5py.File(word_weight_path, 'r') as f:
+                word_weight = np.array(f.get(weight_name))
+            num_row = word_weight.shape[0]
+            for i, w in enumerate(vocab['vocab']):
+                if w in word_vocab['dict'] and word_vocab['dict'][w] < num_row:
+                    weights[i, :] = word_weight[word_vocab['dict'][w], :]
+                else: pass
         init = tf.constant_initializer(weights)
         embed_map = tf.get_variable(
-            name='embed_map', shape=[len(vocab['vocab']), w_dim],
+            name='embed_map', shape=[len(vocab['vocab']), 300],
             initializer=init)
         return embed_map
 
@@ -554,26 +554,28 @@ def conv2d(input, dim, kernel_size, pad='same', use_bias=False, use_bn=False,
         return out
 
 
-def WordWeightAnswer(input, answer_dict, word_weight_dir,
+def WordWeightAnswer(input, answer_dict, word_weight_dir=None,
                      use_bias=False, is_training=True,
                      scope='WordWeightAnswer', reuse=tf.AUTO_REUSE):
     with tf.variable_scope(scope, reuse=reuse) as scope:
         log.warning(scope.name)
-        word_answer_dict_path = os.path.join(word_weight_dir, 'answer_dict.pkl')
-        word_answer_dict = cPickle.load(open(word_answer_dict_path, 'rb'))
-        word_weight_path = os.path.join(word_weight_dir, 'weights.hdf5')
-        with h5py.File(word_weight_path, 'r') as f:
-            answer_weight = np.array(f.get('class_weights'))
-            answer_bias = np.array(f.get('class_biases'))
         input_dim = input.get_shape().as_list()[-1]
         dim = len(answer_dict['vocab'])
         weights = np.zeros([input_dim, dim], dtype=np.float32)
-        biases = np.zeros([dim], dtype=np.float32)
-        for i, a in enumerate(answer_dict['vocab']):
-            if a in word_answer_dict['dict']:
-                weights[:, i] = answer_weight[:, word_answer_dict['dict'][a]]
-                biases[i] = answer_bias[word_answer_dict['dict'][a]]
-            else: pass  # initialize to zero
+        biases = np.zeros([dim], dtype=np.float32) - 100.0
+        if word_weight_dir is not None:
+            word_answer_dict_path = os.path.join(word_weight_dir, 'answer_dict.pkl')
+            word_answer_dict = cPickle.load(open(word_answer_dict_path, 'rb'))
+            word_weight_path = os.path.join(word_weight_dir, 'weights.hdf5')
+            with h5py.File(word_weight_path, 'r') as f:
+                answer_weight = np.array(f.get('class_weights'))
+                answer_bias = np.array(f.get('class_biases'))
+
+            for i, a in enumerate(answer_dict['vocab']):
+                if a in word_answer_dict['dict']:
+                    weights[:, i] = answer_weight[:, word_answer_dict['dict'][a]]
+                    biases[i] = answer_bias[word_answer_dict['dict'][a]]
+                else: pass  # initialize to zero
         if use_bias:
             out = layers.fully_connected(
                 input, dim, activation_fn=None,
