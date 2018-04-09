@@ -20,12 +20,9 @@ class Model(object):
         self.image_dir = config.image_dir
         self.is_train = is_train
 
-        self.pretrained_param_path = config.pretrained_param_path
-        if self.pretrained_param_path is None:
-            raise ValueError('pretrained_param_path is mendatory')
-        self.word_weight_dir = config.vlmap_word_weight_dir
+        self.word_weight_dir = getattr(config, 'vlmap_word_weight_dir', None)
         if self.word_weight_dir is None:
-            raise ValueError('word_weight_dir is mendatory')
+            log.warn('word_weight_dir is None')
 
         self.losses = {}
         self.report = {}
@@ -123,6 +120,7 @@ class Model(object):
             q_L_ft, V_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='q_linear_v')
+        self.mid_result['q_linear_v'] = q_linear_v
 
         """
         Perform attention
@@ -132,6 +130,7 @@ class Model(object):
             use_ln=False, is_train=self.is_train)
         self.mid_result['att_score'] = att_score
         pooled_V_ft = modules.attention_pooling(V_ft, att_score)
+        self.mid_result['pooled_V_ft'] = pooled_V_ft
 
         """
         Answer classification
@@ -141,22 +140,26 @@ class Model(object):
             pooled_V_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='pooled_linear_l')
+        self.mid_result['pooled_linear_l'] = pooled_linear_l
 
         log.warning('q_linear_l')
         l_linear_l = modules.fc_layer(
             q_L_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='q_linear_l')
+        self.mid_result['l_linear_l'] = l_linear_l
 
         joint = modules.fc_layer(
             pooled_linear_l * l_linear_l, L_DIM * 2,
             use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_fc')
         joint = tf.nn.dropout(joint, 0.5)
+        self.mid_result['joint'] = joint
 
         logit = modules.WordWeightAnswer(
             joint, self.answer_dict, self.word_weight_dir,
             use_bias=True, is_training=self.is_train, scope='WordWeightAnswer')
+        self.mid_result['logit'] = logit
 
         """
         Compute loss and accuracy
