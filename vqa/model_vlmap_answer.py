@@ -185,6 +185,8 @@ class Model(object):
                               axis=-1))
             max_exist_answer_acc = tf.reduce_mean(
                 tf.reduce_max(answer_target * self.answer_exist_mask, axis=-1))
+            test_max_answer_acc = tf.reduce_mean(
+                tf.reduce_max(answer_target * self.test_answer_mask, axis=-1))
             test_max_exist_answer_acc = tf.reduce_mean(
                 tf.reduce_max(answer_target * self.answer_exist_mask * \
                               self.test_answer_mask, axis=-1))
@@ -197,6 +199,7 @@ class Model(object):
             self.report['answer_accuracy'] = acc
             self.report['test_answer_accuracy'] = test_acc
             self.report['max_exist_answer_accuracy'] = max_exist_answer_acc
+            self.report['test_max_answer_accuracy'] = test_max_answer_acc
             self.report['test_max_exist_answer_accuracy'] = test_max_exist_answer_acc
 
         """
