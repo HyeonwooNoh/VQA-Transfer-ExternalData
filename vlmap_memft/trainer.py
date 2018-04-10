@@ -18,6 +18,8 @@ class Trainer(object):
             from vlmap_memft.model_vlmap import Model
         elif model_type == 'vlmap_autoenc':
             from vlmap_memft.model_vlmap_autoenc import Model
+        elif model_type == 'vlmap_autoenc_full':
+            from vlmap_memft.model_vlmap_autoenc_full import Model
         return Model
 
     def __init__(self, config, dataset):
@@ -299,7 +301,7 @@ def main():
     # model parameters
     parser.add_argument('--batch_size', type=int, default=512, help=' ')
     parser.add_argument('--model_type', type=str, default='vlmap', help=' ',
-                        choices=['vlmap', 'vlmap_autoenc'])
+                        choices=['vlmap', 'vlmap_autoenc', 'vlmap_autoenc_full'])
     config = parser.parse_args()
     check_config(config)
 
