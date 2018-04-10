@@ -554,6 +554,20 @@ def conv2d(input, dim, kernel_size, pad='same', use_bias=False, use_bn=False,
         return out
 
 
+def AnswerExistMask(answer_dict, word_weight_dir=None):
+    mask = np.zeros([len(answer_dict['vocab'])], dtype=np.float32)
+    if word_weight_dir is not None:
+        word_answer_dict_path = os.path.join(word_weight_dir, 'answer_dict.pkl')
+        word_answer_dict = cPickle.load(open(word_answer_dict_path, 'rb'))
+        for i, a in enumerate(answer_dict['vocab']):
+            if a in word_answer_dict['dict']:
+                mask[i] = 1.0
+    else: mask = mask + 1.0
+    mask = np.expand_dims(mask, axis=0)  # make batch dimension
+    mask_tensor = tf.convert_to_tensor(mask)
+    return mask_tensor
+
+
 def WordWeightAnswer(input, answer_dict, word_weight_dir=None,
                      use_bias=False, is_training=True,
                      scope='WordWeightAnswer', reuse=tf.AUTO_REUSE):

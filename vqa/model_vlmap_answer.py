@@ -37,8 +37,11 @@ class Model(object):
         self.train_answer_mask = tf.expand_dims(tf.sequence_mask(
             self.num_train_answer, maxlen=self.num_answer, dtype=tf.float32),
             axis=0)
+        self.test_answer_mask = 1.0 - self.train_answer_mask
 
         self.glove_map = modules.LearnGloVe(self.vocab)
+        self.answer_exist_mask = modules.AnswerExistMask(
+            self.answer_dict, self.word_weight_dir)
 
         log.infov('loading image features...')
         with h5py.File(config.vfeat_path, 'r') as f:
@@ -177,6 +180,14 @@ class Model(object):
                                       dtype=tf.float32)
             acc = tf.reduce_mean(
                 tf.reduce_sum(one_hot_pred * answer_target, axis=-1))
+            test_acc = tf.reduce_mean(
+                tf.reduce_sum(one_hot_pred * answer_target * self.test_answer_mask,
+                              axis=-1))
+            max_exist_answer_acc = tf.reduce_mean(
+                tf.reduce_max(answer_target * self.answer_exist_mask, axis=-1))
+            test_max_exist_answer_acc = tf.reduce_mean(
+                tf.reduce_max(answer_target * self.answer_exist_mask * \
+                              self.test_answer_mask, axis=-1))
 
             self.mid_result['pred'] = pred
 
@@ -184,6 +195,9 @@ class Model(object):
             self.report['answer_train_loss'] = train_loss
             self.report['answer_report_loss'] = report_loss
             self.report['answer_accuracy'] = acc
+            self.report['test_answer_accuracy'] = test_acc
+            self.report['max_exist_answer_accuracy'] = max_exist_answer_acc
+            self.report['test_max_exist_answer_accuracy'] = test_max_exist_answer_acc
 
         """
         Prepare image summary
