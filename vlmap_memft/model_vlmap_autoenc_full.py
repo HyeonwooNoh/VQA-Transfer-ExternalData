@@ -26,7 +26,7 @@ class Model(object):
         self.vis_image = {}
 
         self.global_step = tf.train.get_or_create_global_step(graph=None)
-        self.latent_loss_weight = 0.01
+        self.latent_loss_weight = tf.convert_to_tensor(0.1)
         self.report['model_step'] = self.global_step
         self.report['latent_loss_weight'] = self.latent_loss_weight
 
@@ -156,6 +156,7 @@ class Model(object):
             self.losses['object_pred_latent'] = self.latent_loss_weight * latent_loss
             self.report['object_pred_loss'] = loss
             self.report['object_pred_latent_loss'] = latent_loss
+            self.report['object_pred_train_latent_loss'] = self.losses['object_pred_latent']
             self.report['object_pred_acc'] = acc
             self.report['object_pred_top_{}_acc'.format(TOP_K)] = top_k_acc
 
@@ -171,8 +172,8 @@ class Model(object):
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='pooled_linear_l')
 
-        obj_embed = tf.nn.embedding_lookup(self.l_answer_word_map,
-                                           self.batch['attr_pred/object_labels'])
+        obj_embed = tf.nn.embedding_lookup(
+            self.l_answer_word_map, self.batch['attr_pred/object_labels'])
         obj_vec = modules.fc_layer(
             obj_embed, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.tanh, is_training=self.is_train,
@@ -180,14 +181,9 @@ class Model(object):
 
         # [bs, #attr, #answer_vocab] x [#answer_vocab, W_DIM]
         # -> [bs, #attr, W_DIM]
-        flat_attr_label = tf.reshape(self.batch['attr_pred/labels'],
-                                     [-1, self.num_answer])
-        flat_num_gt_label = tf.reduce_sum(flat_attr_label, axis=-1, keepdims=True)
-        flat_attr_embed = tf.matmul(flat_attr_label, self.l_answer_word_map)
-        flat_attr_embed = flat_attr_embed / flat_num_gt_label  # average
-        attr_embed = tf.reshape(
-            flat_attr_embed, [-1, self.data_cfg.n_attr_pred, W_DIM])
-
+        attr_embed = tf.nn.embedding_lookup(
+            self.l_answer_word_map,
+            self.batch['attr_pred/random_attribute_labels'])
         attr_embed2 = modules.fc_layer(
             attr_embed, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.tanh, is_training=self.is_train,
@@ -227,24 +223,23 @@ class Model(object):
         self.mid_result['attr_pred/logit'] = logit  # [bs, #attr, #answer]
 
         with tf.name_scope('loss/attr_predict'):
-            multilabel_gt = self.batch['attr_pred/labels']
+            onehot_gt = tf.one_hot(
+                self.batch['attr_pred/random_attribute_labels'],
+                depth=self.num_answer)
             num_valid_entry = self.batch['attr_pred/num']
             valid_mask = tf.sequence_mask(
                 num_valid_entry, maxlen=self.data_cfg.n_attr_pred,
                 dtype=tf.float32)
-            loss, acc, recall, precision, top_1_prec, top_k_recall = \
-                self.binary_classification_loss(logit, multilabel_gt, valid_mask,
-                                                depth=self.num_answer)
+            loss, acc, top_k_acc = \
+                self.n_way_classification_loss(logit, onehot_gt, valid_mask)
             latent_loss = self.latent_loss(attr_vec, attr_log_sigma_sq)
             self.losses['attr_pred'] = loss
             self.losses['attr_pred_latent'] = self.latent_loss_weight * latent_loss
             self.report['attr_pred_loss'] = loss
             self.report['attr_pred_latent_loss'] = latent_loss
+            self.report['attr_pred_train_latent_loss'] = self.losses['attr_pred_latent']
             self.report['attr_pred_acc'] = acc
-            self.report['attr_pred_recall'] = recall
-            self.report['attr_pred_precision'] = precision
-            self.report['attr_pred_top_1_prec'] = top_1_prec
-            self.report['attr_pred_top_{}_recall'.format(TOP_K)] = top_k_recall
+            self.report['attr_pred_top_{}_acc'.format(TOP_K)] = top_k_acc
 
     def build_object_attention(self):
         """
@@ -452,6 +447,7 @@ class Model(object):
             self.losses['obj_blank_fill_latent'] = self.latent_loss_weight * latent_loss
             self.report['obj_blank_fill_loss'] = loss
             self.report['obj_blank_fill_latent_loss'] = latent_loss
+            self.report['obj_blank_fill_train_latent_loss'] = self.losses['obj_blank_fill_latent']
             self.report['obj_blank_fill_acc'] = acc
             self.report['obj_blank_fill_top_{}_acc'.format(TOP_K)] = top_k_acc
 
@@ -531,6 +527,7 @@ class Model(object):
             self.losses['attr_blank_fill_latent'] = self.latent_loss_weight * latent_loss
             self.report['attr_blank_fill_loss'] = loss
             self.report['attr_blank_fill_latent_loss'] = latent_loss
+            self.report['attr_blank_fill_train_latent_loss'] = self.losses['attr_blank_fill_latent']
             self.report['attr_blank_fill_acc'] = acc
             self.report['attr_blank_fill_top_{}_acc'.format(TOP_K)] = top_k_acc
 

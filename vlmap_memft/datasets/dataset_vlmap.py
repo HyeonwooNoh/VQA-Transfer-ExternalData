@@ -127,6 +127,7 @@ class Dataset(object):
         object_labels, weights, normal_boxes = [], [], []
         labels = np.zeros([len(idx_list), self.num_answers],
                           dtype=np.float32)
+        random_attribute_labels = []
         for i, idx in enumerate(idx_list):
             e = entry['attr_predict'][idx]
             weight = np.zeros([self.max_box_num], dtype=np.float32)
@@ -134,10 +135,13 @@ class Dataset(object):
             weights.append(weight)
             object_labels.append(e['object_label'])
             labels[i, e['labels']] = 1.0
+            random_attribute_labels.append(RANDOM_STATE.choice(e['labels']))
             normal_boxes.append(e['normal_box'])
         ret.update({
             'attr_pred/num': np.array(num_valid_data, dtype=np.int32),
             'attr_pred/labels': labels,
+            'attr_pred/random_attribute_labels': np.array(
+                random_attribute_labels, dtype=np.int32),
             'attr_pred/object_labels': np.array(
                 object_labels, dtype=np.int32),
             'attr_pred/weights': np.array(weights, dtype=np.float32),
@@ -302,6 +306,7 @@ class Dataset(object):
             'obj_pred/normal_boxes': [NUM_CONFIG['obj_pred'], 4],
             'attr_pred/num': (),
             'attr_pred/labels': [NUM_CONFIG['attr_pred'], self.num_answers],
+            'attr_pred/random_attribute_labels': [NUM_CONFIG['attr_pred']],
             'attr_pred/object_labels': [NUM_CONFIG['attr_pred']],
             'attr_pred/weights': [NUM_CONFIG['attr_pred'], self.max_box_num],
             'attr_pred/normal_boxes': [NUM_CONFIG['attr_pred'], 4],
@@ -345,6 +350,7 @@ class Dataset(object):
             'obj_pred/normal_boxes': tf.float32,
             'attr_pred/num': tf.int32,
             'attr_pred/labels': tf.float32,
+            'attr_pred/random_attribute_labels': tf.int32,
             'attr_pred/object_labels': tf.int32,
             'attr_pred/weights': tf.float32,
             'attr_pred/normal_boxes': tf.float32,
