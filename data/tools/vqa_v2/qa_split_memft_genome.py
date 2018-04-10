@@ -246,7 +246,7 @@ Why should we keep very frequent words:
     3. threshold_2 > occurrence: always testing set
 
 c.f)
-Among 4810 classes
+Among 3000 classes
 top 500 occurrence object classes have more than 500 occurrences
 if we pick top 1650-th occurrece object, its occurrene is around 50.
 Therefore, with threshold_1 == 500, threshold_2 == 50,
@@ -258,10 +258,13 @@ around 3156 classes are randomly splited into 'train-reserve' and 'test'
 log.warn('Split objects')
 obj_grp1 = [name for name, occ in occurrence.items()
             if occ >= config.occ_thres_1]
+log.warn('# obj_grp1: {}'.format(len(obj_grp1)))
 obj_grp2 = [name for name, occ in occurrence.items()
             if config.occ_thres_1 > occ >= config.occ_thres_2]
+log.warn('# obj_grp2: {}'.format(len(obj_grp2)))
 obj_grp3 = [name for name, occ in occurrence.items()
             if config.occ_thres_2 > occ]
+log.warn('# obj_grp3: {}'.format(len(obj_grp3)))
 RANDOM_STATE.shuffle(obj_grp1)
 RANDOM_STATE.shuffle(obj_grp2)
 half2 = len(obj_grp2) / 2
