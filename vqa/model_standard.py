@@ -19,6 +19,12 @@ class Model(object):
         self.batch = batch
         self.config = config
         self.image_dir = config.image_dir
+        self.is_train = is_train
+
+        # word_weight_dir is only for answer accuracy visualization
+        self.word_weight_dir = getattr(config, 'vlmap_word_weight_dir', None)
+        if self.word_weight_dir is None:
+            log.warn('word_weight_dir is None')
 
         self.losses = {}
         self.report = {}
@@ -28,14 +34,16 @@ class Model(object):
         self.vocab = cPickle.load(open(config.vocab_path, 'rb'))
         self.answer_dict = cPickle.load(open(
             os.path.join(config.tf_record_dir, 'answer_dict.pkl'), 'rb'))
-        self.glove_map = modules.LearnGloVe(self.vocab)
+        self.num_answer = len(self.answer_dict['vocab'])
+        self.num_train_answer = self.answer_dict['num_train_answer']
+        self.train_answer_mask = tf.expand_dims(tf.sequence_mask(
+            self.num_train_answer, maxlen=self.num_answer, dtype=tf.float32),
+            axis=0)
+        self.test_answer_mask = 1.0 - self.train_answer_mask
 
-        # answer candidates
-        log.infov('loading answer info..')
-        with h5py.File(os.path.join(config.tf_record_dir,
-                                    'data_info.hdf5'), 'r') as f:
-            self.num_answer = int(f['data_info']['num_answers'].value)
-        log.infov('done')
+        self.glove_map = modules.LearnGloVe(self.vocab)
+        self.answer_exist_mask = modules.AnswerExistMask(
+            self.answer_dict, self.word_weight_dir)
 
         log.infov('loading image features...')
         with h5py.File(config.vfeat_path, 'r') as f:
@@ -51,7 +59,7 @@ class Model(object):
             self.vfeat_dim = int(f['data_info']['vfeat_dim'].value)
         log.infov('done')
 
-        self.build(is_train=is_train)
+        self.build()
 
     def filter_train_vars(self, trainable_vars):
         train_vars = []
@@ -166,7 +174,7 @@ class Model(object):
                  q_intseq, q_intseq_len, answer_target, pred],
             Tout=tf.uint8)
 
-    def build(self, is_train=True):
+    def build(self):
         """
         build network architecture and loss
         """
@@ -192,7 +200,7 @@ class Model(object):
         log.warning('v_linear_v')
         v_linear_v = modules.fc_layer(
             V_ft, V_DIM, use_bias=True, use_bn=False, use_ln=True,
-            activation_fn=tf.nn.relu, is_training=is_train,
+            activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='v_linear_v')
 
         """
@@ -207,14 +215,14 @@ class Model(object):
         log.warning('q_linear_v')
         q_linear_v = modules.fc_layer(
             q_L_ft, V_DIM, use_bias=True, use_bn=False, use_ln=True,
-            activation_fn=tf.nn.relu, is_training=is_train,
+            activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='q_linear_v')
 
         """
         Perform attention
         """
         att_score = modules.hadamard_attention(v_linear_v, num_V_ft, q_linear_v,
-                                               use_ln=False, is_train=is_train)
+                                               use_ln=False, is_train=self.is_train)
         self.mid_result['att_score'] = att_score
         pooled_V_ft = modules.attention_pooling(V_ft, att_score)
 
@@ -228,25 +236,25 @@ class Model(object):
             log.warning('pooled_linear_l')
             pooled_linear_l = modules.fc_layer(
                 pooled_V_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
-                activation_fn=tf.nn.relu, is_training=is_train,
+                activation_fn=tf.nn.relu, is_training=self.is_train,
                 scope='pooled_linear_l')
 
             log.warning('q_linear_l')
             q_linear_l = modules.fc_layer(
                 q_L_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
-                activation_fn=tf.nn.relu, is_training=is_train,
+                activation_fn=tf.nn.relu, is_training=self.is_train,
                 scope='q_linear_l')
 
             joint = modules.fc_layer(
                 pooled_linear_l * q_linear_l, 2048,
                 use_bias=True, use_bn=False, use_ln=True,
-                activation_fn=tf.nn.relu, is_training=is_train, scope='joint_fc')
+                activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_fc')
             joint = tf.nn.dropout(joint, 0.5)
 
             logit = modules.fc_layer(
                 joint, self.num_answer,
                 use_bias=True, use_bn=False, use_ln=False,
-                activation_fn=None, is_training=is_train, scope='classifier')
+                activation_fn=None, is_training=self.is_train, scope='classifier')
 
         """
         Compute loss and accuracy
@@ -261,12 +269,32 @@ class Model(object):
                                       dtype=tf.float32)
             acc = tf.reduce_mean(
                 tf.reduce_sum(one_hot_pred * answer_target, axis=-1))
+            exist_acc = tf.reduce_mean(
+                tf.reduce_sum(one_hot_pred * answer_target * self.answer_exist_mask,
+                              axis=-1))
+            test_acc = tf.reduce_mean(
+                tf.reduce_sum(one_hot_pred * answer_target * self.test_answer_mask,
+                              axis=-1))
+            max_exist_answer_acc = tf.reduce_mean(
+                tf.reduce_max(answer_target * self.answer_exist_mask, axis=-1))
+            test_max_answer_acc = tf.reduce_mean(
+                tf.reduce_max(answer_target * self.test_answer_mask, axis=-1))
+            test_max_exist_answer_acc = tf.reduce_mean(
+                tf.reduce_max(answer_target * self.answer_exist_mask * \
+                              self.test_answer_mask, axis=-1))
 
             self.mid_result['pred'] = pred
 
             self.losses['answer'] = loss
             self.report['answer_loss'] = loss
             self.report['answer_accuracy'] = acc
+            self.report['exist_answer_accuracy'] = exist_acc
+            self.report['test_answer_accuracy'] = test_acc
+            self.report['max_exist_answer_accuracy'] = max_exist_answer_acc
+            self.report['test_max_answer_accuracy'] = test_max_answer_acc
+            self.report['test_max_exist_answer_accuracy'] = test_max_exist_answer_acc
+
+
 
         """
         Prepare image summary
