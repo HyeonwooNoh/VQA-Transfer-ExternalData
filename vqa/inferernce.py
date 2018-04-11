@@ -14,12 +14,16 @@ class Inference(object):
             from vqa.model_vqa import Model
         elif model_type == 'standard':
             from vqa.model_standard import Model
+        elif model_type == 'standard_testmask':
+            from vqa.model_standard_testmask import Model
         elif model_type == 'vlmap_only':
             from vqa.model_vlmap_only import Model
         elif model_type == 'vlmap_finetune':
             from vqa.model_vlmap_finetune import Model
         elif model_type == 'vlmap_answer':
             from vqa.model_vlmap_answer import Model
+        elif model_type == 'vlmap_answer_full':
+            from vqa.model_vlmap_answer_full import Model
         else:
             raise ValueError('Unknown model_type')
         return Model
