@@ -39,7 +39,8 @@ parser.add_argument('--occ_thres_2', type=int, default=50,
                     'occurrence is smaller, they are splited into train-reserve '
                     'and test.')
 parser.add_argument('--save_split_dir', type=str,
-                    default='data/preprocessed/vqa_v2/qa_split_objattr_genome_memft')
+                    default='data/preprocessed/vqa_v2'
+                    '/qa_split_objattr_genome_memft_check_all_answer', help=' ')
 config = parser.parse_args()
 
 config.save_split_dir += '_thres1_{}'.format(config.occ_thres_1)
@@ -223,12 +224,14 @@ max_name_len = max([len(name.split()) for name in obj_attrs])
 qid2ngrams = {}
 for qid, anno in tqdm(qid2anno.items(), desc='count object occurrence'):
     q_tokens = anno['q_tokens']
-    a_tokens = anno['a_tokens']
+    processed_answers = anno['processed_answers']
     ngrams = []
     for n in range(1, min(len(q_tokens), max_name_len)):
         ngrams.extend(get_ngrams(q_tokens, n))
-    for n in range(1, min(len(a_tokens), max_name_len)):
-        ngrams.extend(get_ngrams(a_tokens, n))
+    for processed_answer in anno['processed_answers']:
+        a_tokens = processed_answer.split()
+        for n in range(1, min(len(a_tokens), max_name_len)):
+            ngrams.extend(get_ngrams(a_tokens, n))
     ngrams = list(set(ngrams))
     for ngram in ngrams:
         if ngram in occurrence: occurrence[ngram] += 1
