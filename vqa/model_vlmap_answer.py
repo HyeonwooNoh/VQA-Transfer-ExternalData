@@ -180,6 +180,9 @@ class Model(object):
                                       dtype=tf.float32)
             acc = tf.reduce_mean(
                 tf.reduce_sum(one_hot_pred * answer_target, axis=-1))
+            exist_acc = tf.reduce_mean(
+                tf.reduce_sum(one_hot_pred * answer_target * self.answer_exist_mask,
+                              axis=-1))
             test_acc = tf.reduce_mean(
                 tf.reduce_sum(one_hot_pred * answer_target * self.test_answer_mask,
                               axis=-1))
@@ -197,6 +200,7 @@ class Model(object):
             self.report['answer_train_loss'] = train_loss
             self.report['answer_report_loss'] = report_loss
             self.report['answer_accuracy'] = acc
+            self.report['exist_answer_accuracy'] = exist_acc
             self.report['test_answer_accuracy'] = test_acc
             self.report['max_exist_answer_accuracy'] = max_exist_answer_acc
             self.report['test_max_answer_accuracy'] = test_max_answer_acc
