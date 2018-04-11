@@ -317,7 +317,9 @@ class Model(object):
                 max_batch_num=20, line_width=2)
         """
 
-        self.loss = self.losses['answer']
+        self.loss = 0
+        for key, loss in self.losses.items():
+            self.loss = self.loss + loss
 
         # scalar summary
         for key, val in self.report.items():

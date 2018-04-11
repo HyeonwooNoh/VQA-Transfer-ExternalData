@@ -34,7 +34,6 @@ class Model(object):
         self.report['model_step'] = self.global_step
         self.report['latent_loss_weight'] = self.latent_loss_weight
 
-
         self.vocab = cPickle.load(open(config.vocab_path, 'rb'))
         self.answer_dict = cPickle.load(open(
             os.path.join(config.tf_record_dir, 'answer_dict.pkl'), 'rb'))
@@ -208,7 +207,7 @@ class Model(object):
             test_max_answer_acc = tf.reduce_mean(
                 tf.reduce_max(answer_target * self.test_answer_mask, axis=-1))
             test_max_exist_answer_acc = tf.reduce_mean(
-                tf.reduce_max(answer_target * self.answer_exist_mask * \
+                tf.reduce_max(answer_target * self.answer_exist_mask *
                               self.test_answer_mask, axis=-1))
             normal_test_acc = tf.where(
                 tf.equal(test_max_answer_acc, 0),
@@ -246,7 +245,9 @@ class Model(object):
                 max_batch_num=20, line_width=2)
         """
 
-        self.loss = self.losses['answer']
+        self.loss = 0
+        for key, loss in self.losses.items():
+            self.loss = self.loss + loss
 
         # scalar summary
         for key, val in self.report.items():
