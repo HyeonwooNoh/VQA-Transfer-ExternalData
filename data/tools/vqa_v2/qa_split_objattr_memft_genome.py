@@ -226,12 +226,10 @@ for qid, anno in tqdm(qid2anno.items(), desc='count object occurrence'):
     q_tokens = anno['q_tokens']
     processed_answers = anno['processed_answers']
     ngrams = []
-    for n in range(1, min(len(q_tokens), max_name_len)):
+    for n in range(1, min(len(q_tokens), max_name_len) + 1):
         ngrams.extend(get_ngrams(q_tokens, n))
     for processed_answer in anno['processed_answers']:
-        a_tokens = processed_answer.split()
-        for n in range(1, min(len(a_tokens), max_name_len)):
-            ngrams.extend(get_ngrams(a_tokens, n))
+        ngrams.append(processed_answer)
     ngrams = list(set(ngrams))
     for ngram in ngrams:
         if ngram in occurrence: occurrence[ngram] += 1
