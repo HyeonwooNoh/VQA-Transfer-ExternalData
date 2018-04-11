@@ -210,6 +210,10 @@ class Model(object):
             test_max_exist_answer_acc = tf.reduce_mean(
                 tf.reduce_max(answer_target * self.answer_exist_mask * \
                               self.test_answer_mask, axis=-1))
+            normal_test_acc = tf.where(
+                tf.equal(test_max_answer_acc, 0),
+                test_max_answer_acc,
+                test_acc / test_max_answer_acc)
 
             latent_loss = self.latent_loss(q_L_mean, q_L_log_sigma_sq)
             self.mid_result['pred'] = pred
@@ -223,6 +227,7 @@ class Model(object):
             self.report['answer_accuracy'] = acc
             self.report['exist_answer_accuracy'] = exist_acc
             self.report['test_answer_accuracy'] = test_acc
+            self.report['normal_test_answer_accuracy'] = normal_test_acc
             self.report['max_exist_answer_accuracy'] = max_exist_answer_acc
             self.report['test_max_answer_accuracy'] = test_max_answer_acc
             self.report['test_max_exist_answer_accuracy'] = test_max_exist_answer_acc
