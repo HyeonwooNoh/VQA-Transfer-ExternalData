@@ -28,6 +28,8 @@ class Trainer(object):
             from vqa.model_vlmap_answer import Model
         elif model_type == 'vlmap_answer_full':
             from vqa.model_vlmap_answer_full import Model
+        elif model_type == 'vlmap_answer_no_noise':
+            from vqa.model_vlmap_answer_no_noise import Model
         else:
             raise ValueError('Unknown model_type')
         return Model
@@ -356,7 +358,7 @@ def main():
     parser.add_argument('--model_type', type=str, default='vqa', help=' ',
                         choices=['vqa', 'standard', 'standard_testmask',
                                  'vlmap_only', 'vlmap_finetune', 'vlmap_answer',
-                                 'vlmap_answer_full'])
+                                 'vlmap_answer_full', 'vlmap_answer_no_noise'])
     # model specific parameters
     parser.add_argument('--vlmap_word_weight_dir', type=str, default=None,
                         help=' ')
