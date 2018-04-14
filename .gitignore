@@ -18,6 +18,7 @@
 data/VisualGenome
 data/VQA_v2
 data/GloVe
+data/wikitext2
 data/preprocessed
 
 # Training results
