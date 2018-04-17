@@ -385,7 +385,7 @@ class Dataset(object):
             'attr_pred/labels': tf.float32,
             'attr_pred/random_attribute_labels': tf.int32,
             'attr_pred/random_wordsets': tf.int32,
-            'attr_pred/random_wordset_labels': tf.int32,
+            'attr_pred/random_wordset_labels': tf.float32,
             'attr_pred/object_labels': tf.int32,
             'attr_pred/weights': tf.float32,
             'attr_pred/normal_boxes': tf.float32,
