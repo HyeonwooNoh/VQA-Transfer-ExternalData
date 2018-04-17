@@ -45,6 +45,11 @@ class Dataset(object):
         self.num_answers = len(self.answer_dict['vocab'])
         log.info('loading answer_dict done')
 
+        log.warn('loading wordset_dict ..')
+        ws_dict_path = os.path.join(data_dir, 'wordset_dict5.pkl')
+        self.ws_dict = cPickle.load(open(ws_dict_path, 'rb'))
+        log.info('loading wordset_dict done')
+
         with h5py.File(os.path.join(data_dir, '{}_vfeat.hdf5'.format(split)),
                        'r') as f:
 
@@ -100,7 +105,7 @@ class Dataset(object):
         num_valid_data = len(idx_list)
         while len(idx_list) < NUM_CONFIG['obj_pred']:
             idx_list.append(idx_list[-1])
-        labels, weights, normal_boxes = [], [], []
+        labels, weights, normal_boxes, wordsets = [], [], [], []
         for idx in idx_list:
             e = entry['object_predict'][idx]
             weight = np.zeros([self.max_box_num], dtype=np.float32)
@@ -108,12 +113,15 @@ class Dataset(object):
             weights.append(weight)
             labels.append(e['label'])
             normal_boxes.append(e['normal_box'])
+            wordsets.append(RANDOM_STATE.choice(
+                self.ws_dict['ans2wordset'][e['label']]))
         ret.update({
             'obj_pred/num': np.array(num_valid_data, dtype=np.int32),
             'obj_pred/labels': np.array(labels, dtype=np.int32),
             'obj_pred/weights': np.array(weights, dtype=np.float32),
             'obj_pred/normal_boxes': np.array(
                 normal_boxes, dtype=np.float32),
+            'obj_pred/wordsets': np.array(wordsets, dtype=np.int32),
         })
         """
         attribute_predict
@@ -125,9 +133,11 @@ class Dataset(object):
         while len(idx_list) < NUM_CONFIG['attr_pred']:
             idx_list.append(idx_list[-1])
         object_labels, weights, normal_boxes = [], [], []
-        labels = np.zeros([len(idx_list), self.num_answers],
-                          dtype=np.float32)
-        random_attribute_labels = []
+        labels = np.zeros([len(idx_list), self.num_answers], dtype=np.float32)
+        rand_attribute_labels = []
+        rand_wordsets = []
+        rand_wordset_labels = np.zeros([len(idx_list), self.num_answers],
+                                       dtype=np.float32)
         for i, idx in enumerate(idx_list):
             e = entry['attr_predict'][idx]
             weight = np.zeros([self.max_box_num], dtype=np.float32)
@@ -135,13 +145,22 @@ class Dataset(object):
             weights.append(weight)
             object_labels.append(e['object_label'])
             labels[i, e['labels']] = 1.0
-            random_attribute_labels.append(RANDOM_STATE.choice(e['labels']))
+            rand_label = RANDOM_STATE.choice(e['labels'])
+            rand_attribute_labels.append(rand_label)
+            rand_wordset = RANDOM_STATE.choice(
+                self.ws_dict['ans2wordset'][rand_label])
+            rand_wordsets.append(rand_wordset)
+            wordset_labels = list(
+                set(e['labels']) & self.ws_dict['wordset2ans'][rand_wordset])
+            rand_wordset_labels[i, wordset_labels] = 1.0
             normal_boxes.append(e['normal_box'])
         ret.update({
             'attr_pred/num': np.array(num_valid_data, dtype=np.int32),
             'attr_pred/labels': labels,
             'attr_pred/random_attribute_labels': np.array(
-                random_attribute_labels, dtype=np.int32),
+                rand_attribute_labels, dtype=np.int32),
+            'attr_pred/random_wordsets': np.array(rand_wordsets, dtype=np.int32),
+            'attr_pred/random_wordset_labels': rand_wordset_labels,
             'attr_pred/object_labels': np.array(
                 object_labels, dtype=np.int32),
             'attr_pred/weights': np.array(weights, dtype=np.float32),
@@ -214,6 +233,7 @@ class Dataset(object):
         maxlen = max([len(entry['obj_blank_fill'][idx]['blank'])
                       for idx in idx_list])
         weights, normal_boxes, fills, blanks_len = [], [], [], []
+        wordsets = []
         blanks = np.zeros([len(idx_list), maxlen], dtype=np.int32)
         for i, idx in enumerate(idx_list):
             e = entry['obj_blank_fill'][idx]
@@ -224,6 +244,8 @@ class Dataset(object):
             blanks_len.append(len(e['blank']))
             blanks[i, :blanks_len[i]] = e['blank']
             fills.append(e['fill'])
+            wordsets.append(RANDOM_STATE.choice(
+                self.ws_dict['ans2wordset'][e['fill']]))
         ret.update({
             'obj_blank_fill/num': np.array(num_valid_data, dtype=np.int32),
             'obj_blank_fill/weights': np.array(weights, dtype=np.float32),
@@ -232,6 +254,7 @@ class Dataset(object):
             'obj_blank_fill/fills': np.array(fills, dtype=np.int32),
             'obj_blank_fill/blanks': blanks,
             'obj_blank_fill/blanks_len': np.array(blanks_len, dtype=np.int32),
+            'obj_blank_fill/wordsets': np.array(wordsets, dtype=np.int32),
         })
         """
         attribute_blank_fill
@@ -245,6 +268,7 @@ class Dataset(object):
         maxlen = max([len(entry['attr_blank_fill'][idx]['blank'])
                       for idx in idx_list])
         weights, normal_boxes, fills, blanks_len = [], [], [], []
+        wordsets = []
         blanks = np.zeros([len(idx_list), maxlen], dtype=np.int32)
         for i, idx in enumerate(idx_list):
             e = entry['attr_blank_fill'][idx]
@@ -255,6 +279,8 @@ class Dataset(object):
             blanks_len.append(len(e['blank']))
             blanks[i, :blanks_len[i]] = e['blank']
             fills.append(e['fill'])
+            wordsets.append(RANDOM_STATE.choice(
+                self.ws_dict['ans2wordset'][e['fill']]))
         ret.update({
             'attr_blank_fill/num': np.array(num_valid_data, dtype=np.int32),
             'attr_blank_fill/weights': np.array(weights, dtype=np.float32),
@@ -263,6 +289,7 @@ class Dataset(object):
             'attr_blank_fill/fills': np.array(fills, dtype=np.int32),
             'attr_blank_fill/blanks': blanks,
             'attr_blank_fill/blanks_len': np.array(blanks_len, dtype=np.int32),
+            'attr_blank_fill/wordsets': np.array(wordsets, dtype=np.int32),
         })
         """
         caption_attend
@@ -304,9 +331,12 @@ class Dataset(object):
             'obj_pred/labels': [NUM_CONFIG['obj_pred']],
             'obj_pred/weights': [NUM_CONFIG['obj_pred'], self.max_box_num],
             'obj_pred/normal_boxes': [NUM_CONFIG['obj_pred'], 4],
+            'obj_pred/wordsets': [NUM_CONFIG['obj_pred']],
             'attr_pred/num': (),
             'attr_pred/labels': [NUM_CONFIG['attr_pred'], self.num_answers],
             'attr_pred/random_attribute_labels': [NUM_CONFIG['attr_pred']],
+            'attr_pred/random_wordsets': [NUM_CONFIG['attr_pred']],
+            'attr_pred/random_wordset_labels': [NUM_CONFIG['attr_pred'], self.num_answers],
             'attr_pred/object_labels': [NUM_CONFIG['attr_pred']],
             'attr_pred/weights': [NUM_CONFIG['attr_pred'], self.max_box_num],
             'attr_pred/normal_boxes': [NUM_CONFIG['attr_pred'], 4],
@@ -324,12 +354,14 @@ class Dataset(object):
             'obj_blank_fill/fills': [NUM_CONFIG['obj_blank_fill']],
             'obj_blank_fill/blanks': [NUM_CONFIG['obj_blank_fill'], None],
             'obj_blank_fill/blanks_len': [NUM_CONFIG['obj_blank_fill']],
+            'obj_blank_fill/wordsets': [NUM_CONFIG['obj_blank_fill']],
             'attr_blank_fill/num': (),
             'attr_blank_fill/weights': [NUM_CONFIG['attr_blank_fill'], self.max_box_num],
             'attr_blank_fill/normal_boxes': [NUM_CONFIG['attr_blank_fill'], 4],
             'attr_blank_fill/fills': [NUM_CONFIG['attr_blank_fill']],
             'attr_blank_fill/blanks': [NUM_CONFIG['attr_blank_fill'], None],
             'attr_blank_fill/blanks_len': [NUM_CONFIG['attr_blank_fill']],
+            'attr_blank_fill/wordsets': [NUM_CONFIG['attr_blank_fill']],
             'cap_att/num': (),
             'cap_att/att_scores': [NUM_CONFIG['caption_att'], self.max_box_num],
             'cap_att/word_tokens': [NUM_CONFIG['caption_att'], None],
@@ -348,9 +380,12 @@ class Dataset(object):
             'obj_pred/labels': tf.int32,
             'obj_pred/weights': tf.float32,
             'obj_pred/normal_boxes': tf.float32,
+            'obj_pred/wordsets': tf.int32,
             'attr_pred/num': tf.int32,
             'attr_pred/labels': tf.float32,
             'attr_pred/random_attribute_labels': tf.int32,
+            'attr_pred/random_wordsets': tf.int32,
+            'attr_pred/random_wordset_labels': tf.int32,
             'attr_pred/object_labels': tf.int32,
             'attr_pred/weights': tf.float32,
             'attr_pred/normal_boxes': tf.float32,
@@ -368,12 +403,14 @@ class Dataset(object):
             'obj_blank_fill/fills': tf.int32,
             'obj_blank_fill/blanks': tf.int32,
             'obj_blank_fill/blanks_len': tf.int32,
+            'obj_blank_fill/wordsets': tf.int32,
             'attr_blank_fill/num': tf.int32,
             'attr_blank_fill/weights': tf.float32,
             'attr_blank_fill/normal_boxes': tf.float32,
             'attr_blank_fill/fills': tf.int32,
             'attr_blank_fill/blanks': tf.int32,
             'attr_blank_fill/blanks_len': tf.int32,
+            'attr_blank_fill/wordsets': tf.int32,
             'cap_att/num': tf.int32,
             'cap_att/att_scores': tf.float32,
             'cap_att/word_tokens': tf.int32,
