@@ -5,6 +5,7 @@ import os
 import numpy as np
 
 from nltk.corpus import wordnet as wn
+from textblob import Word
 from tqdm import tqdm
 
 parser = argparse.ArgumentParser(
@@ -38,6 +39,9 @@ answer_dict = cPickle.load(open(config.answer_dict_path, 'rb'))
 
 vocab_with_synset = []
 for v in answer_dict['vocab']:
+    v_w = Word('_'.join(v.split()))
+    if len(v_w.synsets) > 0:
+        synsets[v] = v_w.synsets[0].name()
     if v in synsets:
         vocab_with_synset.append(v)
 
