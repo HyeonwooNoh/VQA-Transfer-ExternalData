@@ -18,6 +18,8 @@ class Trainer(object):
             from vlmap_memft.model_vlmap import Model
         elif model_type == 'vlmap_wordset':
             from vlmap_memft.model_vlmap_wordset import Model
+        elif model_type == 'vlmap_wordset_only':
+            from vlmap_memft.model_vlmap_wordset_only import Model
         elif model_type == 'vlmap_bf_only':
             from vlmap_memft.model_vlmap_bf_only import Model
         elif model_type == 'vlmap_bf_wordset':
@@ -309,7 +311,8 @@ def main():
     # model parameters
     parser.add_argument('--batch_size', type=int, default=512, help=' ')
     parser.add_argument('--model_type', type=str, default='vlmap', help=' ',
-                        choices=['vlmap', 'vlmap_wordset', 'vlmap_bf_only',
+                        choices=['vlmap', 'vlmap_wordset', 'vlmap_wordset_only',
+                                 'vlmap_bf_only',
                                  'vlmap_autoenc', 'vlmap_bf_or_wordset',
                                  'vlmap_autoenc_full', 'vlmap_bf_wordset'])
     config = parser.parse_args()
