@@ -1,12 +1,14 @@
 import argparse
 import os
 import time
+import shutil
 import numpy as np
 import tensorflow as tf
 
 from tqdm import tqdm
 
 from util import log
+from vqa import importer
 from vqa.datasets import input_ops_vqa_tf_record_memft as input_ops_vqa
 
 
@@ -14,25 +16,7 @@ class Trainer(object):
 
     @staticmethod
     def get_model_class(model_type='vqa'):
-        if model_type == 'vqa':
-            from vqa.model_vqa import Model
-        elif model_type == 'standard':
-            from vqa.model_standard import Model
-        elif model_type == 'standard_testmask':
-            from vqa.model_standard_testmask import Model
-        elif model_type == 'vlmap_only':
-            from vqa.model_vlmap_only import Model
-        elif model_type == 'vlmap_finetune':
-            from vqa.model_vlmap_finetune import Model
-        elif model_type == 'vlmap_answer':
-            from vqa.model_vlmap_answer import Model
-        elif model_type == 'vlmap_answer_full':
-            from vqa.model_vlmap_answer_full import Model
-        elif model_type == 'vlmap_answer_no_noise':
-            from vqa.model_vlmap_answer_no_noise import Model
-        else:
-            raise ValueError('Unknown model_type')
-        return Model
+        return importer.get_model_class(model_type)
 
     def __init__(self, config):
         self.config = config
@@ -55,6 +39,11 @@ class Trainer(object):
             time.strftime("%Y%m%d-%H%M%S"))
         if not os.path.exists(self.train_dir): os.makedirs(self.train_dir)
         log.infov("Train Dir: %s", self.train_dir)
+
+        self.vlmap_word_weight_dir = os.path.join(
+            self.train_dir, config.vlmap_word_weight_dir.split('/')[-1])
+        shutil.copytree(config.vlmap_word_weight_dir, self.vlmap_word_weight_dir)
+        config.vlmap_word_weight_dir = self.vlmap_word_weight_dir
 
         # Input
         self.batch_size = config.batch_size
@@ -336,10 +325,10 @@ def main():
                         help=' ')
     parser.add_argument('--tf_record_dir', type=str,
                         default='data/preprocessed/vqa_v2'
-                        '/new_qa_split_thres1_500_thres2_50/tf_record_memft',
-                        help=' ')
+                        '/qa_split_objattr_genome_memft_check_all_answer_thres1_3000_thres2_50'
+                        '/tf_record_memft', help=' ')
     parser.add_argument('--vfeat_name', type=str,
-                        default='vfeat_bottomup_36.hdf5', help=' ')
+                        default='vfeat_bottomup_36_my.hdf5', help=' ')
     parser.add_argument('--vocab_name', type=str, default='vocab.pkl', help=' ')
     # log
     parser.add_argument('--train_average_iter', type=int, default=200)
@@ -355,10 +344,8 @@ def main():
     parser.add_argument('--lr_weight_decay', action='store_true', default=False)
     # model parameters
     parser.add_argument('--batch_size', type=int, default=512, help=' ')
-    parser.add_argument('--model_type', type=str, default='vqa', help=' ',
-                        choices=['vqa', 'standard', 'standard_testmask',
-                                 'vlmap_only', 'vlmap_finetune', 'vlmap_answer',
-                                 'vlmap_answer_full', 'vlmap_answer_no_noise'])
+    parser.add_argument('--model_type', type=str, default='vlmap_answer',
+                        help=' ', choices=importer.get_model_types())
     # model specific parameters
     parser.add_argument('--vlmap_word_weight_dir', type=str, default=None,
                         help=' ')
