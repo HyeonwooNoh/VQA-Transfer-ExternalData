@@ -34,6 +34,8 @@ class Trainer(object):
             from vlmap_memft.model_vlmap_bf_or_wordset_withatt import Model
         elif model_type == 'vlmap_bf_or_wordset_withatt_sp':
             from vlmap_memft.model_vlmap_bf_or_wordset_withatt_sp import Model
+        elif model_type == 'vlmap_bf_or_wordset_withatt_sp_adapt':
+            from vlmap_memft.model_vlmap_bf_or_wordset_withatt_sp_adapt import Model
         elif model_type == 'vlmap_autoenc':
             from vlmap_memft.model_vlmap_autoenc import Model
         elif model_type == 'vlmap_autoenc_full':
@@ -327,6 +329,7 @@ def main():
                                  'vlmap_bf_or_wordset',
                                  'vlmap_bf_or_wordset_withatt',
                                  'vlmap_bf_or_wordset_withatt_sp',
+                                 'vlmap_bf_or_wordset_withatt_sp_adapt',
                                  'vlmap_autoenc_full', 'vlmap_bf_wordset'])
     config = parser.parse_args()
     check_config(config)
