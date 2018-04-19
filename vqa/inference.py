@@ -3,6 +3,7 @@ import os
 import tensorflow as tf
 
 from util import log
+from vqa import importer
 from vqa.datasets import input_ops_vqa_tf_record_memft as input_ops_vqa
 
 
@@ -10,23 +11,7 @@ class Inference(object):
 
     @staticmethod
     def get_model_class(model_type='vqa'):
-        if model_type == 'vqa':
-            from vqa.model_vqa import Model
-        elif model_type == 'standard':
-            from vqa.model_standard import Model
-        elif model_type == 'standard_testmask':
-            from vqa.model_standard_testmask import Model
-        elif model_type == 'vlmap_only':
-            from vqa.model_vlmap_only import Model
-        elif model_type == 'vlmap_finetune':
-            from vqa.model_vlmap_finetune import Model
-        elif model_type == 'vlmap_answer':
-            from vqa.model_vlmap_answer import Model
-        elif model_type == 'vlmap_answer_full':
-            from vqa.model_vlmap_answer_full import Model
-        else:
-            raise ValueError('Unknown model_type')
-        return Model
+        return importer.get_model_class(model_type)
 
     def __init__(self, config):
         self.config = config
@@ -83,18 +68,35 @@ class Inference(object):
         log.warn('Inference initialization is done')
 
 
+def get_model_types():
+    return importer.get_model_types()
+
+
+def parse_checkpoint(config):
+    config.ckpt_name = config.checkpoint.split('/')[-1]
+
+    dirname = config.checkpoint.split('/')[-2]
+    config.model_type = dirname.split('vqa_')[1].split('_d_')[0]
+
+    qa_split_name = dirname.split('_d_')[1].split('_tf_record_memft')[0]
+    config.tf_record_dir = os.path.join(
+        'data/preprocessed/vqa_v2', qa_split_name, 'tf_record_memft')
+
+    if 'vfeat_bottomup_36_my' in dirname:
+        config.vfeat_name = 'vfeat_bottomup_36_my.hdf5'
+    else:
+        config.vfeat_name = 'vfeat_bottomup_36.hdf5'
+
+    config.vocab_path = os.path.join(config.tf_record_dir, config.vocab_name)
+    config.vfeat_path = os.path.join(config.tf_record_dir, config.vfeat_name)
+
+
 def get_default_config():
     config = collections.namedtuple('config', [])
     config.image_dir = 'data/VQA_v2/images'
-    config.tf_record_dir = 'data/preprocessed/vqa_v2' + \
-        '/new_qa_split_thres1_500_thres2_50/tf_record_memft'
-    config.vfeat_name = 'vfeat_bottomup_36.hdf5'
     config.vocab_name = 'vocab.pkl'
     config.checkpoint = None
     config.batch_size = 512
-    config.model_type = 'vqa'
-    config.vocab_path = os.path.join(config.tf_record_dir, config.vocab_name)
-    config.vfeat_path = os.path.join(config.tf_record_dir, config.vfeat_name)
     return config
 
 
