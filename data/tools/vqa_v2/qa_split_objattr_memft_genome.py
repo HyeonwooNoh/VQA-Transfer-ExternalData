@@ -371,4 +371,8 @@ cPickle.dump(qid_splits, open(os.path.join(
     config.save_split_dir, 'qa_split.pkl'), 'wb'))
 cPickle.dump(qid2anno, open(os.path.join(
     config.save_split_dir, 'merged_annotations.pkl'), 'wb'))
+cPickle.dump(objects, open(os.path.join(
+    config.save_split_dir, 'object_list.pkl'), 'wb'))
+cPickle.dump(attrs, open(os.path.join(
+    config.save_split_dir, 'attribute_list.pkl'), 'wb'))
 log.warn('output saving is done.')

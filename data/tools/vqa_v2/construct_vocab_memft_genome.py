@@ -99,10 +99,20 @@ test_object_set = set(object_split['test'])
 train_ans_set = freq_ans_set - test_object_set
 test_ans_set = freq_ans_set & test_object_set
 
+log.info('loading object and attribute list')
+obj_list_path = os.path.join(config.qa_split_dir, 'object_list.pkl')
+obj_list = cPickle.load(open(obj_list_path, 'rb'))
+attr_list_path = os.path.join(config.qa_split_dir, 'attribute_list.pkl')
+attr_list = cPickle.load(open(attr_list_path, 'rb'))
+obj_set = set(obj_list)
+attr_set = set(attr_list)
+
 answer_dict = {}
 answer_dict['vocab'] = list(train_ans_set) + list(test_ans_set)
 answer_dict['num_train_answer'] = len(train_ans_set)
 answer_dict['dict'] = {v: i for i, v in enumerate(answer_dict['vocab'])}
+answer_dict['is_object'] = [int(v in obj_set) for v in answer_dict['vocab']]
+answer_dict['is_attribute'] = [int(v in attr_set) for v in answer_dict['vocab']]
 
 answer_dict_path = os.path.join(config.qa_split_dir, 'answer_dict.pkl')
 log.warn('save answer_dict: {}'.format(answer_dict_path))
