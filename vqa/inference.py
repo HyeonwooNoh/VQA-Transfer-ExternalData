@@ -17,6 +17,10 @@ class Inference(object):
         self.config = config
         self.vfeat_path = config.vfeat_path
         self.tf_record_dir = config.tf_record_dir
+        self.train_dir = os.path.dirname(config.checkpoint)
+        self.vlmap_word_weight_dir = os.path.join(
+            self.train_dir, config.vlmap_word_weight_dir.split('/')[-1])
+        config.vlmap_word_weight_dir = self.vlmap_word_weight_dir
 
         self.batch_size = config.batch_size
         with tf.name_scope('datasets'):

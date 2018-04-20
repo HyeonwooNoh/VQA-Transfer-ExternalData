@@ -27,6 +27,7 @@ class Model(object):
         self.losses = {}
         self.report = {}
         self.mid_result = {}
+        self.output = {}
         self.vis_image = {}
 
         self.vocab = cPickle.load(open(config.vocab_path, 'rb'))
@@ -131,6 +132,7 @@ class Model(object):
         att_score = modules.hadamard_attention(
             v_linear_v, num_V_ft, q_linear_v,
             use_ln=False, is_train=self.is_train)
+        self.output['att_score'] = att_score
         self.mid_result['att_score'] = att_score
         pooled_V_ft = modules.attention_pooling(V_ft, att_score)
         self.mid_result['pooled_V_ft'] = pooled_V_ft
@@ -162,6 +164,7 @@ class Model(object):
         logit = modules.WordWeightAnswer(
             joint, self.answer_dict, self.word_weight_dir,
             use_bias=True, is_training=self.is_train, scope='WordWeightAnswer')
+        self.output['logit'] = logit
         self.mid_result['logit'] = logit
 
         """
