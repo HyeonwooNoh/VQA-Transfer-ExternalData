@@ -207,7 +207,7 @@ class Model(object):
                               axis=-1))
             max_exist_answer_acc = tf.reduce_mean(
                 tf.reduce_max(answer_target * self.answer_exist_mask, axis=-1))
-            max_train_exist_answer_acc = tf.reduce_mean(
+            max_train_exist_acc = tf.reduce_mean(
                 tf.reduce_max(answer_target * self.answer_exist_mask * \
                               self.train_answer_mask, axis=-1))
             test_obj_max_acc = tf.reduce_mean(
