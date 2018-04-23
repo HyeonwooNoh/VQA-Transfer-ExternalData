@@ -57,6 +57,8 @@ class Model(object):
         self.glove_map = modules.LearnGloVe(self.vocab)
         self.answer_exist_mask = modules.AnswerExistMask(
             self.answer_dict, self.word_weight_dir)
+        self.answer_exist_mask_bool = tf.greater(
+            tf.squeeze(self.answer_exist_mask, axis=0), 0.5)
 
         log.infov('loading image features...')
         with h5py.File(config.vfeat_path, 'r') as f:
@@ -201,7 +203,7 @@ class Model(object):
             tile_joint, self.answer_dict, self.word_weight_dir,
             use_bias=True, is_training=self.is_train, scope='WordWeightAnswer')
         masked_tile_logit = tf.boolean_mask(  # [bs, NUM_MARGINAL, # train answer]
-            tile_logit, self.train_answer_mask_bool, axis=2)
+            tile_logit, self.answer_exist_mask_bool, axis=2)
         tile_prob = tf.nn.softmax(masked_tile_logit, axis=-1)  # [bs, NUM_MARGINAL, # train answer]
 
         marginal_prob = tf.reduce_mean(tile_prob, axis=1)  # [bs, # train answer]
