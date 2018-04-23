@@ -148,6 +148,11 @@ for split in ['train']:
 
         anno = qid2anno[qid]
 
+        max_freq_answer = ' '.join(anno['a_tokens'])
+        if max_freq_answer not in answer_set:
+            continue
+        max_freq_answer_id = answer_dict['dict'][max_freq_answer]
+
         answer_count = {}
         for answer in anno['processed_answers']:
             answer_count[answer] = answer_count.get(answer, 0) + 1
@@ -182,6 +187,8 @@ for split in ['train']:
             'q_intseq/len': tf_util.int64_feature(len(q_intseq)),
             'answers/ids': tf_util.int64_feature(answer_ids),
             'answers/scores': tf_util.float_feature(answer_scores),
+            'answers/max_freq_answer': tf_util.int64_feature(
+                int(max_freq_answer_id))
         }))
         tf_record_writer.write(tf_example.SerializeToString())
 
@@ -199,6 +206,12 @@ for split in ['val', 'testval', 'test']:
             tf_record_writer = tf.python_io.TFRecordWriter(shard_path)
 
         anno = qid2anno[qid]
+
+        max_freq_answer = ' '.join(anno['a_tokens'])
+        if max_freq_answer not in answer_dict:
+            # put default answer
+            max_freq_answer_id = answer_dict['dict'][answer_dict['vocab'][0]]
+        else: max_freq_answer_id = answer_dict['dict'][max_freq_answer]
 
         answer_count = {}
         for answer in anno['processed_answers']:
@@ -233,6 +246,8 @@ for split in ['val', 'testval', 'test']:
             'q_intseq/len': tf_util.int64_feature(len(q_intseq)),
             'answers/ids': tf_util.int64_feature(answer_ids),
             'answers/scores': tf_util.float_feature(answer_scores),
+            'answers/max_freq_answer': tf_util.int64_feature(
+                int(max_freq_answer_id))
         }))
         tf_record_writer.write(tf_example.SerializeToString())
 
