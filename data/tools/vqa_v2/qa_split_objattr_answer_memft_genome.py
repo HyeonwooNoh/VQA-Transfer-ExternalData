@@ -233,7 +233,6 @@ for qid, anno in tqdm(qid2anno.items(), desc='count object occurrence'):
     for ngram in ngrams:
         if ngram in occurrence: occurrence[ngram] += 1
     qid2ngrams[qid] = ngrams
-
 """
 How we could split object classes based on occurrence in questions and answers?
 1. Generalization to rare words: have rare obj_attrs in the test set.
@@ -262,13 +261,13 @@ around 3156 classes are randomly splited into 'train-reserve' and 'test'
 """
 log.warn('Split obj_attrs')
 obj_grp1 = [name for name, occ in occurrence.items()
-            if occ >= config.occ_thres_1]
+            if occ >= max(config.occ_thres_1, 1)]
 log.warn('# obj_grp1: {}'.format(len(obj_grp1)))
 obj_grp2 = [name for name, occ in occurrence.items()
-            if config.occ_thres_1 > occ >= config.occ_thres_2]
+            if config.occ_thres_1 > occ >= max(config.occ_thres_2, 1)]
 log.warn('# obj_grp2: {}'.format(len(obj_grp2)))
 obj_grp3 = [name for name, occ in occurrence.items()
-            if config.occ_thres_2 > occ]
+            if config.occ_thres_2 > occ >= 1]
 log.warn('# obj_grp3: {}'.format(len(obj_grp3)))
 RANDOM_STATE.shuffle(obj_grp1)
 RANDOM_STATE.shuffle(obj_grp2)
