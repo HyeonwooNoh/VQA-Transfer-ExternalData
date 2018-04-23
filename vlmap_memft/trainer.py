@@ -26,6 +26,8 @@ class Trainer(object):
             from vlmap_memft.model_vlmap_bf_only import Model
         elif model_type == 'vlmap_bf_only_withatt':
             from vlmap_memft.model_vlmap_bf_only_withatt import Model
+        elif model_type == 'vlmap_bf_only_withatt_sp':
+            from vlmap_memft.model_vlmap_bf_only_withatt_sp import Model
         elif model_type == 'vlmap_bf_wordset':
             from vlmap_memft.model_vlmap_bf_wordset import Model
         elif model_type == 'vlmap_bf_or_wordset':
@@ -329,6 +331,7 @@ def main():
                                  'vlmap_wordset_only_withatt',
                                  'vlmap_bf_only',
                                  'vlmap_bf_only_withatt',
+                                 'vlmap_bf_only_withatt_sp',
                                  'vlmap_autoenc',
                                  'vlmap_bf_or_wordset',
                                  'vlmap_bf_or_wordset_obj',
