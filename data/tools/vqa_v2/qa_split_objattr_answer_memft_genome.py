@@ -40,7 +40,7 @@ parser.add_argument('--occ_thres_2', type=int, default=-1,
                     'and test.')
 parser.add_argument('--save_split_dir', type=str,
                     default='data/preprocessed/vqa_v2'
-                    '/qa_split_objattr_answer_genome_memft_check_all_answer', help=' ')
+                    '/qa_split_objattr_answer_3div4_genome_memft_check_all_answer', help=' ')
 config = parser.parse_args()
 
 config.save_split_dir += '_thres1_{}'.format(config.occ_thres_1)
@@ -271,9 +271,9 @@ obj_grp3 = [name for name, occ in occurrence.items()
 log.warn('# obj_grp3: {}'.format(len(obj_grp3)))
 RANDOM_STATE.shuffle(obj_grp1)
 RANDOM_STATE.shuffle(obj_grp2)
-half2 = len(obj_grp2) / 2
+half2 = len(obj_grp2) * 3 / 4
 RANDOM_STATE.shuffle(obj_grp3)
-half3 = len(obj_grp3) / 2
+half3 = len(obj_grp3) * 3 / 4
 obj_attrs_split = {
     'train': obj_grp1 + obj_grp2[:half2],
     'train-reserve': obj_grp3[:half3],
