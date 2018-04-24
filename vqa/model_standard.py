@@ -29,6 +29,8 @@ class Model(object):
         self.losses = {}
         self.report = {}
         self.mid_result = {}
+        self.output = {}
+        self.heavy_output = {}
         self.vis_image = {}
 
         self.vocab = cPickle.load(open(config.vocab_path, 'rb'))
@@ -216,6 +218,7 @@ class Model(object):
         # [bs, L_DIM]
         q_L_ft = modules.encode_L(q_embed, self.batch['q_intseq_len'], L_DIM,
                                   cell_type='GRU')
+        self.heavy_output['condition'] = q_L_ft
 
         # [bs, V_DIM}
         log.warning('q_linear_v')
@@ -229,6 +232,7 @@ class Model(object):
         """
         att_score = modules.hadamard_attention(v_linear_v, num_V_ft, q_linear_v,
                                                use_ln=False, is_train=self.is_train)
+        self.output['att_score'] = att_score
         self.mid_result['att_score'] = att_score
         pooled_V_ft = modules.attention_pooling(V_ft, att_score)
 
@@ -261,6 +265,7 @@ class Model(object):
                 joint, self.num_answer,
                 use_bias=True, use_bn=False, use_ln=False,
                 activation_fn=None, is_training=self.is_train, scope='classifier')
+        self.output['logit'] = logit
 
         """
         Compute loss and accuracy
@@ -273,6 +278,13 @@ class Model(object):
             pred = tf.cast(tf.argmax(logit, axis=-1), dtype=tf.int32)
             one_hot_pred = tf.one_hot(pred, depth=self.num_answer,
                                       dtype=tf.float32)
+            self.output['pred'] = pred
+            all_score = tf.reduce_sum(one_hot_pred * answer_target, axis=-1)
+            max_train_score = tf.reduce_max(
+                answer_target * self.train_answer_mask, axis=-1)
+            self.output['all_score'] = all_score
+            self.output['max_train_score'] = max_train_score
+
             acc = tf.reduce_mean(
                 tf.reduce_sum(one_hot_pred * answer_target, axis=-1))
             exist_acc = tf.reduce_mean(

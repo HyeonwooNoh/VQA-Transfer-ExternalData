@@ -28,6 +28,7 @@ class Model(object):
         self.report = {}
         self.mid_result = {}
         self.output = {}
+        self.heavy_output = {}
         self.vis_image = {}
 
         self.vocab = cPickle.load(open(config.vocab_path, 'rb'))
@@ -123,6 +124,7 @@ class Model(object):
         # [bs, L_DIM]
         q_L_ft = modules.encode_L(q_embed, self.batch['q_intseq_len'], L_DIM,
                                   cell_type='GRU')
+        self.heavy_output['condition'] = q_L_ft
 
         # [bs, V_DIM}
         log.warning('q_linear_v')
@@ -187,8 +189,15 @@ class Model(object):
             pred = tf.cast(tf.argmax(logit, axis=-1), dtype=tf.int32)
             one_hot_pred = tf.one_hot(pred, depth=self.num_answer,
                                       dtype=tf.float32)
-            acc = tf.reduce_mean(
-                tf.reduce_sum(one_hot_pred * answer_target, axis=-1))
+            self.output['pred'] = pred
+
+            all_score = tf.reduce_sum(one_hot_pred * answer_target, axis=-1)
+            max_train_score = tf.reduce_max(
+                answer_target * self.train_answer_mask, axis=-1)
+            self.output['all_score'] = all_score
+            self.output['max_train_score'] = max_train_score
+
+            acc = tf.reduce_mean(all_score)
             exist_acc = tf.reduce_mean(
                 tf.reduce_sum(one_hot_pred * answer_target * self.answer_exist_mask,
                               axis=-1))
