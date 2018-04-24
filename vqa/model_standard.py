@@ -40,6 +40,12 @@ class Model(object):
             self.num_train_answer, maxlen=self.num_answer, dtype=tf.float32),
             axis=0)
         self.test_answer_mask = 1.0 - self.train_answer_mask
+        self.obj_answer_mask = tf.expand_dims(
+            tf.constant(self.answer_dict['is_object'], dtype=tf.float32),
+            axis=0)
+        self.attr_answer_mask = tf.expand_dims(
+            tf.constant(self.answer_dict['is_attribute'], dtype=tf.float32),
+            axis=0)
 
         self.glove_map = modules.LearnGloVe(self.vocab)
         self.answer_exist_mask = modules.AnswerExistMask(
@@ -275,26 +281,69 @@ class Model(object):
             test_acc = tf.reduce_mean(
                 tf.reduce_sum(one_hot_pred * answer_target * self.test_answer_mask,
                               axis=-1))
+            test_obj_acc = tf.reduce_mean(
+                tf.reduce_sum(one_hot_pred * answer_target * self.test_answer_mask *
+                              self.obj_answer_mask, axis=-1))
+            test_attr_acc = tf.reduce_mean(
+                tf.reduce_sum(one_hot_pred * answer_target * self.test_answer_mask *
+                              self.attr_answer_mask, axis=-1))
+            train_exist_acc = tf.reduce_mean(
+                tf.reduce_sum(one_hot_pred * answer_target * self.answer_exist_mask *
+                              self.train_answer_mask,
+                              axis=-1))
             max_exist_answer_acc = tf.reduce_mean(
                 tf.reduce_max(answer_target * self.answer_exist_mask, axis=-1))
+            max_train_exist_acc = tf.reduce_mean(
+                tf.reduce_max(answer_target * self.answer_exist_mask *
+                              self.train_answer_mask, axis=-1))
+            test_obj_max_acc = tf.reduce_mean(
+                tf.reduce_max(answer_target * self.test_answer_mask *
+                              self.obj_answer_mask, axis=-1))
+            test_attr_max_acc = tf.reduce_mean(
+                tf.reduce_max(answer_target * self.test_answer_mask *
+                              self.attr_answer_mask, axis=-1))
             test_max_answer_acc = tf.reduce_mean(
                 tf.reduce_max(answer_target * self.test_answer_mask, axis=-1))
             test_max_exist_answer_acc = tf.reduce_mean(
-                tf.reduce_max(answer_target * self.answer_exist_mask * \
+                tf.reduce_max(answer_target * self.answer_exist_mask *
                               self.test_answer_mask, axis=-1))
+            normal_test_obj_acc = tf.where(
+                tf.equal(test_obj_max_acc, 0),
+                test_obj_max_acc,
+                test_obj_acc / test_obj_max_acc)
+            normal_test_attr_acc = tf.where(
+                tf.equal(test_attr_max_acc, 0),
+                test_attr_max_acc,
+                test_attr_acc / test_attr_max_acc)
+            normal_train_exist_acc = tf.where(
+                tf.equal(max_train_exist_acc, 0),
+                max_train_exist_acc,
+                train_exist_acc / max_train_exist_acc)
+            normal_exist_acc = tf.where(
+                tf.equal(max_exist_answer_acc, 0),
+                max_exist_answer_acc,
+                exist_acc / max_exist_answer_acc)
+            normal_test_acc = tf.where(
+                tf.equal(test_max_answer_acc, 0),
+                test_max_answer_acc,
+                test_acc / test_max_answer_acc)
 
             self.mid_result['pred'] = pred
 
             self.losses['answer'] = loss
-            self.report['answer_loss'] = loss
-            self.report['answer_accuracy'] = acc
-            self.report['exist_answer_accuracy'] = exist_acc
-            self.report['test_answer_accuracy'] = test_acc
-            self.report['max_exist_answer_accuracy'] = max_exist_answer_acc
-            self.report['test_max_answer_accuracy'] = test_max_answer_acc
-            self.report['test_max_exist_answer_accuracy'] = test_max_exist_answer_acc
-
-
+            self.report['answer_train_loss'] = loss
+            self.report['answer_report_loss'] = loss
+            self.report['answer_acc'] = acc
+            self.report['exist_acc'] = exist_acc
+            self.report['test_acc'] = test_acc
+            self.report['normal_test_acc'] = normal_test_acc
+            self.report['normal_test_object_acc'] = normal_test_obj_acc
+            self.report['normal_test_attribute_acc'] = normal_test_attr_acc
+            self.report['normal_exist_acc'] = normal_exist_acc
+            self.report['normal_train_exist_acc'] = normal_train_exist_acc
+            self.report['max_exist_acc'] = max_exist_answer_acc
+            self.report['test_max_acc'] = test_max_answer_acc
+            self.report['test_max_exist_acc'] = test_max_exist_answer_acc
 
         """
         Prepare image summary
