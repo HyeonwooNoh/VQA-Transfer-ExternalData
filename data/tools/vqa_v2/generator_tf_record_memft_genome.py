@@ -135,6 +135,7 @@ max_num_answer = 0
 max_q_len = 0
 for split in ['train']:
     num_shards = len(qa_split[split]) / config.num_record_per_shard + 1
+    split_qid2anno = {}
     for i, qid in enumerate(tqdm(qa_split[split],
                                  desc='process {} qids'.format(split))):
         if i % config.num_record_per_shard == 0:
@@ -147,6 +148,7 @@ for split in ['train']:
             tf_record_writer = tf.python_io.TFRecordWriter(shard_path)
 
         anno = qid2anno[qid]
+        split_qid2anno[qid] = anno
 
         max_freq_answer = ' '.join(anno['a_tokens'])
         if max_freq_answer not in answer_set:
@@ -191,9 +193,12 @@ for split in ['train']:
                 int(max_freq_answer_id))
         }))
         tf_record_writer.write(tf_example.SerializeToString())
+    split_anno_path = os.path.join(config.data_dir, '{}_qid2anno.pkl'.format(split))
+    cPickle.dump(split_qid2anno, open(split_anno_path, 'wb'))
 
 for split in ['val', 'testval', 'test']:
     num_shards = len(qa_split[split]) / config.num_record_per_shard + 1
+    split_qid2anno = {}
     for i, qid in enumerate(tqdm(qa_split[split],
                                  desc='process {} qids'.format(split))):
         if i % config.num_record_per_shard == 0:
@@ -206,6 +211,7 @@ for split in ['val', 'testval', 'test']:
             tf_record_writer = tf.python_io.TFRecordWriter(shard_path)
 
         anno = qid2anno[qid]
+        split_qid2anno[qid] = anno
 
         max_freq_answer = ' '.join(anno['a_tokens'])
         if max_freq_answer not in answer_dict:
@@ -250,6 +256,8 @@ for split in ['val', 'testval', 'test']:
                 int(max_freq_answer_id))
         }))
         tf_record_writer.write(tf_example.SerializeToString())
+    split_anno_path = os.path.join(config.data_dir, '{}_qid2anno.pkl'.format(split))
+    cPickle.dump(split_qid2anno, open(split_anno_path, 'wb'))
 
 
 log.warn('write to data_info')
