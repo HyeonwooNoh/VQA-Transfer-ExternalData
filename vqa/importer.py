@@ -21,6 +21,8 @@ def get_model_class(model_type='vqa'):
         from vqa.model_vlmap_finetune import Model
     elif model_type == 'vlmap_answer':
         from vqa.model_vlmap_answer import Model
+    elif model_type == 'vlmap_answer_noc':
+        from vqa.model_vlmap_answer_noc import Model
     elif model_type == 'vlmap_answer_ent':
         from vqa.model_vlmap_answer_ent import Model
     elif model_type == 'vlmap_answer_adapt':

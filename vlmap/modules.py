@@ -570,7 +570,10 @@ def AnswerExistMask(answer_dict, word_weight_dir=None):
 
 def WordWeightAnswer(input, answer_dict, word_weight_dir=None,
                      use_bias=False, is_training=True,
-                     scope='WordWeightAnswer', reuse=tf.AUTO_REUSE):
+                     scope='WordWeightAnswer',
+                     weight_name='class_weights',
+                     bias_name='class_biases',
+                     reuse=tf.AUTO_REUSE):
     with tf.variable_scope(scope, reuse=reuse) as scope:
         log.warning(scope.name)
         input_dim = input.get_shape().as_list()[-1]
@@ -582,8 +585,8 @@ def WordWeightAnswer(input, answer_dict, word_weight_dir=None,
             word_answer_dict = cPickle.load(open(word_answer_dict_path, 'rb'))
             word_weight_path = os.path.join(word_weight_dir, 'weights.hdf5')
             with h5py.File(word_weight_path, 'r') as f:
-                answer_weight = np.array(f.get('class_weights'))
-                answer_bias = np.array(f.get('class_biases'))
+                answer_weight = np.array(f.get(weight_name))
+                answer_bias = np.array(f.get(bias_name))
 
             for i, a in enumerate(answer_dict['vocab']):
                 if a in word_answer_dict['dict']:
