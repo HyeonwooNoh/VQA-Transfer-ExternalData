@@ -40,8 +40,10 @@ class Trainer(object):
             from vlmap_memft.model_vlmap_bf_or_wordset_withatt import Model
         elif model_type == 'vlmap_bf_or_wordset_withatt_sp':
             from vlmap_memft.model_vlmap_bf_or_wordset_withatt_sp import Model
+        elif model_type == 'vlmap_noc_bf_or_wordset_withatt_sp':
+            from vlmap_memft.model_vlmap_noc_bf_or_wordset_withatt_sp import Model
         elif model_type == 'vlmap_bf_or_wordset_withatt_sp_obj':
-            from vlmap_memft.model_vlmap_bf_or_wordset_withatt_sp_obj import Model
+            from vlmap_memft.model_vlmap_bf_or_wordset_withatt_sp import Model
         elif model_type == 'vlmap_bf_or_wordset_withatt_sp_adapt':
             from vlmap_memft.model_vlmap_bf_or_wordset_withatt_sp_adapt import Model
         elif model_type == 'vlmap_autoenc':
@@ -340,6 +342,7 @@ def main():
                                  'vlmap_bf_or_wordset_obj',
                                  'vlmap_bf_or_wordset_withatt',
                                  'vlmap_bf_or_wordset_withatt_sp',
+                                 'vlmap_noc_bf_or_wordset_withatt_sp',
                                  'vlmap_bf_or_wordset_withatt_sp_obj',
                                  'vlmap_bf_or_wordset_withatt_sp_adapt',
                                  'vlmap_autoenc_full', 'vlmap_bf_wordset'])
