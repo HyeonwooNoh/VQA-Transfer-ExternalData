@@ -40,10 +40,12 @@ class Trainer(object):
         if not os.path.exists(self.train_dir): os.makedirs(self.train_dir)
         log.infov("Train Dir: %s", self.train_dir)
 
-        self.vlmap_word_weight_dir = os.path.join(
-            self.train_dir, config.vlmap_word_weight_dir.split('/')[-1])
-        shutil.copytree(config.vlmap_word_weight_dir, self.vlmap_word_weight_dir)
-        config.vlmap_word_weight_dir = self.vlmap_word_weight_dir
+        if config.vlmap_word_weight_dir is not None:
+            self.vlmap_word_weight_dir = os.path.join(
+                self.train_dir, config.vlmap_word_weight_dir.split('/')[-1])
+            shutil.copytree(config.vlmap_word_weight_dir, self.vlmap_word_weight_dir)
+            config.vlmap_word_weight_dir = self.vlmap_word_weight_dir
+        else: self.vlmap_word_weight_dir = config.vlmap_word_weight_dir
 
         # Input
         self.batch_size = config.batch_size
