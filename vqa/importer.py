@@ -2,6 +2,7 @@ def get_model_types():
     model_types = [
         'vqa', 'standard', 'standard_testmask',
         'vlmap_only', 'vlmap_finetune', 'vlmap_answer',
+        'vlmap_answer_noc',
         'vlmap_answer_adapt', 'vlmap_answer_ent',
         'vlmap_answer_full', 'vlmap_answer_no_noise'
     ]
