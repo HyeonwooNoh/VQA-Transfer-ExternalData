@@ -50,6 +50,14 @@ class Dataset(object):
         self.ws_dict = cPickle.load(open(ws_dict_path, 'rb'))
         log.info('loading wordset_dict done')
 
+        log.warn('loading enwiki_context_dict ..')
+        enwiki_dict_pkl_path = os.path.join(data_dir, 'enwiki_context_dict_w3_n5.pkl')
+        enwiki_dict_h5_path = os.path.join(data_dir, 'enwiki_context_dict_w3_n5.hdf5')
+        self.enwiki_dict = cPickle.load(open(enwiki_dict_pkl_path, 'rb'))
+        with h5py.File(enwiki_dict_h5_path, 'r') as f:
+            self.enwiki_dict['np_context'] = f['np_context'].value
+            self.enwiki_dict['np_context_len'] = f['np_context_len'].value
+
         with h5py.File(os.path.join(data_dir, '{}_vfeat.hdf5'.format(split)),
                        'r') as f:
 
@@ -106,6 +114,7 @@ class Dataset(object):
         while len(idx_list) < NUM_CONFIG['obj_pred']:
             idx_list.append(idx_list[-1])
         labels, weights, normal_boxes, wordsets = [], [], [], []
+        enwiki_context_idx_list = []
         for idx in idx_list:
             e = entry['object_predict'][idx]
             weight = np.zeros([self.max_box_num], dtype=np.float32)
@@ -115,6 +124,10 @@ class Dataset(object):
             normal_boxes.append(e['normal_box'])
             wordsets.append(RANDOM_STATE.choice(
                 self.ws_dict['ans2wordset'][e['label']]))
+            enwiki_context_idx = RANDOM_STATE.choice(
+                self.enwiki_dict['ans2context_idx'][e['label']],
+                p=self.enwiki_dict['ans2context_prob'][e['label']])
+            enwiki_context_idx_list.append(enwiki_context_idx)
         ret.update({
             'obj_pred/num': np.array(num_valid_data, dtype=np.int32),
             'obj_pred/labels': np.array(labels, dtype=np.int32),
@@ -122,6 +135,10 @@ class Dataset(object):
             'obj_pred/normal_boxes': np.array(
                 normal_boxes, dtype=np.float32),
             'obj_pred/wordsets': np.array(wordsets, dtype=np.int32),
+            'obj_pred/enwiki_context': np.take(
+                self.enwiki_dict['np_context'], enwiki_context_idx_list, axis=0),
+            'obj_pred/enwiki_context_len': np.take(
+                self.enwiki_dict['np_context_len'], enwiki_context_idx_list, axis=0),
         })
         """
         attribute_predict
@@ -235,6 +252,7 @@ class Dataset(object):
         weights, normal_boxes, fills, blanks_len = [], [], [], []
         wordsets = []
         blanks = np.zeros([len(idx_list), maxlen], dtype=np.int32)
+        enwiki_context_idx_list = []
         for i, idx in enumerate(idx_list):
             e = entry['obj_blank_fill'][idx]
             weight = np.zeros([self.max_box_num], dtype=np.float32)
@@ -246,6 +264,10 @@ class Dataset(object):
             fills.append(e['fill'])
             wordsets.append(RANDOM_STATE.choice(
                 self.ws_dict['ans2wordset'][e['fill']]))
+            enwiki_context_idx = RANDOM_STATE.choice(
+                self.enwiki_dict['ans2context_idx'][e['fill']],
+                p=self.enwiki_dict['ans2context_prob'][e['fill']])
+            enwiki_context_idx_list.append(enwiki_context_idx)
         ret.update({
             'obj_blank_fill/num': np.array(num_valid_data, dtype=np.int32),
             'obj_blank_fill/weights': np.array(weights, dtype=np.float32),
@@ -255,6 +277,10 @@ class Dataset(object):
             'obj_blank_fill/blanks': blanks,
             'obj_blank_fill/blanks_len': np.array(blanks_len, dtype=np.int32),
             'obj_blank_fill/wordsets': np.array(wordsets, dtype=np.int32),
+            'obj_blank_fill/enwiki_context': np.take(
+                self.enwiki_dict['np_context'], enwiki_context_idx_list, axis=0),
+            'obj_blank_fill/enwiki_context_len': np.take(
+                self.enwiki_dict['np_context_len'], enwiki_context_idx_list, axis=0),
         })
         """
         attribute_blank_fill
@@ -270,6 +296,7 @@ class Dataset(object):
         weights, normal_boxes, fills, blanks_len = [], [], [], []
         wordsets = []
         blanks = np.zeros([len(idx_list), maxlen], dtype=np.int32)
+        enwiki_context_idx_list = []
         for i, idx in enumerate(idx_list):
             e = entry['attr_blank_fill'][idx]
             weight = np.zeros([self.max_box_num], dtype=np.float32)
@@ -281,6 +308,10 @@ class Dataset(object):
             fills.append(e['fill'])
             wordsets.append(RANDOM_STATE.choice(
                 self.ws_dict['ans2wordset'][e['fill']]))
+            enwiki_context_idx = RANDOM_STATE.choice(
+                self.enwiki_dict['ans2context_idx'][e['fill']],
+                p=self.enwiki_dict['ans2context_prob'][e['fill']])
+            enwiki_context_idx_list.append(enwiki_context_idx)
         ret.update({
             'attr_blank_fill/num': np.array(num_valid_data, dtype=np.int32),
             'attr_blank_fill/weights': np.array(weights, dtype=np.float32),
@@ -290,6 +321,10 @@ class Dataset(object):
             'attr_blank_fill/blanks': blanks,
             'attr_blank_fill/blanks_len': np.array(blanks_len, dtype=np.int32),
             'attr_blank_fill/wordsets': np.array(wordsets, dtype=np.int32),
+            'attr_blank_fill/enwiki_context': np.take(
+                self.enwiki_dict['np_context'], enwiki_context_idx_list, axis=0),
+            'attr_blank_fill/enwiki_context_len': np.take(
+                self.enwiki_dict['np_context_len'], enwiki_context_idx_list, axis=0),
         })
         """
         caption_attend
@@ -332,6 +367,9 @@ class Dataset(object):
             'obj_pred/weights': [NUM_CONFIG['obj_pred'], self.max_box_num],
             'obj_pred/normal_boxes': [NUM_CONFIG['obj_pred'], 4],
             'obj_pred/wordsets': [NUM_CONFIG['obj_pred']],
+            'obj_pred/enwiki_context': [NUM_CONFIG['obj_pred'],
+                                        self.enwiki_dict['max_context_len']],
+            'obj_pred/enwiki_context_len': [NUM_CONFIG['obj_pred']],
             'attr_pred/num': (),
             'attr_pred/labels': [NUM_CONFIG['attr_pred'], self.num_answers],
             'attr_pred/random_attribute_labels': [NUM_CONFIG['attr_pred']],
@@ -355,6 +393,9 @@ class Dataset(object):
             'obj_blank_fill/blanks': [NUM_CONFIG['obj_blank_fill'], None],
             'obj_blank_fill/blanks_len': [NUM_CONFIG['obj_blank_fill']],
             'obj_blank_fill/wordsets': [NUM_CONFIG['obj_blank_fill']],
+            'obj_blank_fill/enwiki_context': [NUM_CONFIG['obj_blank_fill'],
+                                              self.enwiki_dict['max_context_len']],
+            'obj_blank_fill/enwiki_context_len': [NUM_CONFIG['obj_blank_fill']],
             'attr_blank_fill/num': (),
             'attr_blank_fill/weights': [NUM_CONFIG['attr_blank_fill'], self.max_box_num],
             'attr_blank_fill/normal_boxes': [NUM_CONFIG['attr_blank_fill'], 4],
@@ -362,6 +403,9 @@ class Dataset(object):
             'attr_blank_fill/blanks': [NUM_CONFIG['attr_blank_fill'], None],
             'attr_blank_fill/blanks_len': [NUM_CONFIG['attr_blank_fill']],
             'attr_blank_fill/wordsets': [NUM_CONFIG['attr_blank_fill']],
+            'attr_blank_fill/enwiki_context': [NUM_CONFIG['attr_blank_fill'],
+                                               self.enwiki_dict['max_context_len']],
+            'attr_blank_fill/enwiki_context_len': [NUM_CONFIG['attr_blank_fill']],
             'cap_att/num': (),
             'cap_att/att_scores': [NUM_CONFIG['caption_att'], self.max_box_num],
             'cap_att/word_tokens': [NUM_CONFIG['caption_att'], None],
@@ -381,6 +425,8 @@ class Dataset(object):
             'obj_pred/weights': tf.float32,
             'obj_pred/normal_boxes': tf.float32,
             'obj_pred/wordsets': tf.int32,
+            'obj_pred/enwiki_context': tf.int32,
+            'obj_pred/enwiki_context_len': tf.int32,
             'attr_pred/num': tf.int32,
             'attr_pred/labels': tf.float32,
             'attr_pred/random_attribute_labels': tf.int32,
@@ -404,6 +450,8 @@ class Dataset(object):
             'obj_blank_fill/blanks': tf.int32,
             'obj_blank_fill/blanks_len': tf.int32,
             'obj_blank_fill/wordsets': tf.int32,
+            'obj_blank_fill/enwiki_context': tf.int32,
+            'obj_blank_fill/enwiki_context_len': tf.int32,
             'attr_blank_fill/num': tf.int32,
             'attr_blank_fill/weights': tf.float32,
             'attr_blank_fill/normal_boxes': tf.float32,
@@ -411,6 +459,8 @@ class Dataset(object):
             'attr_blank_fill/blanks': tf.int32,
             'attr_blank_fill/blanks_len': tf.int32,
             'attr_blank_fill/wordsets': tf.int32,
+            'attr_blank_fill/enwiki_context': tf.int32,
+            'attr_blank_fill/enwiki_context_len': tf.int32,
             'cap_att/num': tf.int32,
             'cap_att/att_scores': tf.float32,
             'cap_att/word_tokens': tf.int32,
