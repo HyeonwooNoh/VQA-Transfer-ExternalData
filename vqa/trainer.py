@@ -23,6 +23,8 @@ class Trainer(object):
         self.vfeat_path = config.vfeat_path
         self.tf_record_dir = config.tf_record_dir
 
+        self.max_train_iter = config.max_train_iter
+
         dataset_str = 'd'
         dataset_str += '_' + '_'.join(config.tf_record_dir.replace(
             'data/preprocessed/vqa_v2/', '').split('/'))
@@ -186,14 +188,11 @@ class Trainer(object):
     def train(self):
         log.infov('Training starts')
 
-        max_steps = 1000000
-        ckpt_save_steps = self.checkpoint_step
-
         # initialize average report (put 0 to escape average over empty list)
         avg_step_time = [0]
         avg_train_report = {key: [0] for key in self.avg_report['train']}
 
-        for s in range(max_steps):
+        for s in range(self.max_train_iter):
             """
             write average summary and print log
             """
@@ -257,7 +256,7 @@ class Trainer(object):
             """
             Save Checkpoint
             """
-            if s % ckpt_save_steps == 0:
+            if s % self.checkpoint_step == 0:
                 log.infov('Saved checkpoint at {}'.format(step))
                 self.saver.save(
                     self.session, os.path.join(self.train_dir, 'model'),
@@ -333,6 +332,7 @@ def main():
                         default='vfeat_bottomup_36_my.hdf5', help=' ')
     parser.add_argument('--vocab_name', type=str, default='vocab.pkl', help=' ')
     # log
+    parser.add_argument('--max_train_iter', type=int, default=7300)
     parser.add_argument('--train_average_iter', type=int, default=200)
     parser.add_argument('--val_average_iter', type=int, default=419)  # 419 for 1 epoch
     parser.add_argument('--heavy_summary_step', type=int, default=800)  # 867 for 1 epoch
