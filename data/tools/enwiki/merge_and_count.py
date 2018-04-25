@@ -17,9 +17,6 @@ parser.add_argument('--genome_annotation_dir', type=str,
 parser.add_argument('--dir_name', type=str,
                     default='data/preprocessed/visualgenome'
                     '/memft_all_new_vocab50_obj3000_attr1000_maxlen10', help=' ')
-parser.add_argument('--context_window_size', type=int, default=3,
-                    help='window size for extracting context')
-parser.add_argument('--min_num_word', type=int, default=5, help='min num word in set')
 config = parser.parse_args()
 
 config.enwiki_paths = glob.glob(os.path.join(config.enwiki_dir, 'wiki_*'))
