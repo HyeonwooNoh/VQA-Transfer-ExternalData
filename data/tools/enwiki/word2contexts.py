@@ -21,7 +21,6 @@ parser.add_argument('--dir_name', type=str,
                     '/memft_all_new_vocab50_obj3000_attr1000_maxlen10', help=' ')
 parser.add_argument('--context_window_size', type=int, default=3,
                     help='window size for extracting context')
-parser.add_argument('--min_num_word', type=int, default=5, help='min num word in set')
 config = parser.parse_args()
 
 config.answer_dict_path = os.path.join(config.dir_name, 'answer_dict.pkl')
@@ -99,7 +98,8 @@ for i, v in enumerate(answer_dict['vocab']):
 
     word2contexts[v] = dict(Counter(new_v_contexts))
 
-save_path = os.path.join(config.enwiki_dir, 'word2contexts.pkl')
+save_path = os.path.join(config.enwiki_dir, 'word2contexts_w{}.pkl'.format(
+    config.context_window_size))
 log.warn('saving results to to : {}'.format(save_path))
 cPickle.dump(word2contexts, open(save_path, 'wb'))
 log.warn('done')
