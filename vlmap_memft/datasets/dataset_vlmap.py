@@ -1,9 +1,9 @@
-import collections
 import cPickle
 import h5py
 import os
 import numpy as np
 import tensorflow as tf
+from collections import namedtuple, defaultdict
 
 from util import log
 
@@ -70,10 +70,23 @@ class Dataset(object):
             self.spatial_features = np.array(f.get('spatial_features'))
             log.warn('loading {} features done ..'.format(split))
 
+        self.wordset_choice_idx = {
+                'obj_label': defaultdict(lambda: defaultdict(int)),
+                'obj_fill': defaultdict(lambda: defaultdict(int)),
+                'attr_label': defaultdict(lambda: defaultdict(int)),
+                'attr_fill': defaultdict(lambda: defaultdict(int)),
+
+        self.enwiki_choice_idx = \
+                'obj_label': defaultdict(lambda: defaultdict(int)),
+                'obj_fill': defaultdict(lambda: defaultdict(int)),
+                'attr_label': defaultdict(lambda: defaultdict(int)),
+                'attr_fill': defaultdict(lambda: defaultdict(int)),
+        }
+
         log.info('dataset {} {} init done'.format(name, split))
 
     def get_config(self):
-        config = collections.namedtuple('dataset_config', [])
+        config = namedtuple('dataset_config', [])
         config.n_obj_pred = NUM_CONFIG['obj_pred']
         config.n_attr_pred = NUM_CONFIG['attr_pred']
         config.n_attr_bf = NUM_CONFIG['attr_blank_fill']
@@ -81,6 +94,44 @@ class Dataset(object):
         config.vfeat_dim = self.vfeat_dim
         config.max_box_num = self.max_box_num
         return config
+
+
+    def sample_wordset_and_context_idx(
+            self, category, task, image_idx, idx)
+        # category: obj, attr, task: label, fill
+        
+        wordsets = self.ws_dict['ans2wordset'][e[task]]
+        enwiki_context_idxs = \
+                self.enwiki_dict['ans2context_idx'][e[task]]
+        enwiki_context_probs = \
+                self.enwiki_dict['ans2context_prob'][e[task]]
+
+        if True:
+            wordset = RANDOM_STATE.choice(wordsets)
+            enwiki_context_idx = RANDOM_STATE.choice(
+                context_idxs, p=context_probs)
+        else:
+            wordset_choice_idx = \
+                    self.wordset_choice_idx["{}_{}".format(category, task)]
+            enwiki_choice_idx = \
+                    self.enwiki_choice_idx["{}_{}".format(category, task)]
+
+            wordset_choice_idxs = \
+                    wordset_choice_idx[image_id][idx]
+            enwiki_choice_idxs = \
+                    enwiki_choice_idx[image_id][idx]
+
+            wordset = wordsets[
+                    wordset_choice_idxs % len(wordset_choice_idxs)]
+            enwiki_context_idx = enwiki_context_idxs[
+                    enwiki_choice_idxs % len(enwiki_choice_idxs)]
+            enwiki_context_prob = enwiki_context_probs[
+                    enwiki_choice_idxs % len(enwiki_choice_idxs)]
+
+            wordset_choice_idx[image_id][idx] += 1
+            enwiki_choice_idx[image_id][idx] += 1
+
+        return wordset, enwiki_context_idx
 
     def get_data(self, image_id):
         image_idx = self.image_id2idx[image_id]
@@ -116,12 +167,13 @@ class Dataset(object):
             weights.append(weight)
             labels.append(e['label'])
             normal_boxes.append(e['normal_box'])
-            wordsets.append(RANDOM_STATE.choice(
-                self.ws_dict['ans2wordset'][e['label']]))
-            enwiki_context_idx = RANDOM_STATE.choice(
-                self.enwiki_dict['ans2context_idx'][e['label']],
-                p=self.enwiki_dict['ans2context_prob'][e['label']])
+            
+            wordset, enwiki_context_idx = \
+                    self.sample_wordset_and_context_idx(
+                            'obj', 'label', image_idx, idx)
+            wordsets.append(wordset)
             enwiki_context_idx_list.append(enwiki_context_idx)
+
         ret.update({
             'obj_pred/num': np.array(num_valid_data, dtype=np.int32),
             'obj_pred/labels': np.array(labels, dtype=np.int32),
@@ -134,9 +186,11 @@ class Dataset(object):
             'obj_pred/enwiki_context_len': np.take(
                 self.enwiki_dict['np_context_len'], enwiki_context_idx_list, axis=0),
         })
+
         """
         attribute_predict
         """
+
         idx_list = list(range(len(entry['attr_predict'])))
         RANDOM_STATE.shuffle(idx_list)
         idx_list = idx_list[:NUM_CONFIG['attr_pred']]
@@ -156,10 +210,35 @@ class Dataset(object):
             weights.append(weight)
             object_labels.append(e['object_label'])
             labels[i, e['labels']] = 1.0
-            rand_label = RANDOM_STATE.choice(e['labels'])
-            rand_attribute_labels.append(rand_label)
-            rand_wordset = RANDOM_STATE.choice(
-                self.ws_dict['ans2wordset'][rand_label])
+
+            if True:
+                rand_label = RANDOM_STATE.choice(e['labels'])
+                rand_attribute_labels.append(rand_label)
+                rand_wordset = RANDOM_STATE.choice(
+                    self.ws_dict['ans2wordset'][rand_label])
+            else:
+                category, task = 'attr', 'label'
+                wordset_choice_idx = \
+                        self.wordset_choice_idx["{}_{}".format(category, task)]
+                enwiki_choice_idx = \
+                        self.enwiki_choice_idx["{}_{}".format(category, task)]
+
+                wordset_choice_idxs = \
+                        wordset_choice_idx[image_id][idx]
+                enwiki_choice_idxs = \
+                        enwiki_choice_idx[image_id][idx]
+
+                random_label = e[
+                        wordset_choice_idxs % len(wordset_choice_idxs)]
+                rand_attribute_labels.append(rand_label)
+
+                wordsets = self.ws_dict['ans2wordset'][rand_label]
+                rand_wordset = wordsets[
+                        enwiki_choice_idxs % len(enwiki_choice_idxs)]
+
+                wordset_choice_idx[image_id][idx] += 1
+                enwiki_choice_idx[image_id][idx] += 1
+
             rand_wordsets.append(rand_wordset)
             wordset_labels = list(
                 set(e['labels']) & self.ws_dict['wordset2ans'][rand_wordset])
@@ -202,12 +281,13 @@ class Dataset(object):
             blanks_len.append(len(e['blank']))
             blanks[i, :blanks_len[i]] = e['blank']
             fills.append(e['fill'])
-            wordsets.append(RANDOM_STATE.choice(
-                self.ws_dict['ans2wordset'][e['fill']]))
-            enwiki_context_idx = RANDOM_STATE.choice(
-                self.enwiki_dict['ans2context_idx'][e['fill']],
-                p=self.enwiki_dict['ans2context_prob'][e['fill']])
+
+            wordset, enwiki_context_idx = \
+                    self.sample_wordset_and_context_idx(
+                            'obj', 'fill', image_idx, idx)
+            wordsets.append(wordset)
             enwiki_context_idx_list.append(enwiki_context_idx)
+
         ret.update({
             'obj_blank_fill/num': np.array(num_valid_data, dtype=np.int32),
             'obj_blank_fill/weights': np.array(weights, dtype=np.float32),
@@ -222,9 +302,11 @@ class Dataset(object):
             'obj_blank_fill/enwiki_context_len': np.take(
                 self.enwiki_dict['np_context_len'], enwiki_context_idx_list, axis=0),
         })
+
         """
         attribute_blank_fill
         """
+
         idx_list = list(range(len(entry['attr_blank_fill'])))
         RANDOM_STATE.shuffle(idx_list)
         idx_list = idx_list[:NUM_CONFIG['attr_blank_fill']]
@@ -246,12 +328,13 @@ class Dataset(object):
             blanks_len.append(len(e['blank']))
             blanks[i, :blanks_len[i]] = e['blank']
             fills.append(e['fill'])
-            wordsets.append(RANDOM_STATE.choice(
-                self.ws_dict['ans2wordset'][e['fill']]))
-            enwiki_context_idx = RANDOM_STATE.choice(
-                self.enwiki_dict['ans2context_idx'][e['fill']],
-                p=self.enwiki_dict['ans2context_prob'][e['fill']])
+
+            wordset, enwiki_context_idx = \
+                    self.sample_wordset_and_context_idx(
+                            'attr', 'fill', image_idx, idx)
+            wordsets.append(wordset)
             enwiki_context_idx_list.append(enwiki_context_idx)
+
         ret.update({
             'attr_blank_fill/num': np.array(num_valid_data, dtype=np.int32),
             'attr_blank_fill/weights': np.array(weights, dtype=np.float32),
