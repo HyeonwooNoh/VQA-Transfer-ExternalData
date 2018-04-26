@@ -81,6 +81,8 @@ class Model(object):
         self.build_attribute_blank_fill()
         self.build_object_wordset()
         self.build_attribute_wordset()
+        self.build_object_enwiki()
+        self.build_attribute_enwiki()
         """
         self.build_caption_attention()
         """
@@ -574,7 +576,7 @@ class Model(object):
         pooled_V_ft = self.mid_result['attribute_pooled_V_ft']
 
         enwiki_embed = tf.nn.embedding_lookup(  # [bs, #proposal, len, W_DIM]
-            self.l_word_map, self.batch['attr_blank_fill/enwiki_context'])
+            self.enwiki_map, self.batch['attr_blank_fill/enwiki_context'])
         enwiki_len = self.batch['attr_blank_fill/enwiki_context_len']
         enwiki_maxlen = tf.shape(enwiki_embed)[-2]
         flat_enwiki_ft = modules.encode_L(  # [bs * #proposal, L_DIM]
