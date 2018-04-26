@@ -9,9 +9,12 @@ from util import log
 
 NUM_CONFIG = {
     'obj_pred': 5,
+    'obj_att': 4,
     'attr_pred': 1,
+    'attr_att': 1,
     'attr_blank_fill': 5,
     'obj_blank_fill': 5,
+    'caption_att': 5,
 }
 
 RANDOM_STATE = np.random.RandomState(123)
@@ -75,9 +78,12 @@ class Dataset(object):
     def get_config(self):
         config = collections.namedtuple('dataset_config', [])
         config.n_obj_pred = NUM_CONFIG['obj_pred']
+        config.n_obj_att = NUM_CONFIG['obj_att']
         config.n_attr_pred = NUM_CONFIG['attr_pred']
+        config.n_attr_att = NUM_CONFIG['attr_att']
         config.n_attr_bf = NUM_CONFIG['attr_blank_fill']
         config.n_obj_bf = NUM_CONFIG['obj_blank_fill']
+        config.n_cap_att = NUM_CONFIG['caption_att']
         config.vfeat_dim = self.vfeat_dim
         config.max_box_num = self.max_box_num
         return config
@@ -179,6 +185,60 @@ class Dataset(object):
                 normal_boxes, dtype=np.float32),
         })
         """
+        object_attend
+        """
+        idx_list = list(range(len(entry['object_attend'])))
+        RANDOM_STATE.shuffle(idx_list)
+        idx_list = idx_list[:NUM_CONFIG['obj_att']]
+        num_valid_data = len(idx_list)
+        while len(idx_list) < NUM_CONFIG['obj_att']:
+            idx_list.append(idx_list[-1])
+        maxlen = max([len(entry['object_attend'][idx]['w_tokens'])
+                      for idx in idx_list])
+        att_scores, word_tokens_len = [], []
+        word_tokens = np.zeros([len(idx_list), maxlen], dtype=np.int32)
+        for i, idx in enumerate(idx_list):
+            e = entry['object_attend'][idx]
+            att_score = np.zeros([self.max_box_num], dtype=np.float32)
+            att_score[e['s_idx']] = e['s_value']
+            att_scores.append(att_score)
+            word_tokens_len.append(len(e['w_tokens']))
+            word_tokens[i, :word_tokens_len[i]] = e['w_tokens']
+        ret.update({
+            'obj_att/num': np.array(num_valid_data, dtype=np.int32),
+            'obj_att/att_scores': np.array(att_scores, dtype=np.float32),
+            'obj_att/word_tokens': word_tokens,
+            'obj_att/word_tokens_len': np.array(
+                word_tokens_len, dtype=np.int32),
+        })
+        """
+        attribute_attend
+        """
+        idx_list = list(range(len(entry['attr_attend'])))
+        RANDOM_STATE.shuffle(idx_list)
+        idx_list = idx_list[:NUM_CONFIG['attr_att']]
+        num_valid_data = len(idx_list)
+        while len(idx_list) < NUM_CONFIG['attr_att']:
+            idx_list.append(idx_list[-1])
+        maxlen = max([len(entry['attr_attend'][idx]['w_tokens'])
+                      for idx in idx_list])
+        att_scores, word_tokens_len = [], []
+        word_tokens = np.zeros([len(idx_list), maxlen], dtype=np.int32)
+        for i, idx in enumerate(idx_list):
+            e = entry['attr_attend'][idx]
+            att_score = np.zeros([self.max_box_num], dtype=np.float32)
+            att_score[e['s_idx']] = e['s_value']
+            att_scores.append(att_score)
+            word_tokens_len.append(len(e['w_tokens']))
+            word_tokens[i, :word_tokens_len[i]] = e['w_tokens']
+        ret.update({
+            'attr_att/num': np.array(num_valid_data, dtype=np.int32),
+            'attr_att/att_scores': np.array(att_scores, dtype=np.float32),
+            'attr_att/word_tokens': word_tokens,
+            'attr_att/word_tokens_len': np.array(
+                word_tokens_len, dtype=np.int32),
+        })
+        """
         object_blank_fill
         """
         idx_list = list(range(len(entry['obj_blank_fill'])))
@@ -266,6 +326,33 @@ class Dataset(object):
             'attr_blank_fill/enwiki_context_len': np.take(
                 self.enwiki_dict['np_context_len'], enwiki_context_idx_list, axis=0),
         })
+        """
+        caption_attend
+        """
+        idx_list = list(range(len(entry['caption_attend'])))
+        RANDOM_STATE.shuffle(idx_list)
+        idx_list = idx_list[:NUM_CONFIG['caption_att']]
+        num_valid_data = len(idx_list)
+        while len(idx_list) < NUM_CONFIG['caption_att']:
+            idx_list.append(idx_list[-1])
+        maxlen = max([len(entry['caption_attend'][idx]['w_tokens'])
+                      for idx in idx_list])
+        att_scores, word_tokens_len = [], []
+        word_tokens = np.zeros([len(idx_list), maxlen], dtype=np.int32)
+        for i, idx in enumerate(idx_list):
+            e = entry['caption_attend'][idx]
+            att_score = np.zeros([self.max_box_num], dtype=np.float32)
+            att_score[e['s_idx']] = e['s_value']
+            att_scores.append(att_score)
+            word_tokens_len.append(len(e['w_tokens']))
+            word_tokens[i, :word_tokens_len[i]] = e['w_tokens']
+        ret.update({
+            'cap_att/num': np.array(num_valid_data, dtype=np.int32),
+            'cap_att/att_scores': np.array(att_scores, dtype=np.float32),
+            'cap_att/word_tokens': word_tokens,
+            'cap_att/word_tokens_len': np.array(
+                word_tokens_len, dtype=np.int32),
+        })
         return ret
 
     def get_shapes(self):
@@ -291,6 +378,14 @@ class Dataset(object):
             'attr_pred/object_labels': [NUM_CONFIG['attr_pred']],
             'attr_pred/weights': [NUM_CONFIG['attr_pred'], self.max_box_num],
             'attr_pred/normal_boxes': [NUM_CONFIG['attr_pred'], 4],
+            'obj_att/num': (),
+            'obj_att/att_scores': [NUM_CONFIG['obj_att'], self.max_box_num],
+            'obj_att/word_tokens': [NUM_CONFIG['obj_att'], None],
+            'obj_att/word_tokens_len': [NUM_CONFIG['obj_att']],
+            'attr_att/num': (),
+            'attr_att/att_scores': [NUM_CONFIG['attr_att'], self.max_box_num],
+            'attr_att/word_tokens': [NUM_CONFIG['attr_att'], None],
+            'attr_att/word_tokens_len': [NUM_CONFIG['attr_att']],
             'obj_blank_fill/num': (),
             'obj_blank_fill/weights': [NUM_CONFIG['obj_blank_fill'], self.max_box_num],
             'obj_blank_fill/normal_boxes': [NUM_CONFIG['obj_blank_fill'], 4],
@@ -311,6 +406,10 @@ class Dataset(object):
             'attr_blank_fill/enwiki_context': [NUM_CONFIG['attr_blank_fill'],
                                                self.enwiki_dict['max_context_len']],
             'attr_blank_fill/enwiki_context_len': [NUM_CONFIG['attr_blank_fill']],
+            'cap_att/num': (),
+            'cap_att/att_scores': [NUM_CONFIG['caption_att'], self.max_box_num],
+            'cap_att/word_tokens': [NUM_CONFIG['caption_att'], None],
+            'cap_att/word_tokens_len': [NUM_CONFIG['caption_att']],
         }
         return ret_shapes
 
@@ -336,6 +435,14 @@ class Dataset(object):
             'attr_pred/object_labels': tf.int32,
             'attr_pred/weights': tf.float32,
             'attr_pred/normal_boxes': tf.float32,
+            'obj_att/num': tf.int32,
+            'obj_att/att_scores': tf.float32,
+            'obj_att/word_tokens': tf.int32,
+            'obj_att/word_tokens_len': tf.int32,
+            'attr_att/num': tf.int32,
+            'attr_att/att_scores': tf.float32,
+            'attr_att/word_tokens': tf.int32,
+            'attr_att/word_tokens_len': tf.int32,
             'obj_blank_fill/num': tf.int32,
             'obj_blank_fill/weights': tf.float32,
             'obj_blank_fill/normal_boxes': tf.float32,
@@ -354,6 +461,10 @@ class Dataset(object):
             'attr_blank_fill/wordsets': tf.int32,
             'attr_blank_fill/enwiki_context': tf.int32,
             'attr_blank_fill/enwiki_context_len': tf.int32,
+            'cap_att/num': tf.int32,
+            'cap_att/att_scores': tf.float32,
+            'cap_att/word_tokens': tf.int32,
+            'cap_att/word_tokens_len': tf.int32,
         }
         return ret_type
 
