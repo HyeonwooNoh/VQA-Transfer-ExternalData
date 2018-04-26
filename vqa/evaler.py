@@ -97,7 +97,6 @@ class Evaler(object):
         if self.dump_heavy_output:
             fetch_list.append(self.model.heavy_output)
         # initialize average report (put 0 to escape average over empty list)
-        avg_step_time = []
         avg_eval_report = {key: [] for key in self.model.report.keys()}
         avg_eval_report['testonly_score'] = []
 
@@ -149,9 +148,8 @@ class Evaler(object):
         result_dict['avg_eval_report'] = {
             key: np.array(avg_eval_report[key], dtype=np.float32).mean()
             for key in avg_eval_report}
-        result_dict['avg_eval_report'] = {
-            '{}_num_point'.format(key): len(avg_eval_report[key])
-            for key in avg_eval_report}
+        for key in avg_eval_report:
+            result_dict['avg_eval_report']['{}_num_point'.format(key)] = len(avg_eval_report[key])
         log.info('saving pickle file to: {}'.format(self.save_pkl))
         cPickle.dump(result_dict, open(self.save_pkl, 'wb'))
         log.info('done')
@@ -187,6 +185,7 @@ def parse_checkpoint(config):
 
     config.vocab_path = os.path.join(config.tf_record_dir, config.vocab_name)
     config.vfeat_path = os.path.join(config.tf_record_dir, config.vfeat_name)
+
 
 def main():
     parser = argparse.ArgumentParser(

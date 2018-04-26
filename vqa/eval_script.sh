@@ -7,7 +7,7 @@ path5='vqa_vlmap_answer_noc_d_qa_split_objattr_answer_3div4_genome_memft_check_a
 
 for path in $path1 $path2 $path3 $path4 $path5
 do
-    for model_num in 801 1601 2401 3201 4001 4801 5601 6401 7201
+    for model_num in 1 801 1601 2401 3201 4001 4801 5601 6401 7201
     do
         python vqa/evaler.py --checkpoint $root_dir/$path/model-$model_num --split test
     done
