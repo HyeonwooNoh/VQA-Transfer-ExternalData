@@ -17,6 +17,8 @@ class Trainer(object):
     def get_model_class(model_type='vqa'):
         if model_type == 'standard':
             from vqa.model_standard import Model
+        if model_type == 'standard_word2vec':
+            from vqa.model_standard_word2vec import Model
         else:
             raise ValueError('Unknown model_type')
         return Model

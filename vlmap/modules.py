@@ -412,7 +412,10 @@ def WordWeightEmbed(vocab, word_weight_dir=None, weight_name='v_word',
         return embed_map
 
 
-def LearnGloVe(vocab, scope='LearnGloVe', reuse=tf.AUTO_REUSE):
+def LearnGloVe(
+        vocab, scope='LearnGloVe',
+        reuse=tf.AUTO_REUSE,
+        learnable=True):
     with tf.variable_scope(scope, reuse=reuse) as scope:
         glove_vocab = json.load(open(GLOVE_VOCAB_PATH, 'r'))
         with h5py.File(GLOVE_EMBEDDING_PATH, 'r') as f:
@@ -423,10 +426,12 @@ def LearnGloVe(vocab, scope='LearnGloVe', reuse=tf.AUTO_REUSE):
                     glove_vocab['dict'][w] < glove_param.shape[0]:
                 weights[i, :] = glove_param[glove_vocab['dict'][w], :]
             else: pass  # initialize to zero
-        init = tf.constant_initializer(weights)
-        embed_map = tf.get_variable(
-            name='embed_map', shape=[len(vocab['vocab']), 300],
-            initializer=init)
+
+        embed_map = tf.constant_initializer(weights)
+        if learnable:
+            embed_map = tf.get_variable(
+                name='embed_map', shape=[len(vocab['vocab']), 300],
+                initializer=embed_map)
         return embed_map
 
 

@@ -1,6 +1,7 @@
 def get_model_types():
     model_types = [
-        'vqa', 'standard', 'standard_testmask',
+        'vqa',
+        'standard', 'standard_testmask', 'standard_word2vec',
         'vlmap_only', 'vlmap_finetune', 'vlmap_answer',
         'vlmap_answer2',
         'vlmap_answer_noc',
@@ -15,6 +16,8 @@ def get_model_class(model_type='vqa'):
         from vqa.model_vqa import Model
     elif model_type == 'standard':
         from vqa.model_standard import Model
+    elif model_type == 'standard_word2vec':
+        from vqa.model_standard_word2vec import Model
     elif model_type == 'standard_testmask':
         from vqa.model_standard_testmask import Model
     elif model_type == 'vlmap_only':
