@@ -19,7 +19,7 @@ parser.add_argument('--dir_name', type=str,
                     '/memft_all_new_vocab50_obj3000_attr1000_maxlen10', help=' ')
 config = parser.parse_args()
 
-config.bookcorpus_paths = glob.glob(os.path.join(config.bookcorpus_dir, 'books_large_*'))
+config.bookcorpus_paths = glob.glob(os.path.join(config.bookcorpus_dir, '*.txt'))
 
 config.answer_dict_path = os.path.join(config.dir_name, 'answer_dict.pkl')
 answer_dict = cPickle.load(open(config.answer_dict_path, 'rb'))
