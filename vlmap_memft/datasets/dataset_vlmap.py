@@ -2,6 +2,7 @@ import cPickle
 import h5py
 import os
 import numpy as np
+import multiprocessing
 import tensorflow as tf
 from collections import namedtuple, defaultdict
 
@@ -14,6 +15,7 @@ NUM_CONFIG = {
     'obj_blank_fill': 5,
 }
 
+CPU_COUNT = multiprocessing.cpu_count()
 RANDOM_STATE = np.random.RandomState(123)
 
 
@@ -489,7 +491,7 @@ def create_ops(batch_size,
         padded_shapes=dataset.get_shapes()
     )
 
-    tf_dataset = tf_dataset.prefetch(10)
+    tf_dataset = tf_dataset.prefetch(max(CPU_COUNT-5, 0) or None)
 
     if is_train:
         tf_dataset = tf_dataset.repeat(1000)  # repeat 1000 epoch
