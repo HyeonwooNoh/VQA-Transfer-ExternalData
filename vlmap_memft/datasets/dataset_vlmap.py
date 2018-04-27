@@ -73,16 +73,17 @@ class Dataset(object):
             log.warn('loading {} features done ..'.format(split))
 
         self.wordset_choice_idx = {
-                'obj_label': defaultdict(lambda: defaultdict(int)),
-                'obj_fill': defaultdict(lambda: defaultdict(int)),
-                'attr_label': defaultdict(lambda: defaultdict(int)),
-                'attr_fill': defaultdict(lambda: defaultdict(int)),
+            'obj_label': defaultdict(lambda: defaultdict(int)),
+            'obj_fill': defaultdict(lambda: defaultdict(int)),
+            'attr_label': defaultdict(lambda: defaultdict(int)),
+            'attr_fill': defaultdict(lambda: defaultdict(int)),
+        }
 
-        self.enwiki_choice_idx = \
-                'obj_label': defaultdict(lambda: defaultdict(int)),
-                'obj_fill': defaultdict(lambda: defaultdict(int)),
-                'attr_label': defaultdict(lambda: defaultdict(int)),
-                'attr_fill': defaultdict(lambda: defaultdict(int)),
+        self.enwiki_choice_idx = {
+            'obj_label': defaultdict(lambda: defaultdict(int)),
+            'obj_fill': defaultdict(lambda: defaultdict(int)),
+            'attr_label': defaultdict(lambda: defaultdict(int)),
+            'attr_fill': defaultdict(lambda: defaultdict(int)),
         }
 
         log.info('dataset {} {} init done'.format(name, split))

@@ -21,6 +21,8 @@ data/GloVe
 data/wikitext2
 data/enwiki
 data/preprocessed
+data/BookCorpus
+data/script/BookCorpus
 
 # Training results
 train_dir
