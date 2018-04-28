@@ -72,19 +72,8 @@ class Dataset(object):
             self.spatial_features = np.array(f.get('spatial_features'))
             log.warn('loading {} features done ..'.format(split))
 
-        self.wordset_choice_idx = {
-            'obj_label': defaultdict(lambda: defaultdict(int)),
-            'obj_fill': defaultdict(lambda: defaultdict(int)),
-            'attr_label': defaultdict(lambda: defaultdict(int)),
-            'attr_fill': defaultdict(lambda: defaultdict(int)),
-        }
-
-        self.enwiki_choice_idx = {
-            'obj_label': defaultdict(lambda: defaultdict(int)),
-            'obj_fill': defaultdict(lambda: defaultdict(int)),
-            'attr_label': defaultdict(lambda: defaultdict(int)),
-            'attr_fill': defaultdict(lambda: defaultdict(int)),
-        }
+        self.wordset_choice_idx = defaultdict(int)
+        self.enwiki_choice_idx = defaultdict(int)
 
         log.info('dataset {} {} init done'.format(name, split))
 
@@ -101,28 +90,25 @@ class Dataset(object):
     def sample_wordset_and_context_idx(self, e, category, task, image_idx, idx):
         # category: obj, attr, task: label, fill
 
-        wordsets = self.ws_dict['ans2shuffled_wordset'][e[task]]
-        enwiki_context_idxs = self.enwiki_dict['ans2shuffled_context_idx'][e[task]]
+        label = e[task]
 
-        wordset_choice_idx = \
-            self.wordset_choice_idx["{}_{}".format(category, task)]
-        enwiki_choice_idx = \
-            self.enwiki_choice_idx["{}_{}".format(category, task)]
+        wordsets = self.ws_dict['ans2shuffled_wordset'][label]
+        enwiki_context_idxs = self.enwiki_dict['ans2shuffled_context_idx'][label]
 
-        wordset_choice_idxs = wordset_choice_idx[image_idx][idx]
-        enwiki_choice_idxs = enwiki_choice_idx[image_idx][idx]
+        wordset_choice_idx = self.wordset_choice_idx[label]
+        enwiki_choice_idx = self.enwiki_choice_idx[label]
 
         wordset = wordsets[
-            wordset_choice_idxs % len(wordsets)]
+            wordset_choice_idx % len(wordsets)]
         enwiki_context_idx = enwiki_context_idxs[
-            enwiki_choice_idxs % len(enwiki_context_idxs)]
+            enwiki_choice_idx % len(enwiki_context_idxs)]
 
-        wordset_choice_idx[image_idx][idx] += 1
-        if wordset_choice_idx[image_idx][idx] >= len(wordsets):
-            wordset_choice_idx[image_idx][idx] = 0
-        enwiki_choice_idx[image_idx][idx] += 1
-        if enwiki_choice_idx[image_idx][idx] >= len(enwiki_context_idxs):
-            enwiki_choice_idx[image_idx][idx] = 0
+        self.wordset_choice_idx[label] += 1
+        if self.wordset_choice_idx[label] >= len(wordsets):
+            self.wordset_choice_idx[label] = 0
+        self.enwiki_choice_idx[label] += 1
+        if self.enwiki_choice_idx[label] >= len(enwiki_context_idxs):
+            self.enwiki_choice_idx[label] = 0
 
         return wordset, enwiki_context_idx
 
