@@ -105,9 +105,11 @@ class Dataset(object):
 
         self.wordset_choice_idx[label] += 1
         if self.wordset_choice_idx[label] >= len(wordsets):
+            RANDOM_STATE.shuffle(self.ws_dict['ans2shuffled_wordset'][label])
             self.wordset_choice_idx[label] = 0
         self.enwiki_choice_idx[label] += 1
         if self.enwiki_choice_idx[label] >= len(enwiki_context_idxs):
+            RANDOM_STATE.shuffle(self.enwiki_dict['ans2shuffled_context_idx'][label])
             self.enwiki_choice_idx[label] = 0
 
         return wordset, enwiki_context_idx
@@ -131,12 +133,9 @@ class Dataset(object):
         """
         object_blank_fill
         """
-        entry_len = len(entry['obj_blank_fill'])
-        idx_list = []
-        for _ in range(min(entry_len, NUM_CONFIG['obj_blank_fill'])):
-            idx_list.append(self.index_list_idx['obj_blank_fill'][image_idx])
-            self.index_list_idx['obj_blank_fill'][image_idx] = \
-                (self.index_list_idx['obj_blank_fill'][image_idx] + 1) % entry_len
+        idx_list = list(range(len(entry['obj_blank_fill'])))
+        RANDOM_STATE.shuffle(idx_list)
+        idx_list = idx_list[:NUM_CONFIG['obj_blank_fill']]
         num_valid_data = len(idx_list)
         while len(idx_list) < NUM_CONFIG['obj_blank_fill']:
             idx_list.append(idx_list[-1])
@@ -180,12 +179,10 @@ class Dataset(object):
         """
         attribute_blank_fill
         """
-        entry_len = len(entry['attr_blank_fill'])
-        idx_list = []
-        for _ in range(min(entry_len, NUM_CONFIG['attr_blank_fill'])):
-            idx_list.append(self.index_list_idx['attr_blank_fill'][image_idx])
-            self.index_list_idx['attr_blank_fill'][image_idx] = \
-                (self.index_list_idx['attr_blank_fill'][image_idx] + 1) % entry_len
+
+        idx_list = list(range(len(entry['attr_blank_fill'])))
+        RANDOM_STATE.shuffle(idx_list)
+        idx_list = idx_list[:NUM_CONFIG['attr_blank_fill']]
         num_valid_data = len(idx_list)
         while len(idx_list) < NUM_CONFIG['attr_blank_fill']:
             idx_list.append(idx_list[-1])
