@@ -9,8 +9,6 @@ from collections import namedtuple, defaultdict
 from util import log
 
 NUM_CONFIG = {
-    'obj_pred': 5,
-    'attr_pred': 1,
     'attr_blank_fill': 5,
     'obj_blank_fill': 5,
 }
@@ -74,13 +72,15 @@ class Dataset(object):
 
         self.wordset_choice_idx = defaultdict(int)
         self.enwiki_choice_idx = defaultdict(int)
+        self.index_list_idx = {
+            'obj_blank_fill': defaultdict(int),
+            'attr_blank_fill': defaultdict(int),
+        }
 
         log.info('dataset {} {} init done'.format(name, split))
 
     def get_config(self):
         config = namedtuple('dataset_config', [])
-        config.n_obj_pred = NUM_CONFIG['obj_pred']
-        config.n_attr_pred = NUM_CONFIG['attr_pred']
         config.n_attr_bf = NUM_CONFIG['attr_blank_fill']
         config.n_obj_bf = NUM_CONFIG['obj_blank_fill']
         config.vfeat_dim = self.vfeat_dim
@@ -129,97 +129,14 @@ class Dataset(object):
 
         entry = self.processed[image_id]
         """
-        object_predict
-        """
-        idx_list = list(range(len(entry['object_predict'])))
-        RANDOM_STATE.shuffle(idx_list)
-        idx_list = idx_list[:NUM_CONFIG['obj_pred']]
-        num_valid_data = len(idx_list)
-        while len(idx_list) < NUM_CONFIG['obj_pred']:
-            idx_list.append(idx_list[-1])
-        labels, weights, normal_boxes, wordsets = [], [], [], []
-        enwiki_context_idx_list = []
-        for idx in idx_list:
-            e = entry['object_predict'][idx]
-            weight = np.zeros([self.max_box_num], dtype=np.float32)
-            weight[e['p_idx']] = e['p_weight']
-            weights.append(weight)
-            labels.append(e['label'])
-            normal_boxes.append(e['normal_box'])
-
-            wordset, enwiki_context_idx = \
-                self.sample_wordset_and_context_idx(
-                    e, 'obj', 'label', image_idx, idx)
-            wordsets.append(wordset)
-            enwiki_context_idx_list.append(enwiki_context_idx)
-
-        ret.update({
-            'obj_pred/num': np.array(num_valid_data, dtype=np.int32),
-            'obj_pred/labels': np.array(labels, dtype=np.int32),
-            'obj_pred/weights': np.array(weights, dtype=np.float32),
-            'obj_pred/normal_boxes': np.array(
-                normal_boxes, dtype=np.float32),
-            'obj_pred/wordsets': np.array(wordsets, dtype=np.int32),
-            'obj_pred/enwiki_context': np.take(
-                self.enwiki_dict['np_context'], enwiki_context_idx_list, axis=0),
-            'obj_pred/enwiki_context_len': np.take(
-                self.enwiki_dict['np_context_len'], enwiki_context_idx_list, axis=0),
-        })
-
-        """
-        attribute_predict
-        """
-
-        idx_list = list(range(len(entry['attr_predict'])))
-        RANDOM_STATE.shuffle(idx_list)
-        idx_list = idx_list[:NUM_CONFIG['attr_pred']]
-        num_valid_data = len(idx_list)
-        while len(idx_list) < NUM_CONFIG['attr_pred']:
-            idx_list.append(idx_list[-1])
-        object_labels, weights, normal_boxes = [], [], []
-        labels = np.zeros([len(idx_list), self.num_answers], dtype=np.float32)
-        rand_attribute_labels = []
-        rand_wordsets = []
-        rand_wordset_labels = np.zeros([len(idx_list), self.num_answers],
-                                       dtype=np.float32)
-        for i, idx in enumerate(idx_list):
-            e = entry['attr_predict'][idx]
-            weight = np.zeros([self.max_box_num], dtype=np.float32)
-            weight[e['p_idx']] = e['p_weight']
-            weights.append(weight)
-            object_labels.append(e['object_label'])
-            labels[i, e['labels']] = 1.0
-
-            if True:
-                rand_label = RANDOM_STATE.choice(e['labels'])
-                rand_attribute_labels.append(rand_label)
-                rand_wordset = RANDOM_STATE.choice(
-                    self.ws_dict['ans2wordset'][rand_label])
-
-            rand_wordsets.append(rand_wordset)
-            wordset_labels = list(
-                set(e['labels']) & self.ws_dict['wordset2ans'][rand_wordset])
-            rand_wordset_labels[i, wordset_labels] = 1.0
-            normal_boxes.append(e['normal_box'])
-        ret.update({
-            'attr_pred/num': np.array(num_valid_data, dtype=np.int32),
-            'attr_pred/labels': labels,
-            'attr_pred/random_attribute_labels': np.array(
-                rand_attribute_labels, dtype=np.int32),
-            'attr_pred/random_wordsets': np.array(rand_wordsets, dtype=np.int32),
-            'attr_pred/random_wordset_labels': rand_wordset_labels,
-            'attr_pred/object_labels': np.array(
-                object_labels, dtype=np.int32),
-            'attr_pred/weights': np.array(weights, dtype=np.float32),
-            'attr_pred/normal_boxes': np.array(
-                normal_boxes, dtype=np.float32),
-        })
-        """
         object_blank_fill
         """
-        idx_list = list(range(len(entry['obj_blank_fill'])))
-        RANDOM_STATE.shuffle(idx_list)
-        idx_list = idx_list[:NUM_CONFIG['obj_blank_fill']]
+        entry_len = len(entry['obj_blank_fill'])
+        idx_list = []
+        for _ in range(min(entry_len, NUM_CONFIG['obj_blank_fill'])):
+            idx_list.append(self.index_list_idx['obj_blank_fill'][image_idx])
+            self.index_list_idx['obj_blank_fill'][image_idx] = \
+                (self.index_list_idx['obj_blank_fill'][image_idx] + 1) % entry_len
         num_valid_data = len(idx_list)
         while len(idx_list) < NUM_CONFIG['obj_blank_fill']:
             idx_list.append(idx_list[-1])
@@ -263,10 +180,12 @@ class Dataset(object):
         """
         attribute_blank_fill
         """
-
-        idx_list = list(range(len(entry['attr_blank_fill'])))
-        RANDOM_STATE.shuffle(idx_list)
-        idx_list = idx_list[:NUM_CONFIG['attr_blank_fill']]
+        entry_len = len(entry['attr_blank_fill'])
+        idx_list = []
+        for _ in range(min(entry_len, NUM_CONFIG['attr_blank_fill'])):
+            idx_list.append(self.index_list_idx['attr_blank_fill'][image_idx])
+            self.index_list_idx['attr_blank_fill'][image_idx] = \
+                (self.index_list_idx['attr_blank_fill'][image_idx] + 1) % entry_len
         num_valid_data = len(idx_list)
         while len(idx_list) < NUM_CONFIG['attr_blank_fill']:
             idx_list.append(idx_list[-1])
@@ -315,22 +234,6 @@ class Dataset(object):
             'spatial_ft': [self.max_box_num, 6],
             'normal_boxes': [self.max_box_num, 4],
             'num_boxes': (),
-            'obj_pred/num': (),
-            'obj_pred/labels': [NUM_CONFIG['obj_pred']],
-            'obj_pred/weights': [NUM_CONFIG['obj_pred'], self.max_box_num],
-            'obj_pred/normal_boxes': [NUM_CONFIG['obj_pred'], 4],
-            'obj_pred/wordsets': [NUM_CONFIG['obj_pred']],
-            'obj_pred/enwiki_context': [NUM_CONFIG['obj_pred'],
-                                        self.enwiki_dict['max_context_len']],
-            'obj_pred/enwiki_context_len': [NUM_CONFIG['obj_pred']],
-            'attr_pred/num': (),
-            'attr_pred/labels': [NUM_CONFIG['attr_pred'], self.num_answers],
-            'attr_pred/random_attribute_labels': [NUM_CONFIG['attr_pred']],
-            'attr_pred/random_wordsets': [NUM_CONFIG['attr_pred']],
-            'attr_pred/random_wordset_labels': [NUM_CONFIG['attr_pred'], self.num_answers],
-            'attr_pred/object_labels': [NUM_CONFIG['attr_pred']],
-            'attr_pred/weights': [NUM_CONFIG['attr_pred'], self.max_box_num],
-            'attr_pred/normal_boxes': [NUM_CONFIG['attr_pred'], 4],
             'obj_blank_fill/num': (),
             'obj_blank_fill/weights': [NUM_CONFIG['obj_blank_fill'], self.max_box_num],
             'obj_blank_fill/normal_boxes': [NUM_CONFIG['obj_blank_fill'], 4],
@@ -361,21 +264,6 @@ class Dataset(object):
             'spatial_ft': tf.float32,
             'normal_boxes': tf.float32,
             'num_boxes': tf.int32,
-            'obj_pred/num': tf.int32,
-            'obj_pred/labels': tf.int32,
-            'obj_pred/weights': tf.float32,
-            'obj_pred/normal_boxes': tf.float32,
-            'obj_pred/wordsets': tf.int32,
-            'obj_pred/enwiki_context': tf.int32,
-            'obj_pred/enwiki_context_len': tf.int32,
-            'attr_pred/num': tf.int32,
-            'attr_pred/labels': tf.float32,
-            'attr_pred/random_attribute_labels': tf.int32,
-            'attr_pred/random_wordsets': tf.int32,
-            'attr_pred/random_wordset_labels': tf.float32,
-            'attr_pred/object_labels': tf.int32,
-            'attr_pred/weights': tf.float32,
-            'attr_pred/normal_boxes': tf.float32,
             'obj_blank_fill/num': tf.int32,
             'obj_blank_fill/weights': tf.float32,
             'obj_blank_fill/normal_boxes': tf.float32,
