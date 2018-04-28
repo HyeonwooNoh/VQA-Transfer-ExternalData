@@ -7,7 +7,7 @@ import tensorflow as tf
 from tqdm import tqdm
 
 from util import log
-from vlmap_memft.datasets.dataset_vlmap import Dataset, create_ops
+from vlmap_memft.datasets.dataset_vlmap_sample import Dataset, create_ops
 
 
 class Trainer(object):
