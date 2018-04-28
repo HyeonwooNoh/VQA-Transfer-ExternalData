@@ -268,7 +268,7 @@ class Model(object):
 
             # TODO(taehoon): multi word average or something
             output_glove = modules.LearnGloVe(
-                    self.answer_dict['vocab'], learnable=False)
+                self.answer_dict['vocab'], learnable=False)
             logit = tf.matmul(joint, output_glove)
 
         self.output['logit'] = logit

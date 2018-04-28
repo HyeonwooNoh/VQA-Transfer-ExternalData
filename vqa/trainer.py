@@ -327,6 +327,7 @@ def main():
     parser.add_argument('--tf_record_dir', type=str,
                         default='data/preprocessed/vqa_v2'
                         '/qa_split_objattr_genome_memft_check_all_answer_thres1_3000_thres2_50'
+                        #'/qa_split_objattr_answer_3div4_genome_memft_check_all_answer_thres1_50000_thres2_-1'
                         '/tf_record_memft', help=' ')
     parser.add_argument('--vfeat_name', type=str,
                         default='vfeat_bottomup_36_my.hdf5', help=' ')
