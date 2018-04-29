@@ -23,8 +23,8 @@ parser.add_argument('--max_answer_len', type=int, default=3, help=' ')
 config = parser.parse_args()
 
 # TODO(taehoon)
-catpion_dic = json.load(open(config.caption_dic_path))
-catpion_cap = json.load(open(config.caption_cap_path))
+caption_dic = json.load(open(config.caption_dic_path))
+caption_cap = json.load(open(config.caption_cap_path))
 
 def makedirs(path):
     path = str(path)
@@ -37,7 +37,7 @@ def makedirs(path):
 makedirs(config.caption_split_dir)
 
 caption_split = collections.defaultdict(list)
-for info in catpion_dic['images']:
+for info in caption_dic['images']:
     caption_split[info['split']].append(info['id'])
 
 caption_split_path = os.path.join(
@@ -46,13 +46,59 @@ caption_split_path = os.path.join(
 with open(caption_split_path, 'w') as f:
     json.dump(caption_split, f)
 
+# {'test': xxx, 'train': xxx }
+caption_idxs = collections.defaultdict(list) 
+
+# separate out indexes for each of the provided splits
+for key in caption_split:
+    for ix in range(len(caption_dic['images'])):
+        img = caption_dic['images'][ix]
+        if img['split'] == key:
+            caption_idxs[key].append(ix)
+
 for key in caption_split:
     log.info("# of {}: {}".format(key, len(caption_split[key])))
-import ipdb; ipdb.set_trace() 
+
+noc_object = [
+        'bus', 'bottle', 'couch', 'microwave',
+        'pizza', 'racket', 'suitcase', 'zebra']
+noc_index = [6, 40, 58, 69, 54, 39, 29, 23]
+
+noc_word_map = {
+        'bus': ['bus', 'busses'],
+        'bottle': ['bottle', 'bottles'],
+        'couch': ['couch', 'couches', 'sofa', 'sofas'],
+        'microwave': ['microwave', 'microwaves'],
+        'pizza': ['pizza', 'pizzas'],
+        'racket': ['racket', 'rackets', 'racquet', 'racquets'],
+        'suitcase': ['luggage', 'luggages', 'suitcase', 'suitcases'],
+        'zebra': ['zebra', 'zebras']
+}
+
+for idx in caption_idxs['test']:
+    captions = caption_cap[idx]
+    if any((cap in noc_object) for cap in captions for word in cap):
+        print(captions)
+
+#"object_split.json"
 
 #################
 # Build vocab
 #################
+
+itow = caption_dic['ix_to_word']
+import ipdb; ipdb.set_trace() 
+wtoi = {w:i for i,w in itow.items()}
+# word to detection
+wtod = {w:i+1 for w,i in caption_dic['wtod'].items()}
+dtoi = {w:i+1 for i,w in enumerate(wtod.keys())} # detection to index
+itod = {i+1:w for i,w in enumerate(wtod.keys())}
+wtol = info['wtol']
+ltow = {l:w for w,l in wtol.items()}
+vocab_size = len(itow) + 1 # since it start from 1
+print('vocab size is ', vocab_size)
+
+import ipdb; ipdb.set_trace() 
 
 log.info('loading merged_annotations..')
 merged_anno_path = os.path.join(config.caption_split_dir, 'merged_annotations.pkl')

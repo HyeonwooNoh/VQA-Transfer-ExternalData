@@ -11,6 +11,22 @@ from util import log
 from vqa import importer
 from vqa.datasets import input_ops_vqa_tf_record_memft as input_ops_vqa
 
+noc_object = [
+        'bus', 'bottle', 'couch', 'microwave',
+        'pizza', 'racket', 'suitcase', 'zebra']
+noc_index = [6, 40, 58, 69, 54, 39, 29, 23]
+
+noc_word_map = {
+        'bus': ['bus', 'busses'],
+        'bottle': ['bottle', 'bottles'],
+        'couch': ['couch', 'couches', 'sofa', 'sofas'],
+        'microwave': ['microwave', 'microwaves'],
+        'pizza': ['pizza', 'pizzas'],
+        'racket': ['racket', 'rackets', 'racquet', 'racquets'],
+        'suitcase': ['luggage', 'luggages', 'suitcase', 'suitcases'],
+        'zebra': ['zebra', 'zebras']
+}
+
 
 class Trainer(object):
 
