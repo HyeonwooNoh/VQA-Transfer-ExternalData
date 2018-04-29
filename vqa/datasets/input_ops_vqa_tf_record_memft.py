@@ -14,6 +14,7 @@ def create(batch_size,
     with h5py.File(tf_record_info_path, 'r') as f:
         num_answers = int(f['data_info']['num_answers'].value)
 
+    import ipdb; ipdb.set_trace() 
     tf_record_path = os.path.join(tf_record_dir, split, '{}-*'.format(split))
     with tf.device('/cpu:0'):
         files = tf.data.Dataset.list_files(tf_record_path)
