@@ -15,7 +15,7 @@ ENC_I_PARAM_PATH = 'data/nets/resnet_v1_50.ckpt'
 
 class Model(object):
 
-    def __init__(self, batch, config, is_train=True):
+    def __init__(self, batch, config, is_train=True, image_features=None):
         self.batch = batch
         self.config = config
         self.image_dir = config.image_dir
@@ -53,19 +53,27 @@ class Model(object):
         self.answer_exist_mask = modules.AnswerExistMask(
             self.answer_dict, self.word_weight_dir)
 
-        log.infov('loading image features...')
-        with h5py.File(config.vfeat_path, 'r') as f:
-            self.features = np.array(f.get('image_features'))
-            log.infov('feature done')
-            self.spatials = np.array(f.get('spatial_features'))
-            log.infov('spatials done')
-            self.normal_boxes = np.array(f.get('normal_boxes'))
-            log.infov('normal_boxes done')
-            self.num_boxes = np.array(f.get('num_boxes'))
-            log.infov('num_boxes done')
-            self.max_box_num = int(f['data_info']['max_box_num'].value)
-            self.vfeat_dim = int(f['data_info']['vfeat_dim'].value)
-        log.infov('done')
+        if image_features is None:
+            log.infov('loading image features...')
+            with h5py.File(config.vfeat_path, 'r') as f:
+                self.features = np.array(f.get('image_features'))
+                log.infov('feature done')
+                self.spatials = np.array(f.get('spatial_features'))
+                log.infov('spatials done')
+                self.normal_boxes = np.array(f.get('normal_boxes'))
+                log.infov('normal_boxes done')
+                self.num_boxes = np.array(f.get('num_boxes'))
+                log.infov('num_boxes done')
+                self.max_box_num = int(f['data_info']['max_box_num'].value)
+                self.vfeat_dim = int(f['data_info']['vfeat_dim'].value)
+            log.infov('done')
+        else:
+            self.features = image_features['features']
+            self.spatials = image_features['spatials']
+            self.normal_boxes = image_features['normal_boxes']
+            self.num_boxes = image_features['num_boxes']
+            self.max_box_num = image_features['max_box_num']
+            self.vfeat_dim = image_features['v_feat_dim']
 
         self.build()
 
@@ -261,7 +269,7 @@ class Model(object):
                 activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_fc')
             joint = tf.nn.dropout(joint, 0.5)
 
-            #logit = modules.fc_layer(
+            # logit = modules.fc_layer(
             #    joint, self.num_answer,
             #    use_bias=True, use_bn=False, use_ln=False,
             #    activation_fn=None, is_training=self.is_train, scope='classifier')
@@ -288,6 +296,22 @@ class Model(object):
             all_score = tf.reduce_sum(one_hot_pred * answer_target, axis=-1)
             max_train_score = tf.reduce_max(
                 answer_target * self.train_answer_mask, axis=-1)
+            test_obj_score = tf.reduce_sum(
+                one_hot_pred * answer_target * self.test_answer_mask *
+                self.obj_answer_mask, axis=-1)
+            test_obj_max_score = tf.reduce_max(
+                answer_target * self.test_answer_mask *
+                self.obj_answer_mask, axis=-1)
+            test_attr_score = tf.reduce_sum(
+                one_hot_pred * answer_target * self.test_answer_mask *
+                self.attr_answer_mask, axis=-1)
+            test_attr_max_score = tf.reduce_max(
+                answer_target * self.test_answer_mask *
+                self.attr_answer_mask, axis=-1)
+            self.output['test_obj_score'] = test_obj_score
+            self.output['test_obj_max_score'] = test_obj_max_score
+            self.output['test_attr_score'] = test_attr_score
+            self.output['test_attr_max_score'] = test_attr_max_score
             self.output['all_score'] = all_score
             self.output['max_train_score'] = max_train_score
 
@@ -299,12 +323,8 @@ class Model(object):
             test_acc = tf.reduce_mean(
                 tf.reduce_sum(one_hot_pred * answer_target * self.test_answer_mask,
                               axis=-1))
-            test_obj_acc = tf.reduce_mean(
-                tf.reduce_sum(one_hot_pred * answer_target * self.test_answer_mask *
-                              self.obj_answer_mask, axis=-1))
-            test_attr_acc = tf.reduce_mean(
-                tf.reduce_sum(one_hot_pred * answer_target * self.test_answer_mask *
-                              self.attr_answer_mask, axis=-1))
+            test_obj_acc = tf.reduce_mean(test_obj_score)
+            test_attr_acc = tf.reduce_mean(test_attr_score)
             train_exist_acc = tf.reduce_mean(
                 tf.reduce_sum(one_hot_pred * answer_target * self.answer_exist_mask *
                               self.train_answer_mask,
@@ -314,12 +334,8 @@ class Model(object):
             max_train_exist_acc = tf.reduce_mean(
                 tf.reduce_max(answer_target * self.answer_exist_mask *
                               self.train_answer_mask, axis=-1))
-            test_obj_max_acc = tf.reduce_mean(
-                tf.reduce_max(answer_target * self.test_answer_mask *
-                              self.obj_answer_mask, axis=-1))
-            test_attr_max_acc = tf.reduce_mean(
-                tf.reduce_max(answer_target * self.test_answer_mask *
-                              self.attr_answer_mask, axis=-1))
+            test_obj_max_acc = tf.reduce_mean(test_obj_max_score)
+            test_attr_max_acc = tf.reduce_mean(test_attr_max_score)
             test_max_answer_acc = tf.reduce_mean(
                 tf.reduce_max(answer_target * self.test_answer_mask, axis=-1))
             test_max_exist_answer_acc = tf.reduce_mean(

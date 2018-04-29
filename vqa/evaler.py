@@ -19,7 +19,7 @@ class Evaler(object):
     def get_model_class(model_type='vqa'):
         return importer.get_model_class(model_type)
 
-    def __init__(self, config):
+    def __init__(self, config, set_checkpoint=True, image_features=None):
         self.config = config
         self.split = config.split
         self.max_iter = config.max_iter
@@ -27,14 +27,6 @@ class Evaler(object):
 
         self.vfeat_path = config.vfeat_path
         self.tf_record_dir = config.tf_record_dir
-
-        self.checkpoint = config.checkpoint
-        self.eval_dir = config.checkpoint + '_eval_{}_{}'.format(
-            self.split, time.strftime("%Y%m%d-%H%M%S"))
-        if not os.path.exists(self.eval_dir): os.makedirs(self.eval_dir)
-        log.infov("Eval Dir: %s", self.eval_dir)
-        self.save_hdf5 = os.path.join(self.eval_dir, 'results.hdf5')
-        self.save_pkl = os.path.join(self.eval_dir, 'results.pkl')
 
         # Input
         self.batch_size = config.batch_size
@@ -49,7 +41,8 @@ class Evaler(object):
         # Model
         Model = self.get_model_class(config.model_type)
         log.infov('using model class: {}'.format(Model))
-        self.model = Model(self.batch, config, is_train=False)
+        self.model = Model(self.batch, config, is_train=False,
+                           image_features=image_features)
 
         trainable_vars = tf.trainable_variables()
         train_vars = self.model.filter_train_vars(trainable_vars)
@@ -65,10 +58,24 @@ class Evaler(object):
         self.session = tf.Session(config=session_config)
 
         self.checkpoint_loader = tf.train.Saver(max_to_keep=1)
-        self.ckpt_path = config.checkpoint
-        if self.ckpt_path is not None:
-            log.info('Checkpoint path: {}'.format(self.ckpt_path))
-            self.checkpoint_loader.restore(self.session, self.ckpt_path)
+
+        if set_checkpoint:
+            self.set_eval_dir(config)
+            self.load_checkpoint(config)
+
+    def set_eval_dir(self, config):
+        self.checkpoint = config.checkpoint
+        self.eval_dir = config.checkpoint + '_eval_{}_{}'.format(
+            self.split, time.strftime("%Y%m%d-%H%M%S"))
+        if not os.path.exists(self.eval_dir): os.makedirs(self.eval_dir)
+        log.infov("Eval Dir: %s", self.eval_dir)
+        self.save_hdf5 = os.path.join(self.eval_dir, 'results.hdf5')
+        self.save_pkl = os.path.join(self.eval_dir, 'results.pkl')
+
+    def load_checkpoint(self, config):
+        if config.checkpoint is not None:
+            log.info('Checkpoint path: {}'.format(config.checkpoint))
+            self.checkpoint_loader.restore(self.session, config.checkpoint)
             log.info('Loaded the checkpoint')
         log.warn('Evaluation initialization is done')
 
@@ -99,6 +106,8 @@ class Evaler(object):
         # initialize average report (put 0 to escape average over empty list)
         avg_eval_report = {key: [] for key in self.model.report.keys()}
         avg_eval_report['testonly_score'] = []
+        avg_eval_report['test_attr_only_score'] = []
+        avg_eval_report['test_obj_only_score'] = []
 
         heavy_outputs = {key: [] for key in self.model.heavy_output.keys()}
         heavy_output_idx = 0
@@ -127,6 +136,10 @@ class Evaler(object):
 
                 score = outputs['all_score'][b]
                 max_train_score = outputs['max_train_score'][b]
+                test_obj_score = outputs['test_obj_score'][b]
+                test_obj_max_score = outputs['test_obj_max_score'][b]
+                test_attr_score = outputs['test_attr_score'][b]
+                test_attr_max_score = outputs['test_attr_max_score'][b]
 
                 result_dict['qid2result'][id] = {
                     'image_id': image_id,
@@ -134,6 +147,10 @@ class Evaler(object):
                     'question': question,
                     'score': score,
                     'max_train_score': max_train_score,
+                    'test_obj_score': test_obj_score,
+                    'test_obj_max_score': test_obj_max_score,
+                    'test_attr_score': test_attr_score,
+                    'test_attr_max_score': test_attr_max_score,
                 }
                 if self.dump_heavy_output:
                     result_dict['qid2result'][id]['heavy_output_idx'] = heavy_output_idx
@@ -142,6 +159,10 @@ class Evaler(object):
                     heavy_output_idx += 1
                 if max_train_score <= 0:
                     avg_eval_report['testonly_score'].append(score)
+                    if test_obj_max_score <= 0:
+                        avg_eval_report['test_attr_only_score'].append(test_attr_score)
+                    if test_attr_max_score <= 0:
+                        avg_eval_report['test_obj_only_score'].append(test_obj_score)
                 for key in reports:
                     avg_eval_report[key].append(reports[key])
 
