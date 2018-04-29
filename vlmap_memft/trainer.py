@@ -7,7 +7,7 @@ import tensorflow as tf
 from tqdm import tqdm
 
 from util import log
-from vlmap_memft.datasets.dataset_vlmap_sample import Dataset, create_ops
+from vlmap_memft.datasets.dataset_vlmap import Dataset, create_ops
 
 
 class Trainer(object):
@@ -56,6 +56,7 @@ class Trainer(object):
 
     def __init__(self, config, dataset):
         self.config = config
+        self.max_train_iter = config.max_train_iter
 
         dataset_str = 'd'
         dataset_str += '_' + '_'.join(config.data_dir.replace(
@@ -64,9 +65,9 @@ class Trainer(object):
         hyper_parameter_str = 'bs{}_lr{}'.format(
             config.batch_size, config.learning_rate)
 
-        self.train_dir = './train_dir/{}_{}_{}_{}_{}'.format(
+        self.train_dir = './train_dir/{}_{}_{}_{}_seed{}_{}'.format(
             config.model_type, dataset_str, config.prefix, hyper_parameter_str,
-            time.strftime("%Y%m%d-%H%M%S"))
+            config.seed, time.strftime("%Y%m%d-%H%M%S"))
         if not os.path.exists(self.train_dir): os.makedirs(self.train_dir)
         log.infov("Train Dir: %s", self.train_dir)
 
@@ -191,14 +192,13 @@ class Trainer(object):
     def train(self):
         log.infov('Training starts')
 
-        max_steps = 1000000
         ckpt_save_steps = self.checkpoint_step
 
         # initialize average report (put 0 to escape average over empty list)
         avg_step_time = [0]
         avg_train_report = {key: [0] for key in self.avg_report['train']}
 
-        for s in range(max_steps):
+        for s in range(self.max_train_iter):
             """
             write average summary and print log
             """
@@ -319,6 +319,7 @@ def main():
     parser.add_argument('--image_dir', type=str,
                         default='data/VisualGenome/VG_100K', help=' ')
     # log
+    parser.add_argument('--max_train_iter', type=int, default=4810)
     parser.add_argument('--train_average_iter', type=int, default=10)
     parser.add_argument('--val_average_iter', type=int, default=40)
     parser.add_argument('--heavy_summary_step', type=int, default=200)
@@ -331,6 +332,7 @@ def main():
     parser.add_argument('--learning_rate', type=float, default=0.001, help=' ')
     parser.add_argument('--lr_weight_decay', action='store_true', default=False)
     # model parameters
+    parser.add_argument('--seed', type=int, default=123, help=' ')
     parser.add_argument('--batch_size', type=int, default=512, help=' ')
     parser.add_argument('--model_type', type=str, default='vlmap', help=' ',
                         choices=['vlmap', 'vlmap_wordset', 'vlmap_wordset_only',
@@ -351,6 +353,10 @@ def main():
                                  'vlmap_autoenc_full', 'vlmap_bf_wordset'])
     config = parser.parse_args()
     check_config(config)
+
+    # Set random seed
+    tf.set_random_seed(config.seed)
+    np.random.seed(config.seed)
 
     dataset = {
         'train': Dataset(config.data_dir, 'train'),  # load val during debugging

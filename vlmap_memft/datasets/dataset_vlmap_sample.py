@@ -12,8 +12,6 @@ NUM_CONFIG = {
     'obj_blank_fill': 5,
 }
 
-RANDOM_STATE = np.random.RandomState(123)
-
 
 class Dataset(object):
     def __init__(self, data_dir, split, name='vlmap_memft'):
@@ -90,7 +88,7 @@ class Dataset(object):
         object_blank_fill
         """
         idx_list = list(range(len(entry['obj_blank_fill'])))
-        RANDOM_STATE.shuffle(idx_list)
+        np.random.shuffle(idx_list)
         idx_list = idx_list[:NUM_CONFIG['obj_blank_fill']]
         num_valid_data = len(idx_list)
         while len(idx_list) < NUM_CONFIG['obj_blank_fill']:
@@ -109,7 +107,7 @@ class Dataset(object):
             blanks_len.append(len(e['blank']))
             blanks[i, :blanks_len[i]] = e['blank']
             fills.append(e['fill'])
-            wordsets.append(RANDOM_STATE.choice(
+            wordsets.append(np.random.choice(
                 self.ws_dict['ans2wordset'][e['fill']]))
         ret.update({
             'obj_blank_fill/num': np.array(num_valid_data, dtype=np.int32),
@@ -125,7 +123,7 @@ class Dataset(object):
         attribute_blank_fill
         """
         idx_list = list(range(len(entry['attr_blank_fill'])))
-        RANDOM_STATE.shuffle(idx_list)
+        np.random.shuffle(idx_list)
         idx_list = idx_list[:NUM_CONFIG['attr_blank_fill']]
         num_valid_data = len(idx_list)
         while len(idx_list) < NUM_CONFIG['attr_blank_fill']:
@@ -144,7 +142,7 @@ class Dataset(object):
             blanks_len.append(len(e['blank']))
             blanks[i, :blanks_len[i]] = e['blank']
             fills.append(e['fill'])
-            wordsets.append(RANDOM_STATE.choice(
+            wordsets.append(np.random.choice(
                 self.ws_dict['ans2wordset'][e['fill']]))
         ret.update({
             'attr_blank_fill/num': np.array(num_valid_data, dtype=np.int32),
