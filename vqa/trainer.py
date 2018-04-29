@@ -116,9 +116,9 @@ class Trainer(object):
         self.avg_report = {
             'train': {},
             'val': {},
-            'test': {},
+            'testval': {},
         }
-        for split in ['train', 'val', 'test']:
+        for split in ['train', 'val', 'testval']:
             for key in self.model.report.keys():
                 self.avg_report[split][key] = tf.placeholder(tf.float32)
                 tf.summary.scalar('average_{}/{}'.format(split, key),
@@ -128,13 +128,13 @@ class Trainer(object):
         self.summary_ops = {
             'train': tf.summary.merge_all(key='train'),
             'val': tf.summary.merge_all(key='val'),
-            'test': tf.summary.merge_all(key='test'),
+            'testval': tf.summary.merge_all(key='testval'),
             'heavy_train': tf.summary.merge_all(key='heavy_train'),
             'heavy_val': tf.summary.merge_all(key='heavy_val'),
-            'heavy_test': tf.summary.merge_all(key='heavy_test'),
+            'heavy_testval': tf.summary.merge_all(key='heavy_testval'),
             'average_train': tf.summary.merge_all(key='average_train'),
             'average_val': tf.summary.merge_all(key='average_val'),
-            'average_test': tf.summary.merge_all(key='average_test'),
+            'average_testval': tf.summary.merge_all(key='average_testval'),
             'no_op': tf.no_op(),
         }
 
@@ -226,21 +226,21 @@ class Trainer(object):
                 self.log_message(step, avg_val_report, avg_val_step_time,
                                  split='val', is_train=False)
 
-                # test
-                avg_val_report = {key: [] for key in self.avg_report['test']}
+                # testval
+                avg_val_report = {key: [] for key in self.avg_report['testval']}
                 avg_val_step_time = []
-                for i in tqdm(range(self.val_average_iter), desc='eval test'):
+                for i in tqdm(range(self.val_average_iter), desc='eval testval'):
                     step, summary, loss, report, step_time = self.run_val_step(
-                        i == (self.val_average_iter - 1), split='test')
+                        i == (self.val_average_iter - 1), split='testval')
                     for key in avg_val_report:
                         avg_val_report[key].append(report[key])
                     avg_val_step_time.append(step_time)
                 self.summary_writer.add_summary(summary, global_step=step)
                 step, avg_val_summary = self.write_average_summary(
-                    avg_val_report, split='test')
+                    avg_val_report, split='testval')
                 self.summary_writer.add_summary(avg_val_summary, global_step=step)
                 self.log_message(step, avg_val_report, avg_val_step_time,
-                                 split='test', is_train=False)
+                                 split='testval', is_train=False)
 
             """
             Run TRAINING step
