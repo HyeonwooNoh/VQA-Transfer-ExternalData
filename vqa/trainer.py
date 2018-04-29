@@ -36,9 +36,9 @@ class Trainer(object):
         if config.ft_vlmap:
             hyper_parameter_str += '_ft_vlmap'
 
-        self.train_dir = './train_dir/vqa_{}_{}_{}_{}_{}'.format(
+        self.train_dir = './train_dir/vqa_{}_{}_{}_{}_seed{}_{}'.format(
             config.model_type, dataset_str, config.prefix, hyper_parameter_str,
-            time.strftime("%Y%m%d-%H%M%S"))
+            config.seed, time.strftime("%Y%m%d-%H%M%S"))
         if not os.path.exists(self.train_dir): os.makedirs(self.train_dir)
         log.infov("Train Dir: %s", self.train_dir)
 
@@ -116,9 +116,9 @@ class Trainer(object):
         self.avg_report = {
             'train': {},
             'val': {},
-            'testval': {},
+            'test': {},
         }
-        for split in ['train', 'val', 'testval']:
+        for split in ['train', 'val', 'test']:
             for key in self.model.report.keys():
                 self.avg_report[split][key] = tf.placeholder(tf.float32)
                 tf.summary.scalar('average_{}/{}'.format(split, key),
@@ -128,13 +128,13 @@ class Trainer(object):
         self.summary_ops = {
             'train': tf.summary.merge_all(key='train'),
             'val': tf.summary.merge_all(key='val'),
-            'testval': tf.summary.merge_all(key='testval'),
+            'test': tf.summary.merge_all(key='test'),
             'heavy_train': tf.summary.merge_all(key='heavy_train'),
             'heavy_val': tf.summary.merge_all(key='heavy_val'),
-            'heavy_testval': tf.summary.merge_all(key='heavy_testval'),
+            'heavy_test': tf.summary.merge_all(key='heavy_test'),
             'average_train': tf.summary.merge_all(key='average_train'),
             'average_val': tf.summary.merge_all(key='average_val'),
-            'average_testval': tf.summary.merge_all(key='average_testval'),
+            'average_test': tf.summary.merge_all(key='average_test'),
             'no_op': tf.no_op(),
         }
 
@@ -226,21 +226,21 @@ class Trainer(object):
                 self.log_message(step, avg_val_report, avg_val_step_time,
                                  split='val', is_train=False)
 
-                # testval
-                avg_val_report = {key: [] for key in self.avg_report['testval']}
+                # test
+                avg_val_report = {key: [] for key in self.avg_report['test']}
                 avg_val_step_time = []
-                for i in tqdm(range(self.val_average_iter), desc='eval testval'):
+                for i in tqdm(range(self.val_average_iter), desc='eval test'):
                     step, summary, loss, report, step_time = self.run_val_step(
-                        i == (self.val_average_iter - 1), split='testval')
+                        i == (self.val_average_iter - 1), split='test')
                     for key in avg_val_report:
                         avg_val_report[key].append(report[key])
                     avg_val_step_time.append(step_time)
                 self.summary_writer.add_summary(summary, global_step=step)
                 step, avg_val_summary = self.write_average_summary(
-                    avg_val_report, split='testval')
+                    avg_val_report, split='test')
                 self.summary_writer.add_summary(avg_val_summary, global_step=step)
                 self.log_message(step, avg_val_report, avg_val_step_time,
-                                 split='testval', is_train=False)
+                                 split='test', is_train=False)
 
             """
             Run TRAINING step
@@ -326,8 +326,7 @@ def main():
                         help=' ')
     parser.add_argument('--tf_record_dir', type=str,
                         default='data/preprocessed/vqa_v2'
-                        '/qa_split_objattr_genome_memft_check_all_answer_thres1_3000_thres2_50'
-                        #'/qa_split_objattr_answer_3div4_genome_memft_check_all_answer_thres1_50000_thres2_-1'
+                        '/qa_split_objattr_answer_3div4_genome_memft_check_all_answer_thres1_50000_thres2_-1'
                         '/tf_record_memft', help=' ')
     parser.add_argument('--vfeat_name', type=str,
                         default='vfeat_bottomup_36_my.hdf5', help=' ')
@@ -353,10 +352,15 @@ def main():
     parser.add_argument('--vlmap_word_weight_dir', type=str, default=None,
                         help=' ')
     parser.add_argument('--ft_vlmap', action='store_true', default=False)
+    parser.add_argument('--seed', type=int, default=123, help=' ')
     config = parser.parse_args()
     config.vocab_path = os.path.join(config.tf_record_dir, config.vocab_name)
     config.vfeat_path = os.path.join(config.tf_record_dir, config.vfeat_name)
     check_config(config)
+
+    # Set random seed
+    tf.set_random_seed(config.seed)
+    np.random.seed(config.seed)
 
     trainer = Trainer(config)
     trainer.train()
