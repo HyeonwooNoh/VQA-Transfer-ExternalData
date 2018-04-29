@@ -2,16 +2,29 @@
 mkdir COCO
 cd COCO
 
-wget http://cs.stanford.edu/people/karpathy/deepimagesent/caption_datasets.zip
-wget http://images.cocodataset.org/annotations/annotations_trainval2014.zip
-wget https://nlp.stanford.edu/software/stanford-corenlp-full-2017-06-09.zip
+download_unzip_rm() {
+    url=$1
+    filename=$(basename $1)
 
-# https://www.dropbox.com/s/1t9nrbevzqn93to/coco.tar.gz?dl=0
-# http://cocodataset.org/#download: 2014 training, 2014 val
+    # 1. download
+    if [ -z "$2" ]; then
+        wget $url
+    else
+        wget $url -O $2
+        filename=$2
+    fi
 
-unzip caption_datasets.zip
-unzip annotations_trainval2014.zip
-unzip stanford-corenlp-full-2017-06-09.zip
+    # 2. unzip
+    if [[ $filename == *.tar.gz ]]; then
+        tar -zxvf $filename
+    else
+        unzip $filename
+    fi
+    rm $filename
+}
 
-#python prepro/prepro_dic_coco.py --input_json data/coco/dataset_coco.json --split normal --output_dic_json data/coco/dic_coco.json --output_cap_json data/coco/cap_coco.json
+download_unzip_rm http://cs.stanford.edu/people/karpathy/deepimagesent/caption_datasets.zip
+download_unzip_rm http://images.cocodataset.org/annotations/annotations_trainval2014.zip
 
+download_unzip_rm "https://www.dropbox.com/s/1t9nrbevzqn93to/coco.tar.gz?dl=1" coco.tar.gz
+download_unzip_rm "https://www.dropbox.com/s/2gzo4ops5gbjx5h/coco_detection.h5.tar.gz?dl=1" coco_detection.h5.tar.gz

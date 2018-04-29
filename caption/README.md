@@ -1,1 +1,5 @@
 Neural Baby Talk: https://arxiv.org/pdf/1803.09845.pdf
+
+1. Training:
+
+    python caption/trainer.py --tf_record_dir data/preprocessed/vqa_v2/qa_split_objattr_answer_3div4_genome_memft_check_all_answer_thres1_50000_thres2_-1/tf_record_memft --pretrained_param_path experiments/important/0412_used_pretrained_vlmaps/vlmap_wordset_only_withatt_sp_d_memft_all_new_vocab50_obj3000_attr1000_maxlen10_default_bs512_lr0.001_20180424-102415/model-4801 --vlmap_word_weight_dir experiments/important/0412_used_pretrained_vlmaps/vlmap_wordset_only_withatt_sp_d_memft_all_new_vocab50_obj3000_attr1000_maxlen10_default_bs512_lr0.001_20180424-102415/word_weights_model-4801 --prefix wordset_only_sp

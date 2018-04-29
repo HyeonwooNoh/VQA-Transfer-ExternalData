@@ -22,7 +22,7 @@ data/wikitext2
 data/enwiki
 data/preprocessed
 data/BookCorpus
-data/script/BookCorpus
+data/COCO
 
 # Training results
 train_dir
