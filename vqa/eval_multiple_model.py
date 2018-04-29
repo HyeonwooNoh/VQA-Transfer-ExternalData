@@ -4,6 +4,8 @@ import h5py
 import os
 import numpy as np
 
+import tensorflow as tf
+
 from util import log
 from vqa.evaler import Evaler
 
@@ -112,6 +114,8 @@ def main():
             config.checkpoint = checkpoint
             evaler = Evaler(config, image_features=image_features)
             evaler.eval()
+            evaler.session.close()
+            tf.reset_default_graph()
     log.warn('all evaluation is done')
 
 if __name__ == '__main__':
