@@ -8,21 +8,46 @@ from tqdm import tqdm
 
 from util import log
 
+DEBUG = False
 GLOVE_VOCAB_PATH = 'data/preprocessed/glove_vocab.json'
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--caption_split_dir', type=str,
-                    default='data/preprocessed/coco/standrad', help=' ')
+                    default='data/preprocessed/COCO/standrad', help=' ')
 parser.add_argument('--caption_dic_path', type=str,
                     default='data/COCO/dic_coco.json', help=' ')
 parser.add_argument('--caption_cap_path', type=str,
                     default='data/COCO/cap_coco.json', help=' ')
+parser.add_argument('--reference_vqa_dir', type=str,
+                    default='data/preprocessed/vqa_v2/'
+                    'qa_split_objattr_answer_genome_memft_check_all_answer_thres1_50000_thres2_-1')
 parser.add_argument('--answer_set_limit', type=int, default=3000, help=' ')
 parser.add_argument('--max_answer_len', type=int, default=3, help=' ')
 config = parser.parse_args()
 
-# TODO(taehoon)
+
+###################################
+# get preprocessed data from vqa
+###################################
+
+dirname, filename = os.path.split(os.path.abspath(__file__))
+root_dir = "/".join(dirname.split("/")[:-3])
+
+def symlink(filename):
+    src_path = os.path.join(root_dir, config.reference_vqa_dir, filename)
+    dst_path = os.path.join(root_dir, config.caption_split_dir, filename)
+
+    if os.path.exists(dst_path):
+        log.info("{} already exists".format(dst_path))
+    else:
+        log.info("Sym link: {}->{}".format(src_path, dst_path))
+        os.symlink(src_path, dst_path)
+
+symlink("object_list.pkl")
+symlink("attribute_list.pkl")
+symlink("obj_attrs_split.pkl")
+
 caption_dic = json.load(open(config.caption_dic_path))
 caption_cap = json.load(open(config.caption_cap_path))
 
@@ -41,12 +66,13 @@ for info in caption_dic['images']:
     caption_split[info['split']].append(info['id'])
 
 caption_split_path = os.path.join(
-        config.caption_split_dir, "caption_split.json")
+    config.caption_split_dir, "caption_split.json")
 
 with open(caption_split_path, 'w') as f:
     json.dump(caption_split, f)
 
 # {'test': xxx, 'train': xxx }
+id2caption = {}
 caption_idxs = collections.defaultdict(list) 
 
 # separate out indexes for each of the provided splits
@@ -55,6 +81,13 @@ for key in caption_split:
         img = caption_dic['images'][ix]
         if img['split'] == key:
             caption_idxs[key].append(ix)
+            ix2caption[int(img['id'])] = caption_cap[ix]
+
+ix2caption_path = os.path.join(
+    config.ix2caption_dir, "ix2caption.json")
+with open(ix2caption_path, 'w') as f:
+    json.dump(caption_idxs, f)
+
 
 for key in caption_split:
     log.info("# of {}: {}".format(key, len(caption_split[key])))
@@ -74,40 +107,40 @@ noc_word_map = {
         'suitcase': ['luggage', 'luggages', 'suitcase', 'suitcases'],
         'zebra': ['zebra', 'zebras']
 }
+noc_words = [word for words in noc_word_map.values() for word in words]
 
-for idx in caption_idxs['test']:
-    captions = caption_cap[idx]
-    if any((cap in noc_object) for cap in captions for word in cap):
-        print(captions)
+# check whether noc words in captions
+if DEBUG:
+    for ix in caption_idxs['train']:
+        captions = caption_cap[ix]
+        image_id = caption_dic['images'][ix]['id']
+        file_path = caption_dic['images'][ix]['file_path']
 
-#"object_split.json"
+        if any((word in noc_words) for cap in captions for word in cap):
+            print("test", captions)
 
 #################
 # Build vocab
 #################
 
-itow = caption_dic['ix_to_word']
-import ipdb; ipdb.set_trace() 
-wtoi = {w:i for i,w in itow.items()}
-# word to detection
-wtod = {w:i+1 for w,i in caption_dic['wtod'].items()}
-dtoi = {w:i+1 for i,w in enumerate(wtod.keys())} # detection to index
-itod = {i+1:w for i,w in enumerate(wtod.keys())}
-wtol = info['wtol']
-ltow = {l:w for w,l in wtol.items()}
-vocab_size = len(itow) + 1 # since it start from 1
-print('vocab size is ', vocab_size)
+# below may not be used
+#itow = caption_dic['ix_to_word']
+#wtoi = {w:i for i,w in itow.items()}
+## word to detection
+#wtod = {w:i+1 for w,i in caption_dic['wtod'].items()}
+#dtoi = {w:i+1 for i,w in enumerate(wtod.keys())} # detection to index
+#itod = {i+1:w for i,w in enumerate(wtod.keys())}
+#wtol = caption_dic['wtol']
+#ltow = {l:w for w,l in wtol.items()}
+#vocab_size = len(itow) + 1 # since it start from 1
+#print('vocab size is ', vocab_size)
 
-import ipdb; ipdb.set_trace() 
-
-log.info('loading merged_annotations..')
-merged_anno_path = os.path.join(config.caption_split_dir, 'merged_annotations.pkl')
-qid2anno = cPickle.load(open(merged_anno_path, 'rb'))
 log.info('loading glove_vocab..')
 glove_vocab = json.load(open(GLOVE_VOCAB_PATH, 'r'))
 log.info('done')
 
-obj_attrs_split_path = os.path.join(config.caption_split_dir, 'obj_attrs_split.pkl')
+obj_attrs_split_path = os.path.join(
+        config.caption_split_dir, 'obj_attrs_split.pkl')
 obj_attrs_split = cPickle.load(open(obj_attrs_split_path, 'rb'))
 
 """
@@ -125,8 +158,9 @@ we will just ignore caption with rare answers.
 glove_vocab_set = set(glove_vocab['vocab'])
 
 answers = list()
-for anno in tqdm(qid2anno.values(), desc='count answers'):
-    answers.append(' '.join(anno['a_tokens']))
+for captions in tqdm(caption_cap, desc='count answers'):
+    for tokens in captions:
+        answers.append(' '.join(tokens))
 answer_counts = collections.Counter(answers)
 
 ans_in_order = list(zip(*answer_counts.most_common())[0])
@@ -147,8 +181,9 @@ freq_ans = ans_in_order_glove[:config.answer_set_limit]
 freq_ans_set = set(freq_ans)
 
 q_vocab = set()
-for anno in tqdm(qid2anno.values(), desc='count q_vocab'):
-    for t in anno['q_tokens']: q_vocab.add(t)
+for captions in tqdm(caption_cap, desc='count q_vocab'):
+    for tokens in captions:
+        for t in tokens: q_vocab.add(t)
 q_vocab = q_vocab & glove_vocab_set
 
 a_vocab = set()
@@ -176,6 +211,10 @@ vocab_path = os.path.join(config.caption_split_dir, 'vocab.pkl')
 log.warn('save vocab: {}'.format(vocab_path))
 cPickle.dump(save_vocab, open(vocab_path, 'wb'))
 
+vocab_path = os.path.join(config.caption_split_dir, 'vocab.json')
+log.warn('save vocab: {}'.format(vocab_path))
+json.dump(save_vocab, open(vocab_path, 'w'))
+
 test_object_set = set(obj_attrs_split['test'])
 train_ans_set = freq_ans_set - test_object_set
 test_ans_set = freq_ans_set & test_object_set
@@ -198,5 +237,10 @@ answer_dict['is_attribute'] = [int(v in attr_set) for v in answer_dict['vocab']]
 answer_dict_path = os.path.join(config.caption_split_dir, 'answer_dict.pkl')
 log.warn('save answer_dict: {}'.format(answer_dict_path))
 cPickle.dump(answer_dict, open(answer_dict_path, 'wb'))
+
+freq_ans_path = os.path.join(
+    config.caption_split_dir, 'frequent_answers.json')
+log.warn('save frequent answers: {}'.format(freq_ans_path))
+json.dump(freq_ans, open(freq_ans_path, 'w'))
 
 log.warn('done')

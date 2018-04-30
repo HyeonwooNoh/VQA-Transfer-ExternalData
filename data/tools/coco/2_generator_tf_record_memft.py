@@ -10,43 +10,56 @@ from util import log, tf_util
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument('--caption_split_dir', type=str,
+                    default='data/preprocessed/COCO/standrad', help=' ')
 parser.add_argument('--caption_dic_path', type=str,
                     default='data/COCO/dic_coco.json', help=' ')
 parser.add_argument('--caption_cap_path', type=str,
                     default='data/COCO/cap_coco.json', help=' ')
+parser.add_argument('--reference_vqa_dir', type=str,
+                    default='data/preprocessed/vqa_v2/'
+                    'qa_split_objattr_answer_genome_memft_check_all_answer_thres1_50000_thres2_-1')
 parser.add_argument('--use_train_reserve', action='store_true', default=False)
 parser.add_argument('--num_record_per_shard', type=int, default=1024, help=' ')
 config = parser.parse_args()
 
-config.data_dir = os.path.join(config.qa_split_dir, 'tf_record_memft')
+config.data_dir = os.path.join(config.caption_split_dir, 'tf_record_memft')
 config.data_path = os.path.join(config.data_dir, 'data_info.hdf5')
 config.id_path = os.path.join(config.data_dir, 'id.txt')
 
-if not os.path.exists(config.data_dir):
+#if not os.path.exists(config.data_dir):
+if True:
     log.warn('create directory: {}'.format(config.data_dir))
-    os.makedirs(config.data_dir)
+    if not os.path.exists(config.data_dir):
+        os.makedirs(config.data_dir)
 else:
     raise ValueError(
         'The directory {} already exists. Do not overwrite.'.format(
             config.data_dir))
 
+caption_split_path = os.path.join(
+    config.caption_split_dir, "caption_split.json")
+caption_split = json.load(open(caption_split_path, 'r'))
+
 log.info('loading vocab')
 vocab = json.load(open(
-    os.path.join(config.qa_split_dir, 'vocab.json'), 'r'))
+    os.path.join(config.caption_split_dir, 'vocab.json'), 'r'))
 log.info('loading frequent answers')
 freq_ans = json.load(open(
-    os.path.join(config.qa_split_dir, 'frequent_answers.json'), 'r'))
+    os.path.join(config.caption_split_dir, 'frequent_answers.json'), 'r'))
 freq_ans_set = set(freq_ans)
 log.info('loading merged_captions')
+
+
 qid2caption = json.load(open(os.path.join(
-    config.qa_split_dir, 'merged_captions.json'), 'r'))
+    config.caption_split_dir, 'merged_captions.json'), 'r'))
 log.info('loading qa_split')
 qa_split = json.load(open(os.path.join(
-    config.qa_split_dir, 'qa_split.json'), 'r'))
+    config.caption_split_dir, 'qa_split.json'), 'r'))
 log.info('loading is done')
 
 used_image_paths = open(
-    os.path.join(config.qa_split_dir, 'used_image_path.txt')).read().splitlines()
+    os.path.join(config.caption_split_dir, 'used_image_path.txt')).read().splitlines()
 image_id2idx = {image_path.replace('/', '-'): i for i, image_path in enumerate(
     used_image_paths)}
 image_path2idx = {image_path: i for i, image_path in enumerate(
