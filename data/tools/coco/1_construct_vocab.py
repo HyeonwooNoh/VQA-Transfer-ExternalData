@@ -66,12 +66,13 @@ for info in caption_dic['images']:
     caption_split[info['split']].append(info['id'])
 
 caption_split_path = os.path.join(
-        config.caption_split_dir, "caption_split.json")
+    config.caption_split_dir, "caption_split.json")
 
 with open(caption_split_path, 'w') as f:
     json.dump(caption_split, f)
 
 # {'test': xxx, 'train': xxx }
+id2caption = {}
 caption_idxs = collections.defaultdict(list) 
 
 # separate out indexes for each of the provided splits
@@ -80,6 +81,13 @@ for key in caption_split:
         img = caption_dic['images'][ix]
         if img['split'] == key:
             caption_idxs[key].append(ix)
+            ix2caption[int(img['id'])] = caption_cap[ix]
+
+ix2caption_path = os.path.join(
+    config.ix2caption_dir, "ix2caption.json")
+with open(ix2caption_path, 'w') as f:
+    json.dump(caption_idxs, f)
+
 
 for key in caption_split:
     log.info("# of {}: {}".format(key, len(caption_split[key])))
@@ -115,16 +123,17 @@ if DEBUG:
 # Build vocab
 #################
 
-itow = caption_dic['ix_to_word']
-wtoi = {w:i for i,w in itow.items()}
-# word to detection
-wtod = {w:i+1 for w,i in caption_dic['wtod'].items()}
-dtoi = {w:i+1 for i,w in enumerate(wtod.keys())} # detection to index
-itod = {i+1:w for i,w in enumerate(wtod.keys())}
-wtol = caption_dic['wtol']
-ltow = {l:w for w,l in wtol.items()}
-vocab_size = len(itow) + 1 # since it start from 1
-print('vocab size is ', vocab_size)
+# below may not be used
+#itow = caption_dic['ix_to_word']
+#wtoi = {w:i for i,w in itow.items()}
+## word to detection
+#wtod = {w:i+1 for w,i in caption_dic['wtod'].items()}
+#dtoi = {w:i+1 for i,w in enumerate(wtod.keys())} # detection to index
+#itod = {i+1:w for i,w in enumerate(wtod.keys())}
+#wtol = caption_dic['wtol']
+#ltow = {l:w for w,l in wtol.items()}
+#vocab_size = len(itow) + 1 # since it start from 1
+#print('vocab size is ', vocab_size)
 
 log.info('loading glove_vocab..')
 glove_vocab = json.load(open(GLOVE_VOCAB_PATH, 'r'))
@@ -202,6 +211,10 @@ vocab_path = os.path.join(config.caption_split_dir, 'vocab.pkl')
 log.warn('save vocab: {}'.format(vocab_path))
 cPickle.dump(save_vocab, open(vocab_path, 'wb'))
 
+vocab_path = os.path.join(config.caption_split_dir, 'vocab.json')
+log.warn('save vocab: {}'.format(vocab_path))
+json.dump(save_vocab, open(vocab_path, 'w'))
+
 test_object_set = set(obj_attrs_split['test'])
 train_ans_set = freq_ans_set - test_object_set
 test_ans_set = freq_ans_set & test_object_set
@@ -224,5 +237,10 @@ answer_dict['is_attribute'] = [int(v in attr_set) for v in answer_dict['vocab']]
 answer_dict_path = os.path.join(config.caption_split_dir, 'answer_dict.pkl')
 log.warn('save answer_dict: {}'.format(answer_dict_path))
 cPickle.dump(answer_dict, open(answer_dict_path, 'wb'))
+
+freq_ans_path = os.path.join(
+    config.caption_split_dir, 'frequent_answers.json')
+log.warn('save frequent answers: {}'.format(freq_ans_path))
+json.dump(freq_ans, open(freq_ans_path, 'w'))
 
 log.warn('done')
