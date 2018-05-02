@@ -62,8 +62,9 @@ class Trainer(object):
         dataset_str += '_' + '_'.join(config.data_dir.replace(
             'data/preprocessed/visualgenome/', '').split('/'))
 
-        hyper_parameter_str = 'bs{}_lr{}'.format(
-            config.batch_size, config.learning_rate)
+        hyper_parameter_str = 'bs{}_lr{}_dp{}'.format(
+            config.batch_size, config.learning_rate,
+            config.expand_depth)
 
         self.train_dir = './train_dir/{}_{}_{}_{}_seed{}_{}'.format(
             config.model_type, dataset_str, config.prefix, hyper_parameter_str,
@@ -307,6 +308,8 @@ def check_config(config):
     if config.checkpoint is not None and config.pretrained_param_path is not None:
         raise ValueError('Do not set both checkpoint and pretrained_param_path')
 
+def str2bool(v):
+    return v.lower() in ('true', '1')
 
 def main():
     parser = argparse.ArgumentParser(
@@ -331,6 +334,7 @@ def main():
     parser.add_argument('--pretrained_param_path', type=str, default=None)
     parser.add_argument('--learning_rate', type=float, default=0.001, help=' ')
     parser.add_argument('--lr_weight_decay', action='store_true', default=False)
+    parser.add_argument('--expand_depth', type=str2bool, default=False, help='whether to expand wordset based on deepest depth')
     # model parameters
     parser.add_argument('--seed', type=int, default=123, help=' ')
     parser.add_argument('--batch_size', type=int, default=512, help=' ')

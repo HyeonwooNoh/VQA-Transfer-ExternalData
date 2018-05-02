@@ -6,6 +6,7 @@ import numpy as np
 import tensorflow as tf
 
 from tqdm import tqdm
+from coco_utils import *
 from util import log, tf_util
 
 parser = argparse.ArgumentParser(
@@ -16,9 +17,9 @@ parser.add_argument('--caption_dic_path', type=str,
                     default='data/COCO/dic_coco.json', help=' ')
 parser.add_argument('--caption_cap_path', type=str,
                     default='data/COCO/cap_coco.json', help=' ')
-parser.add_argument('--reference_vqa_dir', type=str,
-                    default='data/preprocessed/vqa_v2/'
-                    'qa_split_objattr_answer_genome_memft_check_all_answer_thres1_50000_thres2_-1')
+parser.add_argument('--reference_vcaption_dir', type=str,
+                    default='data/preprocessed/vcaption_v2/'
+                    'caption_split_objattr_answer_genome_memft_check_all_answer_thres1_50000_thres2_-1')
 parser.add_argument('--use_train_reserve', action='store_true', default=False)
 parser.add_argument('--num_record_per_shard', type=int, default=1024, help=' ')
 config = parser.parse_args()
@@ -51,22 +52,33 @@ freq_ans_set = set(freq_ans)
 log.info('loading merged_captions')
 
 
-qid2caption = json.load(open(os.path.join(
-    config.caption_split_dir, 'merged_captions.json'), 'r'))
-log.info('loading qa_split')
-qa_split = json.load(open(os.path.join(
-    config.caption_split_dir, 'qa_split.json'), 'r'))
+idx2caption = json.load(open(os.path.join(
+    config.caption_split_dir, 'idx2caption.json'), 'r'))
+idx2caption = {int(key):value for key, value in idx2caption.items()}
+
+log.info('loading caption_split')
+caption_split = json.load(open(os.path.join(
+    config.caption_split_dir, 'caption_split.json'), 'r'))
 log.info('loading is done')
+
+
+caption_dic = json.load(open(config.caption_dic_path))
+caption_cap = json.load(open(config.caption_cap_path))
+
+idx2info = {info['id']: info for info in caption_dic['images']}
+
 
 used_image_paths = open(
     os.path.join(config.caption_split_dir, 'used_image_path.txt')).read().splitlines()
-image_id2idx = {image_path.replace('/', '-'): i for i, image_path in enumerate(
+image_id2idx = {
+    image_path.replace('/', '-'): i for i, image_path in enumerate(
     used_image_paths)}
+
 image_path2idx = {image_path: i for i, image_path in enumerate(
     used_image_paths)}
 image_num2path = {}
-for caption in qid2caption.values():
-    image_num2path[caption['image_id']] = caption['image_path']
+for caption in idx2info.values():
+    image_num2path[int(caption['id'])] = caption['file_path']
 
 image_info = {
     'used_image_paths': used_image_paths,
@@ -92,8 +104,8 @@ Data statistics:
 f = h5py.File(config.data_path, 'w')
 
 if config.use_train_reserve:
-    qa_split['train'].extend(qa_split['train-reserve'])
-    qa_split['val'].extend(qa_split['val-reserve'])
+    caption_split['train'].extend(caption_split['train-reserve'])
+    caption_split['val'].extend(caption_split['val-reserve'])
 
 # encode frequent answers
 intseq_ans = []
@@ -102,6 +114,7 @@ for ans in freq_ans:
     intseq_ans.append([vocab['dict'][t] for t in ans.split()])
     intseq_ans_len.append(len(intseq_ans[-1]))
 
+import ipdb; ipdb.set_trace() 
 np_intseq_ans_len = np.array(intseq_ans_len, dtype=np.int32)
 max_ans_len = np_intseq_ans_len.max()
 
@@ -155,8 +168,8 @@ def get_score(occurences):
 max_num_answer = 0
 max_q_len = 0
 for split in ['train']:
-    num_shards = len(qa_split[split]) / config.num_record_per_shard + 1
-    for i, qid in enumerate(tqdm(qa_split[split],
+    num_shards = len(caption_split[split]) / config.num_record_per_shard + 1
+    for i, qid in enumerate(tqdm(caption_split[split],
                                  desc='process {} qids'.format(split))):
         if i % config.num_record_per_shard == 0:
             shard_id = int(i / config.num_record_per_shard)
@@ -207,8 +220,8 @@ for split in ['train']:
         tf_record_writer.write(tf_example.SerializeToString())
 
 for split in ['val', 'testval', 'test']:
-    num_shards = len(qa_split[split]) / config.num_record_per_shard + 1
-    for i, qid in enumerate(tqdm(qa_split[split],
+    num_shards = len(caption_split[split]) / config.num_record_per_shard + 1
+    for i, qid in enumerate(tqdm(caption_split[split],
                                  desc='process {} qids'.format(split))):
         if i % config.num_record_per_shard == 0:
             shard_id = int(i / config.num_record_per_shard)

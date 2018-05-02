@@ -7,6 +7,8 @@ import os
 from tqdm import tqdm
 
 from util import log
+from coco_utils import *
+
 
 DEBUG = False
 GLOVE_VOCAB_PATH = 'data/preprocessed/glove_vocab.json'
@@ -34,19 +36,10 @@ config = parser.parse_args()
 dirname, filename = os.path.split(os.path.abspath(__file__))
 root_dir = "/".join(dirname.split("/")[:-3])
 
-def symlink(filename):
-    src_path = os.path.join(root_dir, config.reference_vqa_dir, filename)
-    dst_path = os.path.join(root_dir, config.caption_split_dir, filename)
-
-    if os.path.exists(dst_path):
-        log.info("{} already exists".format(dst_path))
-    else:
-        log.info("Sym link: {}->{}".format(src_path, dst_path))
-        os.symlink(src_path, dst_path)
-
-symlink("object_list.pkl")
-symlink("attribute_list.pkl")
-symlink("obj_attrs_split.pkl")
+symlink(config, "object_list.pkl")
+symlink(config, "attribute_list.pkl")
+symlink(config, "obj_attrs_split.pkl")
+symlink(config, "used_image_path.txt")
 
 caption_dic = json.load(open(config.caption_dic_path))
 caption_cap = json.load(open(config.caption_cap_path))
@@ -72,22 +65,24 @@ with open(caption_split_path, 'w') as f:
     json.dump(caption_split, f)
 
 # {'test': xxx, 'train': xxx }
-id2caption = {}
+idx2caption = {}
 caption_idxs = collections.defaultdict(list) 
 
 # separate out indexes for each of the provided splits
 for key in caption_split:
-    for ix in range(len(caption_dic['images'])):
-        img = caption_dic['images'][ix]
+    for idx in range(len(caption_dic['images'])):
+        img = caption_dic['images'][idx]
         if img['split'] == key:
-            caption_idxs[key].append(ix)
-            ix2caption[int(img['id'])] = caption_cap[ix]
+            caption_idxs[key].append(idx)
+            idx2caption[int(img['id'])] = caption_cap[idx]
 
-ix2caption_path = os.path.join(
-    config.ix2caption_dir, "ix2caption.json")
-with open(ix2caption_path, 'w') as f:
-    json.dump(caption_idxs, f)
+idx2caption_path = os.path.join(
+    config.caption_split_dir, "idx2caption.json")
+with open(idx2caption_path, 'w') as f:
+    json.dump(idx2caption, f)
 
+idx2caption_path = os.path.join(
+    config.caption_split_dir, "idx2caption.json")
 
 for key in caption_split:
     log.info("# of {}: {}".format(key, len(caption_split[key])))
