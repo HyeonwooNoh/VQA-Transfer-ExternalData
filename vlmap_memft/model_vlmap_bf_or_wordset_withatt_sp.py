@@ -31,7 +31,7 @@ class Model(object):
         self.answer_dict = cPickle.load(open(answer_dict_path, 'rb'))
         self.num_answer = len(self.answer_dict['vocab'])
 
-        ws_dict_path = os.path.join(self.data_dir, 'wordset_dict5_depth{}.pkl'.format(config.expand_depth))
+        ws_dict_path = os.path.join(self.data_dir, 'wordset_dict5_depth{}.pkl'.format(int(config.expand_depth)))
         self.ws_dict = cPickle.load(open(ws_dict_path, 'rb'))
         self.num_ws = len(self.ws_dict['vocab'])
 
