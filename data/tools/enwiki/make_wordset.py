@@ -22,6 +22,8 @@ parser.add_argument('--dir_name', type=str,
                     '/memft_all_new_vocab50_obj3000_attr1000_maxlen10', help=' ')
 parser.add_argument('--context_window_size', type=int, default=3,
                     help='window size for extracting context')
+parser.add_argument('--preprocessing', type=int, default=0,
+                    help='whether to do preprocessing (1) or not (0)')
 parser.add_argument('--min_num_word', type=int, default=5, help='min num word in set')
 config = parser.parse_args()
 
@@ -29,7 +31,9 @@ config.answer_dict_path = os.path.join(config.dir_name, 'answer_dict.pkl')
 answer_dict = cPickle.load(open(config.answer_dict_path, 'rb'))
 
 word2contexts_path = os.path.join(
-    config.enwiki_dir, 'word2contexts_w{}.pkl'.format(config.context_window_size))
+    config.enwiki_dir, 'word2contexts_w{}_p{}.pkl'.format(
+    config.context_window_size,
+    int(config.preprocessing)))
 log.info('loading word2context.. {}'.format(word2contexts_path))
 word2contexts = cPickle.load(open(word2contexts_path, 'rb'))
 log.info('done')
@@ -113,8 +117,8 @@ enwiki_context_dict = {
     'ans2context_idx': ans2context_idx,
     'ans2context_prob': ans2context_prob,
 }
-save_name = 'enwiki_context_dict_w{}_n{}'.format(
-    config.context_window_size, config.min_num_word)
+save_name = 'enwiki_context_dict_w{}_p{}_n{}'.format(
+    config.context_window_size, config.preprocessing, config.min_num_word)
 save_pkl_path = os.path.join(config.dir_name, '{}.pkl'.format(save_name))
 log.info('saving: {} ..'.format(save_pkl_path))
 cPickle.dump(enwiki_context_dict, open(save_pkl_path, 'wb'))

@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 from util import log
 
+
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--enwiki_dir', type=str,
@@ -21,6 +22,8 @@ parser.add_argument('--dir_name', type=str,
                     '/memft_all_new_vocab50_obj3000_attr1000_maxlen10', help=' ')
 parser.add_argument('--context_window_size', type=int, default=3,
                     help='window size for extracting context')
+parser.add_argument('--preprocessing', type=int, default=0,
+                    help='whether to do preprocessing (1) or not (0)')
 config = parser.parse_args()
 
 config.answer_dict_path = os.path.join(config.dir_name, 'answer_dict.pkl')
@@ -80,26 +83,32 @@ for i, v in enumerate(answer_dict['vocab']):
                 context[l] = t_word
             continue
 
-        t_list = [context[l] for context in v_contexts]
-        t_cnt = Counter(t_list)
-        t_set = set([t for t in t_cnt if t_cnt[t] > 2])
+        if config.preprocessing == 1:
+            t_list = [context[l] for context in v_contexts]
+            t_cnt = Counter(t_list)
+            t_set = set([t for t in t_cnt if t_cnt[t] > 2])
+            for context in v_contexts:
+                if context[l] not in t_set: context[l] = t_unk
+                if context[l] in freq_word_set: context[l] = t_unk
+                if context[l] in stopWords: context[l] = t_unk
+
+    if config.preprocessing == 1:
+        new_v_contexts = []
         for context in v_contexts:
-            if context[l] not in t_set: context[l] = t_unk
-            if context[l] in freq_word_set: context[l] = t_unk
-            if context[l] in stopWords: context[l] = t_unk
+            suppressed = [x[0] for x in groupby(context)]
+            if suppressed[0] == t_unk: suppressed = suppressed[1:]
+            if suppressed[-1] == t_unk: suppressed = suppressed[:-1]
+            if len(suppressed) == 1: continue
+            new_v_contexts.append(' '.join(suppressed))
 
-    new_v_contexts = []
-    for context in v_contexts:
-        suppressed = [x[0] for x in groupby(context)]
-        if suppressed[0] == t_unk: suppressed = suppressed[1:]
-        if suppressed[-1] == t_unk: suppressed = suppressed[:-1]
-        if len(suppressed) == 1: continue
-        new_v_contexts.append(' '.join(suppressed))
+        word2contexts[v] = dict(Counter(new_v_contexts))
+    else:
+        word2contexts[v] = dict(Counter(v_contexts))
 
-    word2contexts[v] = dict(Counter(new_v_contexts))
-
-save_path = os.path.join(config.enwiki_dir, 'word2contexts_w{}.pkl'.format(
-    config.context_window_size))
+save_path = os.path.join(
+    config.enwiki_dir, 'word2contexts_w{}_p{}.pkl'.format(
+    config.context_window_size,
+    int(config.preprocessing)))
 log.warn('saving results to to : {}'.format(save_path))
 cPickle.dump(word2contexts, open(save_path, 'wb'))
 log.warn('done')

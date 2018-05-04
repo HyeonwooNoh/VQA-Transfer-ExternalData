@@ -6,6 +6,9 @@ Learning vision and language mapping as a visual knowledge base
 
     vlmap/vlmap_mult_seed_run.sh
 
+## Create weight_dir
+
+    python vlmap_memft/export_word_weights.py --checkpoint experiments/important/0501_vlmap_ordered_iter_bf_or_wordset_seed_234_345_456/vlmap_bf_or_wordset_withatt_sp_d_memft_all_new_vocab50_obj3000_attr1000_maxlen10_ordered_iter_bs512_lr0.001_seed456_20180501-104510/model-4801
 
 ## training vqa
 
