@@ -415,7 +415,8 @@ def WordWeightEmbed(vocab, word_weight_dir=None, weight_name='v_word',
 def LearnGloVe(
         vocab, scope='LearnGloVe',
         reuse=tf.AUTO_REUSE,
-        learnable=True):
+        learnable=True,
+        oov_mean_initialize=False): # out of vocab
     with tf.variable_scope(scope, reuse=reuse) as scope:
         glove_vocab = json.load(open(GLOVE_VOCAB_PATH, 'r'))
         with h5py.File(GLOVE_EMBEDDING_PATH, 'r') as f:
@@ -425,13 +426,25 @@ def LearnGloVe(
             if w in glove_vocab['dict'] and \
                     glove_vocab['dict'][w] < glove_param.shape[0]:
                 weights[i, :] = glove_param[glove_vocab['dict'][w], :]
-            else: pass  # initialize to zero
+            elif oov_mean_initialize and w != "":
+                words = w.split()
+                check_all_in_glove = all(w in glove_vocab['dict'] for w in words)
 
-        embed_map = tf.constant_initializer(weights)
+                if check_all_in_glove:
+                    weights[i, :] = np.mean(
+                        [glove_param[glove_vocab['dict'][w], :] for w in words], 0)
+                else:
+                    raise Exception("Unkown words {}".format(words))
+            else:
+                pass  # initialize to zero
+
         if learnable:
             embed_map = tf.get_variable(
                 name='embed_map', shape=[len(vocab['vocab']), 300],
-                initializer=embed_map)
+                initializer=tf.constant_initializer(weights))
+        else:
+            embed_map = tf.constant(weights.T)
+
         return embed_map
 
 

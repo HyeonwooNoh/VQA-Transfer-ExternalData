@@ -272,16 +272,15 @@ class Model(object):
                 activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_fc')
             joint = tf.nn.dropout(joint, 0.5)
 
-            # logit = modules.fc_layer(
-            #    joint, self.num_answer,
-            #    use_bias=True, use_bn=False, use_ln=False,
-            #    activation_fn=None, is_training=self.is_train, scope='classifier')
+            joint2 = modules.fc_layer(
+                joint, 300,
+                use_bias=True, use_bn=False, use_ln=False,
+                activation_fn=None, is_training=self.is_train, scope='classifier')
 
-            # TODO(taehoon): multi word average or something
-            import ipdb; ipdb.set_trace() 
             output_glove = modules.LearnGloVe(
-                self.answer_dict, learnable=False)
-            logit = tf.matmul(joint, output_glove)
+                self.answer_dict, learnable=False,
+                oov_mean_initialize=True)
+            logit = tf.matmul(joint2, output_glove)
 
         self.output['logit'] = logit
 
