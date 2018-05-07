@@ -5,7 +5,7 @@ import os
 import numpy as np
 import tensorflow as tf
 
-from util import log
+from util import log, get_dummy_data
 
 NUM_CONFIG = {
     'attr_blank_fill': 5,
@@ -14,7 +14,10 @@ NUM_CONFIG = {
 
 
 class Dataset(object):
-    def __init__(self, data_dir, split, name='vlmap_memft'):
+    def __init__(self, config, split, name='vlmap_memft'):
+        self.config = config
+        self.data_dir = data_dir = config.data_dir
+
         self.name = name
         self.split = split
 
@@ -43,20 +46,25 @@ class Dataset(object):
         self.ws_dict = cPickle.load(open(ws_dict_path, 'rb'))
         log.info('loading wordset_dict done')
 
-        with h5py.File(os.path.join(data_dir, '{}_vfeat.hdf5'.format(split)),
-                       'r') as f:
+        
+        if self.config.debug:
+            self.image_features, self.spatial_features, self.normal_boxes, self.num_boxes, \
+                self.max_box_num, self.vfeat_dim = get_dummy_data()
+        else:
+            with h5py.File(os.path.join(data_dir, '{}_vfeat.hdf5'.format(split)),
+                        'r') as f:
 
-            self.vfeat_dim = int(f['data_info']['vfeat_dim'].value)
-            self.max_box_num = int(f['data_info']['max_box_num'].value)
-            log.warn('loading {} image_features ..'.format(split))
-            self.image_features = np.array(f.get('image_features'))
-            log.warn('loading {} normal_boxes ..'.format(split))
-            self.normal_boxes = np.array(f.get('normal_boxes'))
-            log.warn('loading {} num_boxes ..'.format(split))
-            self.num_boxes = np.array(f.get('num_boxes'))
-            log.warn('loading {} spatial_features ..'.format(split))
-            self.spatial_features = np.array(f.get('spatial_features'))
-            log.warn('loading {} features done ..'.format(split))
+                self.vfeat_dim = int(f['data_info']['vfeat_dim'].value)
+                self.max_box_num = int(f['data_info']['max_box_num'].value)
+                log.warn('loading {} image_features ..'.format(split))
+                self.image_features = np.array(f.get('image_features'))
+                log.warn('loading {} normal_boxes ..'.format(split))
+                self.normal_boxes = np.array(f.get('normal_boxes'))
+                log.warn('loading {} num_boxes ..'.format(split))
+                self.num_boxes = np.array(f.get('num_boxes'))
+                log.warn('loading {} spatial_features ..'.format(split))
+                self.spatial_features = np.array(f.get('spatial_features'))
+                log.warn('loading {} features done ..'.format(split))
 
         log.info('dataset {} {} init done'.format(name, split))
 

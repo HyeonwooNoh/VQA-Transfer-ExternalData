@@ -6,7 +6,7 @@ import multiprocessing
 import tensorflow as tf
 from collections import namedtuple, defaultdict
 
-from util import log
+from util import log, get_dummy_data
 
 NUM_CONFIG = {
     'attr_blank_fill': 5,
@@ -17,7 +17,10 @@ CPU_COUNT = multiprocessing.cpu_count()
 
 
 class Dataset(object):
-    def __init__(self, data_dir, split, name='vlmap_memft'):
+    def __init__(self, config, split, name='vlmap_memft'):
+        self.config = config
+        self.data_dir = data_dir = config.data_dir
+
         self.name = name
         self.split = split
 
@@ -54,23 +57,30 @@ class Dataset(object):
             self.enwiki_dict['np_context'] = f['np_context'].value
             self.enwiki_dict['np_context_len'] = f['np_context_len'].value
 
-        with h5py.File(os.path.join(data_dir, '{}_vfeat.hdf5'.format(split)),
-                       'r') as f:
+        if self.config.debug:
+            self.image_features, self.spatial_features, self.normal_boxes, self.num_boxes, \
+                self.max_box_num, self.vfeat_dim = get_dummy_data()
+        else:
+            with h5py.File(os.path.join(data_dir, '{}_vfeat.hdf5'.format(split)),
+                        'r') as f:
 
-            self.vfeat_dim = int(f['data_info']['vfeat_dim'].value)
-            self.max_box_num = int(f['data_info']['max_box_num'].value)
-            log.warn('loading {} image_features ..'.format(split))
-            self.image_features = np.array(f.get('image_features'))
-            log.warn('loading {} normal_boxes ..'.format(split))
-            self.normal_boxes = np.array(f.get('normal_boxes'))
-            log.warn('loading {} num_boxes ..'.format(split))
-            self.num_boxes = np.array(f.get('num_boxes'))
-            log.warn('loading {} spatial_features ..'.format(split))
-            self.spatial_features = np.array(f.get('spatial_features'))
-            log.warn('loading {} features done ..'.format(split))
+                self.vfeat_dim = int(f['data_info']['vfeat_dim'].value)
+                self.max_box_num = int(f['data_info']['max_box_num'].value)
+                log.warn('loading {} image_features ..'.format(split))
+                self.image_features = np.array(f.get('image_features'))
+                log.warn('loading {} normal_boxes ..'.format(split))
+                self.normal_boxes = np.array(f.get('normal_boxes'))
+                log.warn('loading {} num_boxes ..'.format(split))
+                self.num_boxes = np.array(f.get('num_boxes'))
+                log.warn('loading {} spatial_features ..'.format(split))
+                self.spatial_features = np.array(f.get('spatial_features'))
+                log.warn('loading {} features done ..'.format(split))
 
-        self.wordset_choice_idx = defaultdict(int)
-        self.enwiki_choice_idx = defaultdict(int)
+        self.wordset_choice_idx = defaultdict(
+            lambda: defaultdict(lambda: defaultdict(int)))
+        self.enwiki_choice_idx = defaultdict(
+            lambda: defaultdict(lambda: defaultdict(int)))
+
         self.index_list_idx = {
             'obj_blank_fill': defaultdict(int),
             'attr_blank_fill': defaultdict(int),
@@ -87,8 +97,6 @@ class Dataset(object):
         return config
 
     def sample_wordset_and_context_idx(self, e, category, task, image_idx, idx):
-        # category: obj, attr, task: label, fill
-
         label = e[task]
 
         wordsets = self.ws_dict['ans2shuffled_wordset'][label]
@@ -97,19 +105,20 @@ class Dataset(object):
         wordset_choice_idx = self.wordset_choice_idx[label]
         enwiki_choice_idx = self.enwiki_choice_idx[label]
 
-        wordset = wordsets[
-            wordset_choice_idx % len(wordsets)]
-        enwiki_context_idx = enwiki_context_idxs[
-            enwiki_choice_idx % len(enwiki_context_idxs)]
+        wordset = wordsets[wordset_choice_idx]
+        enwiki_context_idx = enwiki_context_idxs[enwiki_choice_idx]
 
-        self.wordset_choice_idx[label] += 1
-        if self.wordset_choice_idx[label] >= len(wordsets):
-            np.random.shuffle(self.ws_dict['ans2shuffled_wordset'][label])
-            self.wordset_choice_idx[label] = 0
-        self.enwiki_choice_idx[label] += 1
-        if self.enwiki_choice_idx[label] >= len(enwiki_context_idxs):
-            np.random.shuffle(self.enwiki_dict['ans2shuffled_context_idx'][label])
-            self.enwiki_choice_idx[label] = 0
+        self.wordset_choice_idx[category][task][label] += 1
+        self.enwiki_choice_idx[category][task][label] += 1
+
+        if self.wordset_choice_idx[category][task][label] >= len(wordsets):
+            np.random.shuffle(
+                self.ws_dict['ans2shuffled_wordset'][label])
+            self.wordset_choice_idx[category][task][label] = 0
+        if self.enwiki_choice_idx[category][task][label] >= len(enwiki_context_idxs):
+            np.random.shuffle(
+                self.enwiki_dict['ans2shuffled_context_idx'][label])
+            self.enwiki_choice_idx[category][task][label] = 0
 
         return wordset, enwiki_context_idx
 

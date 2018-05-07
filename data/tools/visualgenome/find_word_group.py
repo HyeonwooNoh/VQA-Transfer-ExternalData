@@ -86,7 +86,8 @@ if config.expand_depth:
             deepest_depth = max_depth[hypernym]
 
             for dist in range(distance, deepest_depth + 1):
-                new_vocab_hypernyms[v].append("hypernym.{}".format(dist))
+                new_vocab_hypernyms[v].append(
+                    "{}.{}".format(hypernym, dist))
 
     vocab_hypernyms = new_vocab_hypernyms
     hypernym_set = set([h for h_list in vocab_hypernyms.values() for h in h_list])

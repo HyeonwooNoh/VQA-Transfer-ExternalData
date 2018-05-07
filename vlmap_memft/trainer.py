@@ -7,7 +7,8 @@ import tensorflow as tf
 from tqdm import tqdm
 
 from util import log
-from vlmap_memft.datasets.dataset_vlmap_sample import Dataset, create_ops
+from vlmap_memft.datasets.dataset_vlmap import Dataset, create_ops
+#from vlmap_memft.datasets.dataset_vlmap_sample import Dataset, create_ops
 
 
 class Trainer(object):
@@ -336,6 +337,7 @@ def main():
     parser.add_argument('--lr_weight_decay', action='store_true', default=False)
     parser.add_argument('--expand_depth', type=str2bool, default=False, help='whether to expand wordset based on deepest depth')
     # model parameters
+    parser.add_argument('--debug', type=int, default=0, help='0: normal, 1: debug')
     parser.add_argument('--seed', type=int, default=123, help=' ')
     parser.add_argument('--batch_size', type=int, default=512, help=' ')
     parser.add_argument('--model_type', type=str, default='vlmap', help=' ',
@@ -363,8 +365,8 @@ def main():
     np.random.seed(config.seed)
 
     dataset = {
-        'train': Dataset(config.data_dir, 'train'),  # load val during debugging
-        'val': Dataset(config.data_dir, 'val'),
+        'train': Dataset(config, 'train'),  # load val during debugging
+        'val': Dataset(config, 'val'),
     }
     config.data_cfg = dataset['train'].get_config()
 

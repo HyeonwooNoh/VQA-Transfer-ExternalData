@@ -4,7 +4,7 @@ import os
 import numpy as np
 import tensorflow as tf
 
-from util import log
+from util import log, get_dummy_data
 from vlmap import modules
 
 W_DIM = 300  # Word dimension
@@ -51,7 +51,10 @@ class Model(object):
         self.answer_exist_mask = modules.AnswerExistMask(
             self.answer_dict, self.word_weight_dir)
 
-        if image_features is None:
+        if self.config.debug:
+            self.features, self.spatials, self.normal_boxes, self.num_boxes, \
+                self.max_box_num, self.vfeat_dim = get_dummy_data()
+        elif image_features is None:
             log.infov('loading image features...')
             with h5py.File(config.vfeat_path, 'r') as f:
                 self.features = np.array(f.get('image_features'))
