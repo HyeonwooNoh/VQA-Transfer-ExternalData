@@ -336,6 +336,7 @@ def main():
     parser.add_argument('--learning_rate', type=float, default=0.001, help=' ')
     parser.add_argument('--lr_weight_decay', action='store_true', default=False)
     parser.add_argument('--expand_depth', type=str2bool, default=False, help='whether to expand wordset based on deepest depth')
+    parser.add_argument('--enwiki_preprocessing', type=int, default=0, help='0: normal, 1: debug')
     # model parameters
     parser.add_argument('--debug', type=int, default=0, help='0: normal, 1: debug')
     parser.add_argument('--seed', type=int, default=123, help=' ')

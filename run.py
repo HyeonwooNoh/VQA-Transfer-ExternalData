@@ -54,8 +54,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('num_thread', type=int)
     parser.add_argument('--debug', type=int, default=0, help='0: normal, 1: debug')
-    parser.add_argument('--num_thread', type=int, default=2)
     parser.add_argument('--time_str', type=str, default=None)
     parser.add_argument('--skip_vqa', type=int, default=0)
     parser.add_argument('--skip_vlmap', type=int, default=0)
@@ -66,11 +66,12 @@ if __name__ == '__main__':
     time_str = config.time_str or datetime.now().strftime("%Y%m%d-%H%M%S")
 
     TAG = time_str + "_vqa_bf_or_ws_123_from_vlamp_234_345_456_depth{}"
-    VLMAP_BASE = "vlmap_bf_or_wordset_withatt_sp_d_memft_all_new_vocab50_obj3000_attr1000_maxlen10_expand_depth_bs512_lr0.001_dp{}_seed{}_*"
+    VLMAP_BASE = "vlmap_bf_or_wordset_withatt_sp_d_memft_all_new_vocab50_obj3000_attr1000_maxlen10_expand_depth_bs512_lr0.001_dp{depth}_seed{seed}_*"
 
     VLMAP_SEEDS = [234, 345, 456]
     VQA_SEEDS = [123, 234, 345]
     DEPTHS = ['True', 'False']
+    MODEL_TYPES = ['vlmap_answer', 'standard_word2vec']
     
     #########################
     # 1. find_word_group.py
@@ -111,11 +112,11 @@ if __name__ == '__main__':
 
         important_dirs[depth] = base_path
 
-        dirs = list_dir("train_dir", prefix=VLMAP_BASE.format("*", "*"))
+        dirs = list_dir("train_dir", prefix=VLMAP_BASE.format(depth=depth, seed="*"))
         for directory in dirs:
             dir_time_str = directory.rsplit('_', 1)[1]
 
-            if time_str < dir_time_str:
+            if time_str <= dir_time_str:
                 src_path = directory
                 dst_path = os.path.join(base_path, directory.rsplit('/')[-1].rsplit('_', 1)[0])
 
@@ -129,6 +130,9 @@ if __name__ == '__main__':
     cmds = []
     for key in important_sub_dirs:
         for directory in important_sub_dirs[key]:
+            check_dir = os.path.join(directory, "word_weights_model-4800")
+            if os.path.exists(check_dir):
+                continue
             checkpoint = os.path.join(directory, "model-4800")
             cmd = "python vlmap_memft/export_word_weights.py --checkpoint={}".format(checkpoint)
             cmds.append(cmd)
@@ -156,9 +160,12 @@ if __name__ == '__main__':
                     cmd = "python vqa/trainer.py" \
                         " --pretrained_param_path {path}/model-4800" \
                         " --vlmap_word_weight_dir {path}/word_weights_model-4800" \
-                        " --prefix dp{dp}_sd{vlmap_seed}vqa_sd{vqa_seed} --seed {vqa_seed}" \
+                        " --prefix dp{dp}_sd{vlmap_seed}_vqasd{vqa_seed} --seed {vqa_seed}" \
                         .format(path=path, dp=dp, vlmap_seed=vlmap_seed, vqa_seed=vqa_seed)
-                    cmds.append(cmd)
+
+                    for model_type in MODEL_TYPES:
+                        cmd += " --model_type={}".format(model_type)
+                        cmds.append(cmd)
 
         parallel_run(cmds, config)
 

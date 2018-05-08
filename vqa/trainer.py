@@ -353,7 +353,7 @@ def main():
                         help=' ')
     parser.add_argument('--ft_vlmap', action='store_true', default=False)
     parser.add_argument('--seed', type=int, default=123, help=' ')
-    parser.add_argument('--debug', type=int, default=1, help='0: normal, 1: debug')
+    parser.add_argument('--debug', type=int, default=0, help='0: normal, 1: debug')
 
     config = parser.parse_args()
     config.vocab_path = os.path.join(config.tf_record_dir, config.vocab_name)

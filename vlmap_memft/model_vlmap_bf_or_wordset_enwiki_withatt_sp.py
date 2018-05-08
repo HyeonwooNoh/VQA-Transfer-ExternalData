@@ -36,7 +36,8 @@ class Model(object):
         self.num_ws = len(self.ws_dict['vocab'])
 
         enwiki_dict_path = os.path.join(
-            self.data_dir, 'enwiki_context_dict_w3_n5.pkl')
+            self.data_dir, 'enwiki_context_dict_w3_p{}_n5.pkl'.format(config.enwiki_preprocessing))
+
         self.enwiki_dict = cPickle.load(open(enwiki_dict_path, 'rb'))
         self.num_context_vocab = len(self.enwiki_dict['context_word_vocab'])
         self.max_context_len = self.enwiki_dict['max_context_len']

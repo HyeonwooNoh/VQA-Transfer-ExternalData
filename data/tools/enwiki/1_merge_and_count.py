@@ -11,7 +11,7 @@ from util import log
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--enwiki_dir', type=str,
-                    default='data/preprocessed/enwiki/enwiki_processed_backup', help=' ')
+                    default='data/preprocessed/enwiki/enwiki_processed', help=' ')
 parser.add_argument('--genome_annotation_dir', type=str,
                     default='data/VisualGenome/annotations', help=' ')
 parser.add_argument('--dir_name', type=str,
