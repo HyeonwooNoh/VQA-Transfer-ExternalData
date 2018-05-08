@@ -102,8 +102,8 @@ class Dataset(object):
         wordsets = self.ws_dict['ans2shuffled_wordset'][label]
         enwiki_context_idxs = self.enwiki_dict['ans2shuffled_context_idx'][label]
 
-        wordset_choice_idx = self.wordset_choice_idx[label]
-        enwiki_choice_idx = self.enwiki_choice_idx[label]
+        wordset_choice_idx = self.wordset_choice_idx[category][task][label]
+        enwiki_choice_idx = self.enwiki_choice_idx[category][task][label]
 
         wordset = wordsets[wordset_choice_idx]
         enwiki_context_idx = enwiki_context_idxs[enwiki_choice_idx]
