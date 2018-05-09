@@ -14,7 +14,7 @@ from util import log
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--enwiki_dir', type=str,
-                    default='data/preprocessed/enwiki/enwiki_processed', help=' ')
+                    default='data/preprocessed/enwiki/enwiki_processed_backup', help=' ')
 parser.add_argument('--genome_annotation_dir', type=str,
                     default='data/VisualGenome/annotations', help=' ')
 parser.add_argument('--dir_name', type=str,
@@ -103,13 +103,12 @@ for i, v in enumerate(answer_dict['vocab']):
 
         word2contexts[v] = dict(Counter(new_v_contexts))
     else:
-        word2contexts[v] = dict(Counter([" ".join(c) for c in v_contexts]))
+        word2contexts[v] = dict(Counter(v_contexts))
 
 save_path = os.path.join(
     config.enwiki_dir, 'word2contexts_w{}_p{}.pkl'.format(
     config.context_window_size,
     int(config.preprocessing)))
-
 log.warn('saving results to to : {}'.format(save_path))
 cPickle.dump(word2contexts, open(save_path, 'wb'))
 log.warn('done')

@@ -25,7 +25,7 @@ data/BookCorpus
 data/COCO
 
 # Training results
-train_dir
+*train_dir
 experiments
 
 # Temporary files

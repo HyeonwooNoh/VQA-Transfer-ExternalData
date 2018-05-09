@@ -41,6 +41,8 @@ class Trainer(object):
             from vlmap_memft.model_vlmap_bf_or_wordset_withatt import Model
         elif model_type == 'vlmap_bf_or_wordset_withatt_sp':
             from vlmap_memft.model_vlmap_bf_or_wordset_withatt_sp import Model
+        elif model_type == 'vlmap_enwiki_withatt_sp':
+            from vlmap_memft.model_vlmap_enwiki_withatt_sp import Model
         elif model_type == 'vlmap_bf_or_wordset_enwiki_withatt_sp':
             from vlmap_memft.model_vlmap_bf_or_wordset_enwiki_withatt_sp import Model
         elif model_type == 'vlmap_noc_bf_or_wordset_withatt_sp':
@@ -94,7 +96,7 @@ class Trainer(object):
                 batch_opt, default=lambda: vlmap_batch['train'], exclusive=True)
 
         # Model
-        Model = self.get_model_class(config.model_type)
+        Model = self.get_model__class(config.model_type)
         log.infov('using model class: {}'.format(Model))
         self.model = Model(self.batch, config, is_train=True)
 
@@ -336,7 +338,7 @@ def main():
     parser.add_argument('--learning_rate', type=float, default=0.001, help=' ')
     parser.add_argument('--lr_weight_decay', action='store_true', default=False)
     parser.add_argument('--expand_depth', type=str2bool, default=False, help='whether to expand wordset based on deepest depth')
-    parser.add_argument('--enwiki_preprocessing', type=int, default=0, help='0: normal, 1: debug')
+    parser.add_argument('--enwiki_preprocessing', type=int, default=0, help='0: no, 1: yes')
     # model parameters
     parser.add_argument('--debug', type=int, default=0, help='0: normal, 1: debug')
     parser.add_argument('--seed', type=int, default=123, help=' ')
