@@ -65,8 +65,11 @@ class Evaler(object):
 
     def set_eval_dir(self, config):
         self.checkpoint = config.checkpoint
-        self.eval_dir = config.checkpoint + '_eval_{}_{}'.format(
-            self.split, time.strftime("%Y%m%d-%H%M%S"))
+        self.eval_dir = config.checkpoint + '_eval_{}'.format(self.split)
+        if self.dump_heavy_output:
+            self.eval_dir += '_dump_heavy'
+        self.eval_dir += '_{}'.format(time.strftime("%Y%m%d-%H%M%S"))
+
         if not os.path.exists(self.eval_dir): os.makedirs(self.eval_dir)
         log.infov("Eval Dir: %s", self.eval_dir)
         self.save_hdf5 = os.path.join(self.eval_dir, 'results.hdf5')
@@ -121,7 +124,7 @@ class Evaler(object):
 
             reports, outputs, inputs = fetch[:3]
             if self.dump_heavy_output:
-                heavy_output = fetch[4]
+                heavy_output = fetch[3]
 
             batch_size = len(inputs['id'])
             for b in range(batch_size):
