@@ -2,6 +2,10 @@
 Learning vision and language mapping as a visual knowledge base
 
 
+## All in 1
+
+    python run.py 3 4 --time_str="20180508-145023" --skip_vlmap=1
+
 ## training conditional classifier
 
     vlmap/vlmap_mult_seed_run.sh

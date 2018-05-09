@@ -10,4 +10,3 @@ ipython==5.5.0
 jupyter==1.0.0
 nltk==3.2.5
 ipdb==0.11
-textblog

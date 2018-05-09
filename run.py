@@ -1,6 +1,7 @@
 import os
 import time
 import shlex
+import itertools
 import subprocess
 from glob import glob
 from datetime import datetime
@@ -13,15 +14,25 @@ def list_dir(directory, prefix="", postfix=""):
     lists.sort()
     return lists
 
-def parallel_run(commands, config):
-    for idx, cmd in enumerate(commands):
-        num = idx % config.num_thread
-        cmd = 'CUDA_VISIBLE_DEVICES={} '.format(num) + cmd
+def grouper(iterable, n):
+    it = iter(iterable)
+    while True:
+       chunk = tuple(itertools.islice(it, n))
+       if not chunk:
+           return
+       yield chunk
 
-        if num != config.num_thread - 1:
-            run(cmd, config, wait=False)
-        else:
-            run(cmd, config)
+def parallel_run(commands, config):
+    for cmds in grouper(commands, config.num_thread):
+        procs = []
+
+        for num, cmd in enumerate(cmds):
+            cmd = 'CUDA_VISIBLE_DEVICES={} '.format(num % config.num_gpu) + cmd
+            proc = run(cmd, config)
+            procs.append(proc)
+
+        for proc in procs:
+            proc.wait()
 
 def makedirs(path):
     if not os.path.exists(path):
@@ -39,14 +50,12 @@ def symlink(src_path, dst_path):
         log.info("Sym link: {}->{}".format(src_path, dst_path))
         os.symlink(src_path, dst_path)
 
-def run(cmd, config, wait=True):
+def run(cmd, config):
     print(" [*] {}".format(cmd))
     if not config.debug:
-        if wait:
-            subprocess.call(cmd, shell=True)
-        else:
-            subprocess.Popen(cmd, shell=True)
-        time.sleep(1.1)
+        proc = subprocess.Popen(cmd, shell=True)
+        time.sleep(1)
+    return proc
 
 
 if __name__ == '__main__':
@@ -55,6 +64,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('num_thread', type=int)
+    parser.add_argument('num_gpu', type=int)
     parser.add_argument('--debug', type=int, default=0, help='0: normal, 1: debug')
     parser.add_argument('--time_str', type=str, default=None)
     parser.add_argument('--skip_vqa', type=int, default=0)
@@ -71,7 +81,7 @@ if __name__ == '__main__':
     VLMAP_SEEDS = [234, 345, 456]
     VQA_SEEDS = [123, 234, 345]
     DEPTHS = ['True', 'False']
-    MODEL_TYPES = ['vlmap_answer', 'standard_word2vec']
+    MODEL_TYPES = ['vlmap_answer'] #, 'standard_word2vec']
     
     #########################
     # 1. find_word_group.py
@@ -175,7 +185,8 @@ if __name__ == '__main__':
 
     cmds = []
     for key, important_dir in important_dirs.items():
-        cmd = "python vqa/eval_multiple_model.py --root_train_dir={}".format(important_dir)
+        #cmd = "python vqa/eval_multiple_model.py --root_train_dir={}".format(important_dir)
+        cmd = "python vqa/eval_multiple_model.py --root_train_dir=train_dir"
         cmds.append(cmd)
 
     parallel_run(cmds, config)
@@ -186,7 +197,8 @@ if __name__ == '__main__':
 
     cmds = []
     for key, important_dir in important_dirs.items():
-        cmd = "python vqa/eval_collection.py --root_train_dir={}".format(important_dir)
+        #cmd = "python vqa/eval_collection.py --root_train_dir={}".format(important_dir)
+        cmd = "python vqa/eval_multiple_model.py --root_train_dir=train_dir"
         cmds.append(cmd)
 
     parallel_run(cmds, config)

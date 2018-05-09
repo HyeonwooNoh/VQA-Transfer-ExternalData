@@ -55,6 +55,7 @@ def main():
     parser.add_argument('--batch_size', type=int, default=512, help=' ')
     parser.add_argument('--dump_heavy_output', action='store_true', default=False,
                         help=' ')
+    parser.add_argument('--debug', type=int, default=0, help='0: normal, 1: debug')
     config = parser.parse_args()
     check_config(config)
 
