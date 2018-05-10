@@ -4,17 +4,28 @@ import h5py
 import os
 import numpy as np
 
-from collections import Counter
-from itertools import groupby
-from nltk.corpus import stopwords  # remove stopwords and too frequent words (in, a, the ..)
 from tqdm import tqdm
+from itertools import groupby
+from collections import Counter
+from nltk.corpus import stopwords  # remove stopwords and too frequent words (in, a, the ..)
+from collections import defaultdict
 
 from util import log
 
+
+def str_list(value):
+    if not value:
+        return value
+    else:
+        return [num for num in value.split(',')]
+
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('--enwiki_dir', type=str,
-                    default='data/preprocessed/enwiki/enwiki_processed_backup', help=' ')
+parser.add_argument('--enwiki_dirs', type=str_list,
+                    default='data/preprocessed/enwiki/enwiki_processed_1_4,' \
+                            'data/preprocessed/enwiki/enwiki_processed_2_4,' \
+                            'data/preprocessed/enwiki/enwiki_processed_3_4,' \
+                            'data/preprocessed/enwiki/enwiki_processed_4_4', help=' ')
 parser.add_argument('--genome_annotation_dir', type=str,
                     default='data/VisualGenome/annotations', help=' ')
 parser.add_argument('--dir_name', type=str,
@@ -30,13 +41,25 @@ config = parser.parse_args()
 config.answer_dict_path = os.path.join(config.dir_name, 'answer_dict.pkl')
 answer_dict = cPickle.load(open(config.answer_dict_path, 'rb'))
 
-word2contexts_path = os.path.join(
-    config.enwiki_dir, 'word2contexts_w{}_p{}.pkl'.format(
-    config.context_window_size,
-    int(config.preprocessing)))
-log.info('loading word2context.. {}'.format(word2contexts_path))
-word2contexts = cPickle.load(open(word2contexts_path, 'rb'))
-log.info('done')
+word2contexts = None
+
+for enwiki_dir in tqdm(config.enwiki_dirs, desc="merging word2contexts"):
+    word2contexts_path = os.path.join(
+        enwiki_dir, 'word2contexts_w{}_p{}.pkl'.format(
+            config.context_window_size,
+            int(config.preprocessing)))
+
+    log.info('loading word2context.. {}'.format(word2contexts_path))
+    cur_word2contexts = cPickle.load(open(word2contexts_path, 'rb'))
+
+    if word2contexts is None:
+        word2contexts = cur_word2contexts
+    else:
+        for word, counter in tqdm(cur_word2contexts.items()):
+            for context, count in counter.items():
+                word2contexts[word][context] += count
+
+log.info('word2contexts done')
 
 context2word_list = {}
 for v in tqdm(word2contexts, desc='build context2word_list'):
