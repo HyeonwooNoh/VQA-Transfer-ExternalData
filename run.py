@@ -79,7 +79,7 @@ if __name__ == '__main__':
     time_str = config.time_str or datetime.now().strftime("%Y%m%d-%H%M%S")
 
     VLMAP_PREFIX = 'expand_depth'
-    TAG = time_str + "_vqa_bf_or_ws_123_from_vlamp_234_345_456_depth{}"
+    TAG = time_str + "_vqa_bf_or_ws_123_from_vlamp_234_345_456"
     VLMAP_BASE = "{vlmap_model}_d_memft_all_new_vocab50_obj3000_attr1000_maxlen10_" \
                  "{vlmap_prefix}_bs512_lr0.001_dp{depth}_seed{seed}_*"
 
@@ -149,8 +149,7 @@ if __name__ == '__main__':
     # 3. symlink to experiments/important/*
     #########################################
 
-    tag = TAG.format(depth)
-    important_dir = "{}/{}".format(config.result_dir, tag)
+    important_dir = "{}/{}".format(config.result_dir, TAG)
     makedirs(important_dir)
 
     important_sub_dirs = []
