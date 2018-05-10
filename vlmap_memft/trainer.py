@@ -96,7 +96,7 @@ class Trainer(object):
                 batch_opt, default=lambda: vlmap_batch['train'], exclusive=True)
 
         # Model
-        Model = self.get_model__class(config.model_type)
+        Model = self.get_model_class(config.model_type)
         log.infov('using model class: {}'.format(Model))
         self.model = Model(self.batch, config, is_train=True)
 

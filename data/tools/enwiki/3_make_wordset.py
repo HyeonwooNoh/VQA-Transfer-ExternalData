@@ -41,7 +41,7 @@ config = parser.parse_args()
 config.answer_dict_path = os.path.join(config.dir_name, 'answer_dict.pkl')
 answer_dict = cPickle.load(open(config.answer_dict_path, 'rb'))
 
-word2contexts = None
+word2contexts = defaultdict(lambda: defaultdict(int))
 
 for enwiki_dir in tqdm(config.enwiki_dirs, desc="merging word2contexts"):
     word2contexts_path = os.path.join(
@@ -52,12 +52,9 @@ for enwiki_dir in tqdm(config.enwiki_dirs, desc="merging word2contexts"):
     log.info('loading word2context.. {}'.format(word2contexts_path))
     cur_word2contexts = cPickle.load(open(word2contexts_path, 'rb'))
 
-    if word2contexts is None:
-        word2contexts = cur_word2contexts
-    else:
-        for word, counter in tqdm(cur_word2contexts.items()):
-            for context, count in counter.items():
-                word2contexts[word][context] += count
+    for word, counter in tqdm(cur_word2contexts.items()):
+        for context, count in counter.items():
+            word2contexts[word][context] += count
 
 log.info('word2contexts done')
 

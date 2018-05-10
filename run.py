@@ -65,6 +65,7 @@ if __name__ == '__main__':
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('num_thread', type=int)
     parser.add_argument('num_gpu', type=int)
+    parser.add_argument('vlmap_prefix', type=str)
     parser.add_argument('--debug', type=int, default=0, help='0: normal, 1: debug')
     parser.add_argument('--time_str', type=str, default=None)
     parser.add_argument('--enwiki_sep_num', type=int, default=4)
@@ -78,7 +79,7 @@ if __name__ == '__main__':
 
     time_str = config.time_str or datetime.now().strftime("%Y%m%d-%H%M%S")
 
-    VLMAP_PREFIX = 'expand_depth'
+    vlmap_prefix = config.vlmap_prefix
     TAG = time_str + "_vqa_bf_or_ws_123_from_vlamp_234_345_456"
     VLMAP_BASE = "{vlmap_model}_d_memft_all_new_vocab50_obj3000_attr1000_maxlen10_" \
                  "{vlmap_prefix}_bs512_lr0.001_dp{depth}_seed{seed}_*"
