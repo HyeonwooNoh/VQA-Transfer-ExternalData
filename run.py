@@ -23,10 +23,15 @@ def grouper(iterable, n):
        yield chunk
 
 def parallel_run(commands, config):
-    for cmds in grouper(commands, config.num_thread):
+    groups = grouper(commands, config.num_thread)
+
+    for idx, cmds in enumerate(groups):
         procs = []
 
         for num, cmd in enumerate(cmds):
+            print(" [*] Group {}/{}, Thread {}/{}". \
+                format(idx, len(groups), num, len(cmds)))
+
             cmd = 'CUDA_VISIBLE_DEVICES={} '.format(num % config.num_gpu) + cmd
             proc = run(cmd, config)
             procs.append(proc)
