@@ -160,6 +160,7 @@ if __name__ == '__main__':
         depth="*",
         seed="*"))
 
+    base_path = "{}/{}".format(config.result_dir, TAG)
     for directory in dirs:
         dir_time_str = directory.rsplit('_', 1)[1]
 
@@ -175,11 +176,27 @@ if __name__ == '__main__':
     #########################################
 
     cmds = []
+    steps = {}
+
     for directory in important_sub_dirs:
-        check_dir = os.path.join(directory, "word_weights_model-4800")
+        checkpoint_found = False
+        for tmp_step in [4800, 4801]:
+            check_path = os.path.join(directory, "model-{}.data-00000-of-00001".format(tmp_step))
+            if os.path.exists(check_path):
+                steps[directory] = tmp_step
+                checkpoint_found = True
+                break
+
+        if not checkpoint_found:
+            log.error("="*40)
+            log.error(" {} not found".format(check_path))
+            log.error("="*40)
+
+        check_dir = os.path.join(directory, "word_weights_model-{}".format(steps[directory]))
         if os.path.exists(check_dir):
             continue
-        checkpoint = os.path.join(directory, "model-4800")
+        checkpoint = os.path.join(directory, "model-{}".format(steps[directory]))
+
         cmd = "python vlmap_memft/export_word_weights.py --checkpoint={}".format(checkpoint)
         cmds.append(cmd)
 
@@ -197,19 +214,21 @@ if __name__ == '__main__':
 
     if not config.skip_vqa:
         cmds = []
-        for path in important_sub_dirs:
+        for directory in important_sub_dirs:
             for vqa_seed in VQA_SEEDS:
-                dp = find_arg(path, "dp")
-                vlmap_seed = find_arg(path, "seed")
+                dp = find_arg(directory, "dp")
+                vlmap_seed = find_arg(directory, "seed")
 
                 cmd = "python vqa/trainer.py" \
-                    " --vlmap_word_weight_dir {path}/word_weights_model-4800" \
+                    " --vlmap_word_weight_dir {directory}/word_weights_model-{step}" \
                     " --prefix dp{dp}_sd{vlmap_seed}_vqasd{vqa_seed} --seed {vqa_seed}" \
-                    .format(path=path, dp=dp, vlmap_seed=vlmap_seed, vqa_seed=vqa_seed)
+                    .format(directory=directory, dp=dp, step=steps[directory],
+                            vlmap_seed=vlmap_seed, vqa_seed=vqa_seed)
 
                 for model_type in MODEL_TYPES:
                     if model_type != 'standard_word2vec':
-                        cmd += " --pretrained_param_path {path}/model-4800".format(path=path)
+                        cmd += " --pretrained_param_path {directory}/model-{step}". \
+                            format(directory=directory, step=steps[directory])
 
                     cmd += " --model_type={}".format(model_type)
                     cmds.append(cmd)
