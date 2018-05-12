@@ -23,7 +23,7 @@ def grouper(iterable, n):
        yield chunk
 
 def parallel_run(commands, config):
-    groups = grouper(commands, config.num_thread)
+    groups = list(grouper(commands, config.num_thread))
 
     for idx, cmds in enumerate(groups):
         procs = []
@@ -89,13 +89,17 @@ if __name__ == '__main__':
     VLMAP_BASE = "{vlmap_model}_d_memft_all_new_vocab50_obj3000_attr1000_maxlen10_" \
                  "{vlmap_prefix}_bs512_lr0.001_dp{depth}_seed{seed}_*"
 
-    VLMAP_SEEDS = [234, 345, 456]
-    VQA_SEEDS = [123, 234, 345]
+    #VLMAP_SEEDS = [234, 345, 456]
+    #VQA_SEEDS = [123, 234, 345]
+    VLMAP_SEEDS = [234]
+    VQA_SEEDS = [123]
+
     DEPTHS = ['False']
     VLMAP_MODELS = ['vlmap_bf_or_wordset_withatt_sp',
                     'vlmap_enwiki_withatt_sp']
-    enwiki_preprocessing = False
-    MODEL_TYPES = ['vlmap_answer', 'standard_word2vec']
+    enwiki_preprocessing = False 
+    # standard_word2vec: 3, vlmap_answer: 6
+    MODEL_TYPES = ['standard_word2vec', 'vlmap_answer']
     
     #########################
     # 1. find_word_group.py
@@ -224,16 +228,28 @@ if __name__ == '__main__':
                 dp = find_arg(directory, "dp")
                 vlmap_seed = find_arg(directory, "seed")
 
-                cmd = "python vqa/trainer.py" \
+                base_cmd = "python vqa/trainer.py" \
                     " --vlmap_word_weight_dir {directory}/word_weights_model-{step}" \
-                    " --prefix dp{dp}_sd{vlmap_seed}_vqasd{vqa_seed} --seed {vqa_seed}" \
+                    " --seed {vqa_seed}" \
                     .format(directory=directory, dp=dp, step=steps[directory],
                             vlmap_seed=vlmap_seed, vqa_seed=vqa_seed)
 
                 for model_type in MODEL_TYPES:
-                    if model_type != 'standard_word2vec':
-                        cmd += " --pretrained_param_path {directory}/model-{step}". \
+                    if model_type == 'standard_word2vec':
+                        if 'vlmap_bf_or_wordset_withatt_sp' not in directory:
+                            continue
+                        cmd = base_cmd
+                    elif model_type == 'vlmap_answer':
+                        if 'vlmap_bf_or_wordset_withatt_sp' in directory:
+                            continue
+                        cmd = base_cmd + " --pretrained_param_path {directory}/model-{step}". \
                             format(directory=directory, step=steps[directory])
+                    else:
+                        raise Exception()
+
+                    cmd += " --prefix dp{dp}_md{model_type}_sd{vlmap_seed}_vqasd{vqa_seed}". \
+                        format(directory=directory, dp=dp, step=steps[directory],
+                               vlmap_seed=vlmap_seed, vqa_seed=vqa_seed, model_type=model_type)
 
                     cmd += " --model_type={}".format(model_type)
                     cmds.append(cmd)
