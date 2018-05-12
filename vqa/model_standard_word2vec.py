@@ -76,7 +76,7 @@ class Model(object):
             self.normal_boxes = image_features['normal_boxes']
             self.num_boxes = image_features['num_boxes']
             self.max_box_num = image_features['max_box_num']
-            self.vfeat_dim = image_features['v_feat_dim']
+            self.vfeat_dim = image_features['vfeat_dim']
 
         self.build()
 

@@ -261,11 +261,11 @@ if __name__ == '__main__':
     #########################################
 
     cmd = "python vqa/eval_multiple_model.py --root_train_dir=train_dir"
-    run(cmd, config)
+    parallel_run([cmd], config)
 
     #########################################
     # -1. vqa/eval_collection.py
     #########################################
 
     cmd = "python vqa/eval_collection.py --root_train_dir=train_dir"
-    run(cmd, config)
+    parallel_run([cmd], config)
