@@ -97,10 +97,11 @@ if __name__ == '__main__':
     #VQA_SEEDS = [123]
 
     DEPTHS = ['False']
-    VLMAP_MODELS = ['vlmap_bf_or_wordset_withatt_sp']
-    enwiki_preprocessing = False 
+    VLMAP_MODELS = [#'vlmap_bf_or_wordset_withatt_sp',
+                    'vlmap_enwiki_withatt_sp']
     # standard_word2vec: 3, vlmap_answer: 6
-    MODEL_TYPES = ['standard_word2vec']#, 'vlmap_answer']
+    MODEL_TYPES = ['vlmap_answer']
+    #MODEL_TYPES = ['standard_word2vec', 'vlmap_answer']
     
     #########################
     # 1. find_word_group.py
@@ -141,18 +142,39 @@ if __name__ == '__main__':
         for depth in DEPTHS:
             for vlmap_model in VLMAP_MODELS:
                 for vlmap_seed in VLMAP_SEEDS:
-                    cmd = 'python vlmap_memft/trainer.py' \
-                        ' --model_type={vlmap_model}' \
-                        ' --prefix={vlmap_prefix}' \
-                        ' --max_train_iter=4810 --seed={vlmap_seed} --expand_depth={depth}' \
-                        .format(vlmap_prefix=vlmap_prefix,
-                                vlmap_model=vlmap_model,
-                                vlmap_seed=vlmap_seed,
-                                depth=depth)
                     if vlmap_model == '':
+                        cmd = 'python vlmap_memft/trainer.py' \
+                            ' --model_type={vlmap_model}' \
+                            ' --prefix={vlmap_prefix}' \
+                            ' --max_train_iter=4810 --seed={vlmap_seed} --expand_depth={depth}' \
+                            .format(vlmap_prefix=vlmap_prefix,
+                                    vlmap_model=vlmap_model,
+                                    vlmap_seed=vlmap_seed,
+                                    depth=depth)
                         cmd += ' --enwiki_preprocessing=0'
+                        cmds.append(cmd)
+                    elif vlmap_model == 'vlmap_enwiki_withatt_sp':
+                        cmd = 'python vlmap_memft/trainer.py' \
+                            ' --model_type={vlmap_model}' \
+                            ' --prefix={vlmap_prefix}' \
+                            ' --max_train_iter=4810 --seed={vlmap_seed} --expand_depth={depth}' \
+                            .format(vlmap_prefix=vlmap_prefix+"wikipro0",
+                                    vlmap_model=vlmap_model,
+                                    vlmap_seed=vlmap_seed,
+                                    depth=depth)
+                        tmp_cmd = cmd + ' --enwiki_preprocessing=0'
+                        cmds.append(tmp_cmd)
 
-                    cmds.append(cmd)
+                        cmd = 'python vlmap_memft/trainer.py' \
+                            ' --model_type={vlmap_model}' \
+                            ' --prefix={vlmap_prefix}' \
+                            ' --max_train_iter=4810 --seed={vlmap_seed} --expand_depth={depth}' \
+                            .format(vlmap_prefix=vlmap_prefix+"wikipro1",
+                                    vlmap_model=vlmap_model,
+                                    vlmap_seed=vlmap_seed,
+                                    depth=depth)
+                        tmp_cmd = cmd + ' --enwiki_preprocessing=1'
+                        cmds.append(tmp_cmd)
 
         parallel_run(cmds, config)
     
