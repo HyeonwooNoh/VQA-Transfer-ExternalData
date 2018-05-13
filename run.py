@@ -89,17 +89,18 @@ if __name__ == '__main__':
     VLMAP_BASE = "{vlmap_model}_d_memft_all_new_vocab50_obj3000_attr1000_maxlen10_" \
                  "{vlmap_prefix}_bs512_lr0.001_dp{depth}_seed{seed}_*"
 
-    #VLMAP_SEEDS = [234, 345, 456]
-    #VQA_SEEDS = [123, 234, 345]
-    VLMAP_SEEDS = [234]
-    VQA_SEEDS = [123]
+    VLMAP_SEEDS = [234, 345, 456]
+    VQA_SEEDS = [123, 234, 345]
+    #VLMAP_SEEDS = [345, 456]
+    #VQA_SEEDS = [234, 345]
+    #VLMAP_SEEDS = [234]
+    #VQA_SEEDS = [123]
 
     DEPTHS = ['False']
-    VLMAP_MODELS = ['vlmap_bf_or_wordset_withatt_sp',
-                    'vlmap_enwiki_withatt_sp']
+    VLMAP_MODELS = ['vlmap_bf_or_wordset_withatt_sp']
     enwiki_preprocessing = False 
     # standard_word2vec: 3, vlmap_answer: 6
-    MODEL_TYPES = ['standard_word2vec', 'vlmap_answer']
+    MODEL_TYPES = ['standard_word2vec']#, 'vlmap_answer']
     
     #########################
     # 1. find_word_group.py

@@ -4,14 +4,20 @@ import h5py
 import os
 import numpy as np
 
+import math
 from tqdm import tqdm
+import multiprocessing
+from threading import Thread
 from itertools import groupby
 from collections import Counter
 from nltk.corpus import stopwords  # remove stopwords and too frequent words (in, a, the ..)
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 from util import log
 
+
+cpu_count = multiprocessing.cpu_count()
+num_thread = max(cpu_count - 2, 1)
 
 def str_list(value):
     if not value:
@@ -41,7 +47,7 @@ config = parser.parse_args()
 config.answer_dict_path = os.path.join(config.dir_name, 'answer_dict.pkl')
 answer_dict = cPickle.load(open(config.answer_dict_path, 'rb'))
 
-word2contexts = defaultdict(lambda: defaultdict(int))
+word2contexts = defaultdict(lambda: Counter())
 
 for enwiki_dir in tqdm(config.enwiki_dirs, desc="merging word2contexts"):
     word2contexts_path = os.path.join(
@@ -52,10 +58,29 @@ for enwiki_dir in tqdm(config.enwiki_dirs, desc="merging word2contexts"):
     log.info('loading word2context.. {}'.format(word2contexts_path))
     cur_word2contexts = cPickle.load(open(word2contexts_path, 'rb'))
 
-    for word, counter in tqdm(cur_word2contexts.items()):
-        for context, count in counter.items():
-            word2contexts[word][context] += count
+    def f(words, start, end):
+        for word in words[start:end]:
+            word2contexts[word] += Counter(cur_word2contexts[word])
 
+    words = cur_word2contexts.keys()
+    length = len(words)
+    num = int(math.ceil(length / num_thread))
+
+    threads = []
+    print("start thread")
+
+    for idx in range(num_thread):
+        t = Thread(
+            target=f,
+            args=(words, idx*num, (idx+1)*num))
+        threads.append(t)
+
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+#import ipdb; ipdb.set_trace() 
 log.info('word2contexts done')
 
 context2word_list = {}
