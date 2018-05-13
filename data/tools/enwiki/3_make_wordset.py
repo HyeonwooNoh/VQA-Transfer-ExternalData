@@ -320,7 +320,7 @@ for enwiki_dir in tqdm(config.enwiki_dirs, desc="merging word2contexts"):
                 continue
 
             for context, count in cur_word2contexts[word].iteritems():
-                if context not in word2contexts[word][context]:
+                if context not in word2contexts[word]:
                     word2contexts[word][context] = count
                 else:
                     word2contexts[word][context] += count
