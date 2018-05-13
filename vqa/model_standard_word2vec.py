@@ -196,7 +196,10 @@ class Model(object):
             answer_target = self.batch['answer_target']
             loss = tf.nn.sigmoid_cross_entropy_with_logits(
                 labels=answer_target, logits=logit)
-            loss = tf.reduce_mean(tf.reduce_sum(loss, axis=-1))
+            train_loss = tf.reduce_mean(tf.reduce_sum(
+                loss * self.train_answer_mask, axis=-1))
+            report_loss = tf.reduce_mean(tf.reduce_sum(loss, axis=-1))
+
             pred = tf.cast(tf.argmax(logit, axis=-1), dtype=tf.int32)
             one_hot_pred = tf.one_hot(pred, depth=self.num_answer,
                                       dtype=tf.float32)
@@ -272,9 +275,9 @@ class Model(object):
 
             self.mid_result['pred'] = pred
 
-            self.losses['answer'] = loss
-            self.report['answer_train_loss'] = loss
-            self.report['answer_report_loss'] = loss
+            self.losses['answer'] = train_loss
+            self.report['answer_train_loss'] = train_loss
+            self.report['answer_report_loss'] = report_loss
             self.report['answer_acc'] = acc
             self.report['exist_acc'] = exist_acc
             self.report['test_acc'] = test_acc
