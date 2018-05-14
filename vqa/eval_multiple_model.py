@@ -70,11 +70,20 @@ def main():
         log.infov('{:02d}: {}'.format(i, train_dir))
 
     # Initialization
-    train_dir = all_train_dirs[0]
-    checkpoints = glob.glob(os.path.join(train_dir, 'model-*.index'))
-    checkpoints = sorted([(int(c.split('model-')[1].split('.index')[0]),
-                           c.split('.index')[0]) for c in checkpoints],
-                         key=lambda x: x[0])
+    filtered_train_dirs = []
+    for train_dir in all_train_dirs:
+        checkpoints = glob.glob(os.path.join(train_dir, 'model-*.index'))
+        if len(checkpoints) == 0:
+            continue
+        else:
+            filtered_train_dirs.append(train_dir)
+
+        checkpoints = sorted([(int(c.split('model-')[1].split('.index')[0]),
+                            c.split('.index')[0]) for c in checkpoints],
+                            key=lambda x: x[0])
+
+    all_train_dirs = filtered_train_dirs
+
     config.checkpoint = checkpoints[0][1]
     parse_checkpoint(config)
 

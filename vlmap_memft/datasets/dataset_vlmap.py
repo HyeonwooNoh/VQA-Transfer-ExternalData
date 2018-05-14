@@ -50,8 +50,11 @@ class Dataset(object):
         log.info('loading wordset_dict done')
 
         log.warn('loading enwiki_context_dict ..')
-        enwiki_dict_pkl_path = os.path.join(data_dir, 'enwiki_context_dict_w3_n5.pkl')
-        enwiki_dict_h5_path = os.path.join(data_dir, 'enwiki_context_dict_w3_n5.hdf5')
+        enwiki_dict_pkl_path = os.path.join(
+            data_dir, 'enwiki_context_dict_w3_p{}_n5.pkl'.format(config.enwiki_preprocessing))
+        enwiki_dict_h5_path = os.path.join(
+            data_dir, 'enwiki_context_dict_w3_p{}_n5.hdf5'.format(config.enwiki_preprocessing))
+
         self.enwiki_dict = cPickle.load(open(enwiki_dict_pkl_path, 'rb'))
         with h5py.File(enwiki_dict_h5_path, 'r') as f:
             self.enwiki_dict['np_context'] = f['np_context'].value
