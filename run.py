@@ -270,9 +270,12 @@ if __name__ == '__main__':
                     else:
                         raise Exception()
 
-                    cmd += " --prefix dp{dp}_md{model_type}_sd{vlmap_seed}_vqasd{vqa_seed}". \
-                        format(directory=directory, dp=dp, step=steps[directory],
-                               vlmap_seed=vlmap_seed, vqa_seed=vqa_seed, model_type=model_type)
+                    vlmap_prefix = "{}_{}".format(
+                        config.vlmap_prefix, directory.split(config.vlmap_prefix)[1])
+
+                    cmd += " --prefix {vlmap_prefix}_md{model_type}_vqasd{vqa_seed}". \
+                        format(directory=directory, vlmap_prefix=vlmap_prefix,
+                               vqa_seed=vqa_seed, model_type=model_type)
 
                     cmd += " --model_type={}".format(model_type)
                     cmds.append(cmd)
