@@ -43,6 +43,8 @@ class Trainer(object):
             from vlmap_memft.model_vlmap_bf_or_wordset_withatt_sp import Model
         elif model_type == 'vlmap_enwiki_withatt_sp':
             from vlmap_memft.model_vlmap_enwiki_withatt_sp import Model
+        elif model_type == 'model_vlmap_bf_enwiki_withatt_sp':
+            from vlmap_memft.model_model_vlmap_bf_enwiki_withatt_sp import Model
         elif model_type == 'vlmap_bf_or_wordset_enwiki_withatt_sp':
             from vlmap_memft.model_vlmap_bf_or_wordset_enwiki_withatt_sp import Model
         elif model_type == 'vlmap_noc_bf_or_wordset_withatt_sp':
@@ -356,6 +358,7 @@ def main():
                                  'vlmap_bf_or_wordset_withatt',
                                  'vlmap_bf_or_wordset_withatt_sp',
                                  'vlmap_enwiki_withatt_sp',
+                                 'vlmap_bf_enwiki_withatt_sp',
                                  'vlmap_bf_or_wordset_enwiki_withatt_sp',
                                  'vlmap_noc_bf_or_wordset_withatt_sp',
                                  'vlmap_bf_or_wordset_withatt_sp_obj',
