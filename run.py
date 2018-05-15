@@ -96,9 +96,10 @@ if __name__ == '__main__':
     #VLMAP_SEEDS = [234]
     #VQA_SEEDS = [123]
 
+    ENWIKI_PREPROCESSING = int(False)
     DEPTHS = ['False']
-    VLMAP_MODELS = [#'vlmap_bf_or_wordset_withatt_sp',
-                    'vlmap_enwiki_withatt_sp']
+    VLMAP_MODELS = ['vlmap_bf_or_wordset_enwiki_withatt_sp',
+                    'vlmap_bf_enwiki_withatt_sp']
     # standard_word2vec: 3, vlmap_answer: 6
     MODEL_TYPES = ['vlmap_answer']
     #MODEL_TYPES = ['standard_word2vec', 'vlmap_answer']
@@ -142,18 +143,7 @@ if __name__ == '__main__':
         for depth in DEPTHS:
             for vlmap_model in VLMAP_MODELS:
                 for vlmap_seed in VLMAP_SEEDS:
-                    if vlmap_model == '':
-                        cmd = 'python vlmap_memft/trainer.py' \
-                            ' --model_type={vlmap_model}' \
-                            ' --prefix={vlmap_prefix}' \
-                            ' --max_train_iter=4810 --seed={vlmap_seed} --expand_depth={depth}' \
-                            .format(vlmap_prefix=vlmap_prefix,
-                                    vlmap_model=vlmap_model,
-                                    vlmap_seed=vlmap_seed,
-                                    depth=depth)
-                        cmd += ' --enwiki_preprocessing=0'
-                        cmds.append(cmd)
-                    elif vlmap_model == 'vlmap_enwiki_withatt_sp':
+                    if vlmap_model == 'vlmap_enwiki_withatt_sp':
                         cmd = 'python vlmap_memft/trainer.py' \
                             ' --model_type={vlmap_model}' \
                             ' --prefix={vlmap_prefix}' \
@@ -175,6 +165,17 @@ if __name__ == '__main__':
                                     depth=depth)
                         tmp_cmd = cmd + ' --enwiki_preprocessing=1'
                         cmds.append(tmp_cmd)
+                    else:
+                        cmd = 'python vlmap_memft/trainer.py' \
+                            ' --model_type={vlmap_model}' \
+                            ' --prefix={vlmap_prefix}' \
+                            ' --max_train_iter=4810 --seed={vlmap_seed} --expand_depth={depth}' \
+                            .format(vlmap_prefix=vlmap_prefix,
+                                    vlmap_model=vlmap_model,
+                                    vlmap_seed=vlmap_seed,
+                                    depth=depth)
+                        cmd += ' --enwiki_preprocessing={}'.format(ENWIKI_PREPROCESSING)
+                        cmds.append(cmd)
 
         parallel_run(cmds, config)
     
@@ -270,9 +271,12 @@ if __name__ == '__main__':
                     else:
                         raise Exception()
 
-                    cmd += " --prefix dp{dp}_md{model_type}_sd{vlmap_seed}_vqasd{vqa_seed}". \
-                        format(directory=directory, dp=dp, step=steps[directory],
-                               vlmap_seed=vlmap_seed, vqa_seed=vqa_seed, model_type=model_type)
+                    vlmap_prefix = "{}_{}".format(
+                        config.vlmap_prefix, directory.split(config.vlmap_prefix)[1])
+
+                    cmd += " --prefix {vlmap_prefix}_md{model_type}_vqasd{vqa_seed}". \
+                        format(directory=directory, vlmap_prefix=vlmap_prefix,
+                               vqa_seed=vqa_seed, model_type=model_type)
 
                     cmd += " --model_type={}".format(model_type)
                     cmds.append(cmd)
