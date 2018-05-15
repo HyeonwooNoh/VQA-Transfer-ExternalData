@@ -2,7 +2,9 @@ import argparse
 import cPickle
 import glob
 import os
+import numpy as np
 
+from collections import defaultdict
 from tqdm import tqdm
 
 from util import log
@@ -13,6 +15,9 @@ parser.add_argument('--root_train_dir', type=str, default=None, help=' ')
 parser.add_argument('--train_dirs', nargs='+', type=str, default=[], help=' ')
 parser.add_argument('--split', type=str, default='test', help=' ',
                     choices=['train', 'val', 'testval', 'test'])
+parser.add_argument('--qa_split_dir', type=str, default='data/preprocessed/vqa_v2'
+                    '/qa_split_objattr_answer_3div4_genome_memft_check_all'
+                    '_answer_thres1_50000_thres2_-1', help=' ')
 config = parser.parse_args()
 
 if config.root_train_dir is None and len(config.train_dirs) == 0:
@@ -25,6 +30,9 @@ if config.root_train_dir is None:
 else:
     all_train_dirs = glob.glob(os.path.join(config.root_train_dir, 'vqa_*'))
 all_train_dirs = sorted(all_train_dirs)
+
+pure_test_qid2anno_path = os.path.join(config.qa_split_dir, 'pure_test_qid2anno.pkl')
+pure_test_qid2anno = cPickle.load(open(pure_test_qid2anno_path, 'rb'))
 
 log.warn('all_train_dirs:')
 for i, train_dir in enumerate(all_train_dirs):
@@ -39,15 +47,7 @@ for i_train_dir, train_dir in enumerate(all_train_dirs):
                      for e in eval_dirs}
     iters = sorted(eval_iter2dir)
 
-    collect_results = {
-        'iter': [],
-        'testonly_score': [],
-        'testonly_score_num_point': [],
-        'test_obj_only_score': [],
-        'test_obj_only_score_num_point': [],
-        'test_attr_only_score': [],
-        'test_attr_only_score_num_point': [],
-    }
+    collect_results = defaultdict(list)
     collect_list = [('iter', 'testonly_score', 'testonly_score_num_point',
                      'test_obj_only_score', 'test_obj_only_score_num_point',
                      'test_attr_only_score', 'test_attr_only_score_num_point')]
@@ -55,8 +55,24 @@ for i_train_dir, train_dir in enumerate(all_train_dirs):
         eval_dir = eval_iter2dir[i]
         results = cPickle.load(open(os.path.join(eval_dir, 'results.pkl'), 'rb'))
         avg = results['avg_eval_report']
+        res = results['qid2result']
         collect_results['iter'].append(i)
+        new_testonly_score = np.array(
+            [anno['answer_score'].get(res[qid]['pred'], 0)
+             for qid, anno in pure_test_qid2anno.items()]).mean()
+        new_test_obj_only_score = np.array(
+            [anno['answer_score'].get(res[qid]['pred'], 0)
+             for qid, anno in pure_test_qid2anno.items()
+             if res[qid]['test_attr_max_score'] <= 0]).mean()
+        new_test_attr_only_score = np.array(
+            [anno['answer_score'].get(res[qid]['pred'], 0)
+             for qid, anno in pure_test_qid2anno.items()
+             if res[qid]['test_obj_max_score'] <= 0]).mean()
+
         collect_results['testonly_score'].append(avg['testonly_score'])
+        collect_results['new_testonly_score'].append(new_testonly_score)
+        collect_results['new_test_obj_only_score'].append(new_test_obj_only_score)
+        collect_results['new_test_attr_only_score'].append(new_test_attr_only_score)
         collect_results['testonly_score_num_point'].append(avg['testonly_score_num_point'])
         collect_results['test_obj_only_score'].append(
             avg['test_obj_only_score'])
