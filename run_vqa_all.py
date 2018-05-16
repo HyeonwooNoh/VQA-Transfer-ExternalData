@@ -98,6 +98,9 @@ if __name__ == '__main__':
     # standard_word2vec: 3, vlmap_answer: 6
     MODEL_TYPES = ['vlmap_answer']
     #MODEL_TYPES = ['standard_word2vec', 'vlmap_answer']
+
+    #VQA_DEFAULT_ARG = ' --tf_record_dir=data/preprocessed/vqa_v2/qa_split_objattr_answer_3div4_genome_memft_check_all_answer_thres1_50000_thres2_-1/tf_record_memft'
+    VQA_DEFAULT_ARG = ' --tf_record_dir=data/preprocessed/vqa_v2/qa_split_objattr_answer_3div4_genome_memft_check_all_answer_thres1_50000_thres2_-1_with_seen_answer_in_test/tf_record_memft'
     
     #########################################
     # 3. symlink to experiments/important/*
@@ -180,6 +183,8 @@ if __name__ == '__main__':
                     " --seed {vqa_seed}" \
                     .format(directory=directory, dp=dp, step=steps[directory],
                             vlmap_seed=vlmap_seed, vqa_seed=vqa_seed)
+
+                base_cmd += VQA_DEFAULT_ARG
 
                 for model_type in MODEL_TYPES:
                     if model_type.startswith('standard'):

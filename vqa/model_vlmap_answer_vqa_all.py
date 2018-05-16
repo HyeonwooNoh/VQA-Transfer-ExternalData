@@ -186,29 +186,32 @@ class Model(object):
 
         logit = modules.WordWeightAnswer(
             joint, self.answer_dict, self.word_weight_dir,
-            use_bias=True, is_training=self.is_train, scope='WordWeightAnswer')
+            use_bias=True, is_training=self.is_train,
+            default_bias=-100.0, scope='WordWeightAnswer')
+
         ##########################
         # 2. Fine tuned vlmap
         ##########################
 
-        log.warning('q_linear_l')
+        log.warning('tuned_q_linear_l')
         tuned_l_linear_l = modules.fc_layer(
             q_L_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train,
-            scope='q_linear_l')
+            scope='tuned_q_linear_l')
         self.mid_result['tuned_l_linear_l'] = tuned_l_linear_l
 
         tuned_joint = modules.fc_layer(
             pooled_linear_l * tuned_l_linear_l, L_DIM * 2,
             use_bias=True, use_bn=False, use_ln=True,
-            activation_fn=tf.nn.relu, is_training=self.is_train, scope='tuned_joint_fc')
+            activation_fn=tf.nn.relu, is_training=self.is_train,
+            scope='tuned_joint_fc')
         tuned_joint = tf.nn.dropout(tuned_joint, 0.5)
         self.mid_result['tuned_joint'] = tuned_joint
 
         tuned_logit = modules.WordWeightAnswer(
             tuned_joint, self.answer_dict, self.word_weight_dir,
             use_bias=True, is_training=self.is_train,
-            scope='TunedWordWeightAnswer')
+            default_bias=0, scope='TunedWordWeightAnswer')
 
         ##########################
         # 3. Combine logits
@@ -226,7 +229,7 @@ class Model(object):
             untuned_loss = tf.nn.sigmoid_cross_entropy_with_logits(
                 labels=answer_target, logits=logit)
             tuned_loss = tf.nn.sigmoid_cross_entropy_with_logits(
-                labels=answer_target, logits=tuned_logit)
+                labels=answer_target, logits=logit + tuned_logit)
 
             loss = untuned_loss + tuned_loss
 

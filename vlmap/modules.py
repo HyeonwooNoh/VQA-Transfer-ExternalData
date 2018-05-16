@@ -591,13 +591,14 @@ def WordWeightAnswer(input, answer_dict, word_weight_dir=None,
                      scope='WordWeightAnswer',
                      weight_name='class_weights',
                      bias_name='class_biases',
+                     default_bias=-100.0,
                      reuse=tf.AUTO_REUSE):
     with tf.variable_scope(scope, reuse=reuse) as scope:
         log.warning(scope.name)
         input_dim = input.get_shape().as_list()[-1]
         dim = len(answer_dict['vocab'])
         weights = np.zeros([input_dim, dim], dtype=np.float32)
-        biases = np.zeros([dim], dtype=np.float32) - 100.0
+        biases = np.zeros([dim], dtype=np.float32) + default_bias
         if word_weight_dir is not None:
             word_answer_dict_path = os.path.join(word_weight_dir, 'answer_dict.pkl')
             word_answer_dict = cPickle.load(open(word_answer_dict_path, 'rb'))
