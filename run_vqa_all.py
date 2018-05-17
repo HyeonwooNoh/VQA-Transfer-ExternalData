@@ -92,9 +92,9 @@ if __name__ == '__main__':
     VQA_SEEDS = [123, 234, 345]
 
     DEPTHS = ['False']
-    MODEL_TYPES = [#'vlmap_answer_vqa_all',
-                   'standard',
-                   'standard_word2vec']
+    MODEL_TYPES = ['vlmap_answer_vqa_all',
+                   #'standard',
+                   #'standard_word2vec']
     # standard_word2vec: 3, vlmap_answer: 6
     MODEL_TYPES = ['vlmap_answer']
     #MODEL_TYPES = ['standard_word2vec', 'vlmap_answer']
