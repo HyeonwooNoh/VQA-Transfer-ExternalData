@@ -89,18 +89,20 @@ if __name__ == '__main__':
     VLMAP_BASE = "{vlmap_model}_d_memft_all_new_vocab50_obj3000_attr1000_maxlen10_" \
                  "{vlmap_prefix}_bs512_lr0.001_dp{depth}_seed{seed}_*"
 
+    VLMAP_SEEDS = [234, 345, 456]
     VQA_SEEDS = [123, 234, 345]
+    #VLMAP_SEEDS = [345, 456]
+    #VQA_SEEDS = [234, 345]
+    #VLMAP_SEEDS = [234]
+    #VQA_SEEDS = [123]
 
+    ENWIKI_PREPROCESSING = int(False)
     DEPTHS = ['False']
-    MODEL_TYPES = ['vlmap_answer_vqa_all',
-                   #'standard',
-                   #'standard_word2vec']
+    VLMAP_MODELS = ['vlmap_bf_or_wordset_enwiki_withatt_sp',
+                    'vlmap_bf_enwiki_withatt_sp']
     # standard_word2vec: 3, vlmap_answer: 6
     MODEL_TYPES = ['vlmap_answer']
     #MODEL_TYPES = ['standard_word2vec', 'vlmap_answer']
-
-    #VQA_DEFAULT_ARG = ' --tf_record_dir=data/preprocessed/vqa_v2/qa_split_objattr_answer_3div4_genome_memft_check_all_answer_thres1_50000_thres2_-1/tf_record_memft'
-    VQA_DEFAULT_ARG = ' --tf_record_dir=data/preprocessed/vqa_v2/qa_split_objattr_answer_3div4_genome_memft_check_all_answer_thres1_50000_thres2_-1_with_seen_answer_in_test/tf_record_memft'
     
     #########################################
     # 3. symlink to experiments/important/*
@@ -184,12 +186,14 @@ if __name__ == '__main__':
                     .format(directory=directory, dp=dp, step=steps[directory],
                             vlmap_seed=vlmap_seed, vqa_seed=vqa_seed)
 
-                base_cmd += VQA_DEFAULT_ARG
-
                 for model_type in MODEL_TYPES:
-                    if model_type.startswith('standard'):
+                    if model_type == 'standard_word2vec':
+                        if 'vlmap_bf_or_wordset_withatt_sp' not in directory:
+                            continue
                         cmd = base_cmd
                     elif model_type == 'vlmap_answer':
+                        if 'vlmap_bf_or_wordset_withatt_sp' in directory:
+                            continue
                         cmd = base_cmd + " --pretrained_param_path {directory}/model-{step}". \
                             format(directory=directory, step=steps[directory])
                     else:

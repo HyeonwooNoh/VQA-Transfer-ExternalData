@@ -29,6 +29,9 @@ def parallel_run(commands, config):
         procs = []
 
         for num, cmd in enumerate(cmds):
+            if num > 0:
+                time.sleep(60*3)
+
             print(" [*] Group {}/{}, Thread {}/{}". \
                 format(idx, len(groups), num, len(cmds)))
 
@@ -233,6 +236,7 @@ if __name__ == '__main__':
         cmd = "python vlmap_memft/export_word_weights.py --checkpoint={}".format(checkpoint)
         cmds.append(cmd)
 
+    cmds = list(reversed(cmds))
     parallel_run(cmds, config)
 
     #########################################
