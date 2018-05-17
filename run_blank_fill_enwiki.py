@@ -89,18 +89,94 @@ if __name__ == '__main__':
     VLMAP_BASE = "{vlmap_model}_d_memft_all_new_vocab50_obj3000_attr1000_maxlen10_" \
                  "{vlmap_prefix}_bs512_lr0.001_dp{depth}_seed{seed}_*"
 
+    VLMAP_SEEDS = [234, 345, 456]
     VQA_SEEDS = [123, 234, 345]
+    #VLMAP_SEEDS = [345, 456]
+    #VQA_SEEDS = [234, 345]
+    #VLMAP_SEEDS = [234]
+    #VQA_SEEDS = [123]
 
+    ENWIKI_PREPROCESSING = int(False)
     DEPTHS = ['False']
-    MODEL_TYPES = [#'vlmap_answer_vqa_all',
-                   'standard',
-                   'standard_word2vec']
+    VLMAP_MODELS = ['vlmap_noc_bf_or_enwiki_withatt_sp']
     # standard_word2vec: 3, vlmap_answer: 6
     MODEL_TYPES = ['vlmap_answer']
     #MODEL_TYPES = ['standard_word2vec', 'vlmap_answer']
+    
+    #########################
+    # 1. find_word_group.py
+    #########################
 
-    #VQA_DEFAULT_ARG = ' --tf_record_dir=data/preprocessed/vqa_v2/qa_split_objattr_answer_3div4_genome_memft_check_all_answer_thres1_50000_thres2_-1/tf_record_memft'
-    VQA_DEFAULT_ARG = ' --tf_record_dir=data/preprocessed/vqa_v2/qa_split_objattr_answer_3div4_genome_memft_check_all_answer_thres1_50000_thres2_-1_with_seen_answer_in_test/tf_record_memft'
+    if config.process_depth:
+        cmds = []
+        for depth in DEPTHS:
+            cmd = 'python data/tools/visualgenome/find_word_group.py --expand_depth={}'.format(depth)
+            cmds.append(cmd)
+            #run(cmd, config)
+
+        parallel_run(cmds, config)
+
+    if config.process_enwiki:
+        cmds = []
+        base_cmd = 'python data/tools/enwiki/{} --enwiki_dir=data/preprocessed/enwiki/enwiki_processed_{}_{}'
+
+        def loop(filename, args):
+            for arg, values in args.items():
+                for value in values:
+                    for idx in range(1, config.enwiki_sep_num+1):
+                        cmd = base_cmd.format(filename, idx, config.enwiki_sep_num)
+                        cmd += " --{}={}".format(arg, value)
+                        cmds.append(cmd)
+
+        loop('2_word2contexts.py', {'preprocessing': [0, 1]})
+
+        #cmds.append(base_cmd.format('3_make_wordset.py', idx, config.enwiki_sep_num))
+        parallel_run(cmds, config)
+    
+    ###############################
+    # 2. vlmap_memft/trainer.py
+    ###############################
+
+    if not config.skip_vlmap:
+        cmds = []
+        for depth in DEPTHS:
+            for vlmap_model in VLMAP_MODELS:
+                for vlmap_seed in VLMAP_SEEDS:
+                    if vlmap_model == 'vlmap_enwiki_withatt_sp':
+                        cmd = 'python vlmap_memft/trainer.py' \
+                            ' --model_type={vlmap_model}' \
+                            ' --prefix={vlmap_prefix}' \
+                            ' --max_train_iter=4810 --seed={vlmap_seed} --expand_depth={depth}' \
+                            .format(vlmap_prefix=vlmap_prefix+"wikipro0",
+                                    vlmap_model=vlmap_model,
+                                    vlmap_seed=vlmap_seed,
+                                    depth=depth)
+                        tmp_cmd = cmd + ' --enwiki_preprocessing=0'
+                        cmds.append(tmp_cmd)
+
+                        cmd = 'python vlmap_memft/trainer.py' \
+                            ' --model_type={vlmap_model}' \
+                            ' --prefix={vlmap_prefix}' \
+                            ' --max_train_iter=4810 --seed={vlmap_seed} --expand_depth={depth}' \
+                            .format(vlmap_prefix=vlmap_prefix+"wikipro1",
+                                    vlmap_model=vlmap_model,
+                                    vlmap_seed=vlmap_seed,
+                                    depth=depth)
+                        tmp_cmd = cmd + ' --enwiki_preprocessing=1'
+                        cmds.append(tmp_cmd)
+                    else:
+                        cmd = 'python vlmap_memft/trainer.py' \
+                            ' --model_type={vlmap_model}' \
+                            ' --prefix={vlmap_prefix}' \
+                            ' --max_train_iter=4810 --seed={vlmap_seed} --expand_depth={depth}' \
+                            .format(vlmap_prefix=vlmap_prefix,
+                                    vlmap_model=vlmap_model,
+                                    vlmap_seed=vlmap_seed,
+                                    depth=depth)
+                        cmd += ' --enwiki_preprocessing={}'.format(ENWIKI_PREPROCESSING)
+                        cmds.append(cmd)
+
+        parallel_run(cmds, config)
     
     #########################################
     # 3. symlink to experiments/important/*
@@ -115,9 +191,6 @@ if __name__ == '__main__':
         vlmap_model="*",
         depth="*",
         seed="*"))
-
-    # should add paths for pretrained vlmap_memfit paths
-    import ipdb; ipdb.set_trace() 
 
     base_path = "{}/{}".format(config.result_dir, TAG)
     for directory in dirs:
@@ -184,12 +257,14 @@ if __name__ == '__main__':
                     .format(directory=directory, dp=dp, step=steps[directory],
                             vlmap_seed=vlmap_seed, vqa_seed=vqa_seed)
 
-                base_cmd += VQA_DEFAULT_ARG
-
                 for model_type in MODEL_TYPES:
                     if model_type.startswith('standard'):
+                        if 'vlmap_bf_or_wordset_withatt_sp' not in directory:
+                            continue
                         cmd = base_cmd
                     elif model_type == 'vlmap_answer':
+                        if 'vlmap_bf_or_wordset_withatt_sp' in directory:
+                            continue
                         cmd = base_cmd + " --pretrained_param_path {directory}/model-{step}". \
                             format(directory=directory, step=steps[directory])
                     else:

@@ -281,6 +281,7 @@ if __name__ == '__main__':
                     cmd += " --model_type={}".format(model_type)
                     cmds.append(cmd)
 
+        import ipdb; ipdb.set_trace() 
         parallel_run(cmds, config)
 
     #########################################
