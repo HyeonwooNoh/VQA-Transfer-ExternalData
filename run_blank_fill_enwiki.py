@@ -29,9 +29,6 @@ def parallel_run(commands, config):
         procs = []
 
         for num, cmd in enumerate(cmds):
-            if num > 0:
-                time.sleep(60*3)
-
             print(" [*] Group {}/{}, Thread {}/{}". \
                 format(idx, len(groups), num, len(cmds)))
 
@@ -101,8 +98,7 @@ if __name__ == '__main__':
 
     ENWIKI_PREPROCESSING = int(False)
     DEPTHS = ['False']
-    VLMAP_MODELS = ['vlmap_bf_or_wordset_enwiki_withatt_sp',
-                    'vlmap_bf_enwiki_withatt_sp']
+    VLMAP_MODELS = ['vlmap_noc_bf_or_enwiki_withatt_sp']
     # standard_word2vec: 3, vlmap_answer: 6
     MODEL_TYPES = ['vlmap_answer']
     #MODEL_TYPES = ['standard_word2vec', 'vlmap_answer']
@@ -236,7 +232,6 @@ if __name__ == '__main__':
         cmd = "python vlmap_memft/export_word_weights.py --checkpoint={}".format(checkpoint)
         cmds.append(cmd)
 
-    cmds = list(reversed(cmds))
     parallel_run(cmds, config)
 
     #########################################
@@ -285,7 +280,6 @@ if __name__ == '__main__':
                     cmd += " --model_type={}".format(model_type)
                     cmds.append(cmd)
 
-        import ipdb; ipdb.set_trace() 
         parallel_run(cmds, config)
 
     #########################################

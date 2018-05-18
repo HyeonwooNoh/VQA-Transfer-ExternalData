@@ -3,6 +3,7 @@ def get_model_types():
         'vqa',
         'standard', 'standard_testmask', 'standard_word2vec',
         'vlmap_only', 'vlmap_finetune', 'vlmap_answer',
+        'vlmap_answer_vqa_all',
         'vlmap_answer2',
         'vlmap_answer_noc',
         'vlmap_answer_adapt', 'vlmap_answer_ent',
@@ -26,6 +27,8 @@ def get_model_class(model_type='vqa'):
         from vqa.model_vlmap_finetune import Model
     elif model_type == 'vlmap_answer':
         from vqa.model_vlmap_answer import Model
+    elif model_type == 'vlmap_answer_vqa_all':
+        from vqa.model_vlmap_answer_vqa_all import Model
     elif model_type == 'vlmap_answer2':
         from vqa.model_vlmap_answer2 import Model
     elif model_type == 'vlmap_answer_noc':
