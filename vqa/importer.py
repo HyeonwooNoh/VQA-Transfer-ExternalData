@@ -27,7 +27,7 @@ def get_model_class(model_type='vqa'):
         from vqa.model_vlmap_finetune import Model
     elif model_type == 'vlmap_answer':
         from vqa.model_vlmap_answer import Model
-    elif model_type == 'vlmap_answer_vqa_all':
+    elif model_type == 'vlmap_answer_vqa_all' or model_type == 'vlmap_answer_':
         from vqa.model_vlmap_answer_vqa_all import Model
     elif model_type == 'vlmap_answer2':
         from vqa.model_vlmap_answer2 import Model
@@ -42,5 +42,5 @@ def get_model_class(model_type='vqa'):
     elif model_type == 'vlmap_answer_no_noise':
         from vqa.model_vlmap_answer_no_noise import Model
     else:
-        raise ValueError('Unknown model_type')
+        raise ValueError('Unknown model_type: {}'.format(model_type))
     return Model

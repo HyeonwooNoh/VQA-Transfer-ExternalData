@@ -92,9 +92,9 @@ if __name__ == '__main__':
     VQA_SEEDS = [123, 234, 345]
 
     DEPTHS = ['False']
-    MODEL_TYPES = [#'vlmap_answer_vqa_all',
-                   'standard',
-                   'standard_word2vec']
+    MODEL_TYPES = ['vlmap_answer_vqa_all']
+                   #'standard',
+                   #'standard_word2vec']
     # standard_word2vec: 3, vlmap_answer: 6
     #MODEL_TYPES = ['vlmap_answer']#, 'vlmap_answer_vqa_all']
     #MODEL_TYPES = ['standard_word2vec', 'vlmap_answer']
@@ -172,18 +172,20 @@ if __name__ == '__main__':
 
     if not config.skip_vqa:
         cmds = []
+        directory = "/root/git/vlmap_bf_or_wordset_withatt_sp_d_memft_all_new_vocab50_obj3000_attr1000_maxlen10_default_bs512_lr0.001"
+        step = 4801
+
         for vqa_seed in VQA_SEEDS:
             base_cmd = "python vqa/trainer.py" \
+                " --vlmap_word_weight_dir {directory}/word_weights_model-{step}" \
                 " --seed {vqa_seed}" \
-                .format(vqa_seed=vqa_seed)
+                .format(vqa_seed=vqa_seed, directory=directory, step=step)
 
             base_cmd += VQA_DEFAULT_ARG
 
             for model_type in MODEL_TYPES:
-                if model_type.startswith('standard'):
-                    cmd = base_cmd
-                else:
-                    raise Exception()
+                cmd = base_cmd + " --pretrained_param_path {directory}/model-{step}". \
+                            format(directory=directory, step=step)
 
                 cmd += " --prefix md{model_type}_vqasd{vqa_seed}". \
                     format(vlmap_prefix=vlmap_prefix,
