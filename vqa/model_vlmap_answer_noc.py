@@ -80,7 +80,8 @@ class Model(object):
         for var in trainable_vars:
             if var.name.split('/')[0] == 'q_linear_l': pass
             elif var.name.split('/')[0] == 'pooled_linear_l': pass
-            elif var.name.split('/')[0] == 'joint_fc': pass
+            elif var.name.split('/')[0] == 'joint_v': pass
+            elif var.name.split('/')[0] == 'joint_l': pass
             elif var.name.split('/')[0] == 'WordWeightAnswerV': pass
             elif var.name.split('/')[0] == 'WordWeightAnswerL': pass
             else: train_vars.append(var)
@@ -92,6 +93,10 @@ class Model(object):
             if var.name.split('/')[0] == 'q_linear_l':
                 transfer_vars.append(var)
             elif var.name.split('/')[0] == 'pooled_linear_l':
+                transfer_vars.append(var)
+            elif var.name.split('/')[0] == 'joint_v':
+                transfer_vars.append(var)
+            elif var.name.split('/')[0] == 'joint_l':
                 transfer_vars.append(var)
         return transfer_vars
 
@@ -157,29 +162,39 @@ class Model(object):
         """
         log.warning('pooled_linear_l')
         pooled_linear_l = modules.fc_layer(
-            pooled_V_ft, L_DIM * 2, use_bias=True, use_bn=False, use_ln=True,
+            pooled_V_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='pooled_linear_l')
-        pooled_linear_l = tf.nn.dropout(pooled_linear_l, 0.5)
         self.mid_result['pooled_linear_l'] = pooled_linear_l
 
         log.warning('q_linear_l')
         l_linear_l = modules.fc_layer(
-            q_L_ft, L_DIM * 2, use_bias=True, use_bn=False, use_ln=True,
+            q_L_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='q_linear_l')
-        l_linear_l = tf.nn.dropout(l_linear_l, 0.5)
         self.mid_result['l_linear_l'] = l_linear_l
 
+        v_joint = modules.fc_layer(
+            pooled_linear_l, L_DIM * 2,
+            use_bias=True, use_bn=False, use_ln=True,
+            activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_v')
+        v_joint = tf.nn.dropout(v_joint, 0.5)
+
+        l_joint = modules.fc_layer(
+            l_linear_l, L_DIM * 2,
+            use_bias=True, use_bn=False, use_ln=True,
+            activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_l')
+        l_joint = tf.nn.dropout(l_joint, 0.5)
+
         v_logit = modules.WordWeightAnswer(
-            pooled_linear_l, self.answer_dict, self.word_weight_dir,
+            v_joint, self.answer_dict, self.word_weight_dir,
             use_bias=True, is_training=self.is_train,
             scope='WordWeightAnswerV',
             weight_name='v_class_weights',
             bias_name='v_class_biases')
 
         l_logit = modules.WordWeightAnswer(
-            l_linear_l, self.answer_dict, self.word_weight_dir,
+            l_joint, self.answer_dict, self.word_weight_dir,
             use_bias=True, is_training=self.is_train,
             scope='WordWeightAnswerL',
             weight_name='l_class_weights',

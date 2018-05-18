@@ -93,233 +93,6 @@ class Model(object):
 
         return self.loss
 
-    def build_object_predict(self):
-        """
-        object_predict
-        """
-        # [#obj, #proposal] x [#proposal x feat_dim] -> [#obj,feat_dim]
-        V_ft = tf.matmul(self.batch['obj_pred/weights'],
-                         self.batch['image_ft'])
-        v_linear_l = modules.fc_layer(
-            V_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
-            activation_fn=tf.nn.relu, is_training=self.is_train,
-            scope='pooled_linear_l')
-        dummy_l = tf.zeros_like(self.batch['obj_pred/labels'], dtype=tf.float32)
-        dummy_l = tf.tile(tf.expand_dims(dummy_l, axis=-1), [1, 1, L_DIM])
-        l_linear_l = modules.fc_layer(
-            dummy_l, L_DIM, use_bias=True, use_bn=False, use_ln=True,
-            activation_fn=tf.nn.relu, is_training=self.is_train,
-            scope='q_linear_l')
-
-        joint = modules.fc_layer(
-            v_linear_l * l_linear_l, L_DIM * 2,
-            use_bias=True, use_bn=False, use_ln=True,
-            activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_fc')
-        joint = tf.nn.dropout(joint, 0.5)
-
-        logit = modules.fc_layer(
-            joint, self.num_answer,
-            use_bias=True, use_bn=False, use_ln=False,
-            activation_fn=None, is_training=self.is_train, scope='classifier')
-        self.mid_result['obj_pred/logit'] = logit  # [bs, #obj, #answer]
-
-        with tf.name_scope('loss/object_predict'):
-            onehot_gt = tf.one_hot(self.batch['obj_pred/labels'],
-                                   depth=self.num_answer)
-            num_valid_entry = self.batch['obj_pred/num']
-            valid_mask = tf.sequence_mask(
-                num_valid_entry, maxlen=self.data_cfg.n_obj_pred,
-                dtype=tf.float32)
-            loss, acc, top_k_acc = \
-                self.n_way_classification_loss(logit, onehot_gt, valid_mask)
-            self.losses['object_pred'] = loss
-            self.report['object_pred_loss'] = loss
-            self.report['object_pred_acc'] = acc
-            self.report['object_pred_top_{}_acc'.format(TOP_K)] = top_k_acc
-
-    def build_attribute_predict(self):
-        """
-        attribute_predict
-        """
-        # [#attr, #proposal] x [#proposal x feat_dim] -> [#attr,feat_dim]
-        V_ft = tf.matmul(self.batch['attr_pred/weights'],
-                         self.batch['image_ft'])
-        v_linear_l = modules.fc_layer(
-            V_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
-            activation_fn=tf.nn.relu, is_training=self.is_train,
-            scope='pooled_linear_l')
-
-        L_ft = tf.nn.embedding_lookup(self.l_answer_word_map,
-                                      self.batch['attr_pred/object_labels'])
-        reg_l_ft = modules.fc_layer(
-            L_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
-            activation_fn=tf.nn.tanh, is_training=self.is_train,
-            scope='attr_pred/encode_object_labels')
-        self.mid_result['attr_pred/reg_l_ft'] = reg_l_ft
-
-        l_linear_l = modules.fc_layer(
-            reg_l_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
-            activation_fn=tf.nn.relu, is_training=self.is_train,
-            scope='q_linear_l')
-
-        joint = modules.fc_layer(
-            v_linear_l * l_linear_l, L_DIM * 2,
-            use_bias=True, use_bn=False, use_ln=True,
-            activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_fc')
-        joint = tf.nn.dropout(joint, 0.5)
-
-        logit = modules.fc_layer(
-            joint, self.num_answer,
-            use_bias=True, use_bn=False, use_ln=False,
-            activation_fn=None, is_training=self.is_train, scope='classifier')
-        self.mid_result['attr_pred/logit'] = logit  # [bs, #attr, #answer]
-
-        with tf.name_scope('loss/attr_predict'):
-            multilabel_gt = self.batch['attr_pred/labels']
-            num_valid_entry = self.batch['attr_pred/num']
-            valid_mask = tf.sequence_mask(
-                num_valid_entry, maxlen=self.data_cfg.n_attr_pred,
-                dtype=tf.float32)
-            loss, acc, recall, precision, top_1_prec, top_k_recall = \
-                self.binary_classification_loss(logit, multilabel_gt, valid_mask,
-                                                depth=self.num_answer)
-            self.losses['attr_pred'] = loss
-            self.report['attr_pred_loss'] = loss
-            self.report['attr_pred_acc'] = acc
-            self.report['attr_pred_recall'] = recall
-            self.report['attr_pred_precision'] = precision
-            self.report['attr_pred_top_1_prec'] = top_1_prec
-            self.report['attr_pred_top_{}_recall'.format(TOP_K)] = top_k_recall
-
-    def build_object_attention(self):
-        """
-        object_attention
-        """
-        num_V_ft = self.batch['num_boxes']
-        v_linear_v = self.mid_result['v_linear_v']
-
-        w_embed = tf.nn.embedding_lookup(self.v_word_map,
-                                         self.batch['obj_att/word_tokens'])
-        w_L_ft = modules.fc_layer(  # [bs, #proposal, len, L_DIM]
-            w_embed, L_DIM, use_bias=True, use_bn=False, use_ln=True,
-            activation_fn=tf.nn.relu, is_training=self.is_train,
-            scope='v_word_fc')
-        w_len = self.batch['obj_att/word_tokens_len']
-        mask = tf.sequence_mask(  # [bs, #proposal, len]
-            w_len, maxlen=tf.shape(w_L_ft)[-2],
-            dtype=tf.float32)
-        pooled_w_L_ft = tf.reduce_sum(w_L_ft * tf.expand_dims(mask, axis=-1),
-                                      axis=-2)
-        pooled_w_L_ft = pooled_w_L_ft / \
-            tf.expand_dims(tf.to_float(w_len), axis=-1)
-
-        l_linear_v = modules.fc_layer(
-            pooled_w_L_ft, V_DIM, use_bias=True, use_bn=False, use_ln=True,
-            activation_fn=tf.nn.relu, is_training=self.is_train,
-            scope='q_linear_v')
-
-        tile_v_linear_v = tf.tile(tf.expand_dims(v_linear_v, axis=1),
-                                  [1, self.data_cfg.n_obj_att, 1, 1])
-        flat_tile_v_linear_v = tf.reshape(tile_v_linear_v,
-                                          [-1, self.data_cfg.max_box_num, V_DIM])
-        tile_num_V_ft = tf.tile(tf.expand_dims(num_V_ft, axis=1),
-                                [1, self.data_cfg.n_obj_att])
-        flat_tile_num_V_ft = tf.reshape(tile_num_V_ft, [-1])
-
-        flat_l_linear_v = tf.reshape(l_linear_v, [-1, V_DIM])
-
-        # flat_att_logit: [bs * #obj, num_proposal]
-        flat_att_logit = modules.hadamard_attention(
-            flat_tile_v_linear_v, flat_tile_num_V_ft, flat_l_linear_v,
-            use_ln=False, is_train=self.is_train, normalizer=None)
-
-        n_entry = self.data_cfg.n_obj_att
-        n_proposal = self.data_cfg.max_box_num
-        logit = tf.reshape(flat_att_logit, [-1, n_entry, n_proposal])
-
-        with tf.name_scope('loss/object_attend'):
-            multilabel_gt = tf.to_float(
-                tf.greater(self.batch['obj_att/att_scores'], 0.5))
-            num_valid_entry = self.batch['obj_att/num']
-            valid_mask = tf.sequence_mask(
-                num_valid_entry, maxlen=self.data_cfg.n_obj_att,
-                dtype=tf.float32)
-            loss, acc, recall, precision, top_1_prec, top_k_recall = \
-                self.binary_classification_loss(logit, multilabel_gt, valid_mask,
-                                                depth=self.data_cfg.max_box_num)
-            self.losses['object_att'] = loss
-            self.report['object_att_loss'] = loss
-            self.report['object_att_acc'] = acc
-            self.report['object_att_recall'] = recall
-            self.report['object_att_precision'] = precision
-            self.report['object_att_top_1_prec'] = top_1_prec
-            self.report['object_att_top_{}_recall'.format(TOP_K)] = top_k_recall
-
-    def build_attribute_attention(self):
-        """
-        attribute_attention
-        """
-        num_V_ft = self.batch['num_boxes']
-        v_linear_v = self.mid_result['v_linear_v']
-
-        w_embed = tf.nn.embedding_lookup(self.v_word_map,
-                                         self.batch['attr_att/word_tokens'])
-        w_L_ft = modules.fc_layer(
-            w_embed, L_DIM, use_bias=True, use_bn=False, use_ln=True,
-            activation_fn=tf.nn.relu, is_training=self.is_train,
-            scope='v_word_fc')
-
-        w_len = self.batch['attr_att/word_tokens_len']
-        mask = tf.sequence_mask(  # [bs, #proposal, len]
-            w_len, maxlen=tf.shape(w_L_ft)[-2],
-            dtype=tf.float32)
-        pooled_w_L_ft = tf.reduce_sum(w_L_ft * tf.expand_dims(mask, axis=-1),
-                                      axis=-2)
-        pooled_w_L_ft = pooled_w_L_ft / \
-            tf.expand_dims(tf.to_float(w_len), axis=-1)
-
-        l_linear_v = modules.fc_layer(
-            pooled_w_L_ft, V_DIM, use_bias=True, use_bn=False, use_ln=True,
-            activation_fn=tf.nn.relu, is_training=self.is_train,
-            scope='q_linear_v')
-
-        tile_v_linear_v = tf.tile(tf.expand_dims(v_linear_v, axis=1),
-                                  [1, self.data_cfg.n_attr_att, 1, 1])
-        flat_tile_v_linear_v = tf.reshape(tile_v_linear_v,
-                                          [-1, self.data_cfg.max_box_num, V_DIM])
-        tile_num_V_ft = tf.tile(tf.expand_dims(num_V_ft, axis=1),
-                                [1, self.data_cfg.n_attr_att])
-        flat_tile_num_V_ft = tf.reshape(tile_num_V_ft, [-1])
-
-        flat_l_linear_v = tf.reshape(l_linear_v, [-1, V_DIM])
-
-        # flat_att_logit: [bs * #attr, num_proposal]
-        flat_att_logit = modules.hadamard_attention(
-            flat_tile_v_linear_v, flat_tile_num_V_ft, flat_l_linear_v,
-            use_ln=False, is_train=self.is_train, normalizer=None)
-
-        n_entry = self.data_cfg.n_attr_att
-        n_proposal = self.data_cfg.max_box_num
-        logit = tf.reshape(flat_att_logit, [-1, n_entry, n_proposal])
-
-        with tf.name_scope('loss/attr_attend'):
-            multilabel_gt = tf.to_float(
-                tf.greater(self.batch['attr_att/att_scores'], 0.5))
-            num_valid_entry = self.batch['attr_att/num']
-            valid_mask = tf.sequence_mask(
-                num_valid_entry, maxlen=self.data_cfg.n_attr_att,
-                dtype=tf.float32)
-            loss, acc, recall, precision, top_1_prec, top_k_recall = \
-                self.binary_classification_loss(logit, multilabel_gt, valid_mask,
-                                                depth=self.data_cfg.max_box_num)
-            self.losses['attr_att'] = loss
-            self.report['attr_att_loss'] = loss
-            self.report['attr_att_acc'] = acc
-            self.report['attr_att_recall'] = recall
-            self.report['attr_att_precision'] = precision
-            self.report['attr_att_top_1_prec'] = top_1_prec
-            self.report['attr_att_top_{}_recall'.format(TOP_K)] = top_k_recall
-
     def build_object_V_ft(self):
         V_ft = self.batch['image_ft']  # [bs,  #proposal, #feat_dim]
         V_ft = tf.expand_dims(V_ft, axis=1)  # [bs, 1, #proposal, #feat_dim]
@@ -376,24 +149,34 @@ class Model(object):
             activation_fn=tf.tanh, is_training=self.is_train, scope='wordset_ft')
 
         v_linear_l = modules.fc_layer(
-            pooled_V_ft, L_DIM * 2, use_bias=True, use_bn=False, use_ln=True,
+            pooled_V_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='pooled_linear_l')
-        v_linear_l = tf.nn.dropout(v_linear_l, 0.5)
 
         l_linear_l = modules.fc_layer(
-            wordset_ft, L_DIM * 2, use_bias=True, use_bn=False, use_ln=True,
+            wordset_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='q_linear_l')
-        l_linear_l = tf.nn.dropout(l_linear_l, 0.5)
+
+        v_joint = modules.fc_layer(
+            v_linear_l, L_DIM * 2,
+            use_bias=True, use_bn=False, use_ln=True,
+            activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_v')
+        v_joint = tf.nn.dropout(v_joint, 0.5)
+
+        l_joint = modules.fc_layer(
+            l_linear_l, L_DIM * 2,
+            use_bias=True, use_bn=False, use_ln=True,
+            activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_l')
+        l_joint = tf.nn.dropout(l_joint, 0.5)
 
         v_logit = modules.fc_layer(
-            v_linear_l, self.num_answer,
+            v_joint, self.num_answer,
             use_bias=True, use_bn=False, use_ln=False,
             activation_fn=None, is_training=self.is_train, scope='classifier_v')
 
         l_logit = modules.fc_layer(
-            l_linear_l, self.num_answer,
+            l_joint, self.num_answer,
             use_bias=True, use_bn=False, use_ln=False,
             activation_fn=None, is_training=self.is_train, scope='classifier_l')
 
@@ -473,24 +256,34 @@ class Model(object):
             activation_fn=tf.tanh, is_training=self.is_train, scope='wordset_ft')
 
         v_linear_l = modules.fc_layer(
-            pooled_V_ft, L_DIM * 2, use_bias=True, use_bn=False, use_ln=True,
+            pooled_V_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='pooled_linear_l')
-        v_linear_l = tf.nn.dropout(v_linear_l, 0.5)
 
         l_linear_l = modules.fc_layer(
-            wordset_ft, L_DIM * 2, use_bias=True, use_bn=False, use_ln=True,
+            wordset_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='q_linear_l')
-        l_linear_l = tf.nn.dropout(l_linear_l, 0.5)
+
+        v_joint = modules.fc_layer(
+            v_linear_l, L_DIM * 2,
+            use_bias=True, use_bn=False, use_ln=True,
+            activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_v')
+        v_joint = tf.nn.dropout(v_joint, 0.5)
+
+        l_joint = modules.fc_layer(
+            l_linear_l, L_DIM * 2,
+            use_bias=True, use_bn=False, use_ln=True,
+            activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_l')
+        l_joint = tf.nn.dropout(l_joint, 0.5)
 
         v_logit = modules.fc_layer(
-            v_linear_l, self.num_answer,
+            v_joint, self.num_answer,
             use_bias=True, use_bn=False, use_ln=False,
             activation_fn=None, is_training=self.is_train, scope='classifier_v')
 
         l_logit = modules.fc_layer(
-            l_linear_l, self.num_answer,
+            l_joint, self.num_answer,
             use_bias=True, use_bn=False, use_ln=False,
             activation_fn=None, is_training=self.is_train, scope='classifier_l')
 
@@ -532,24 +325,34 @@ class Model(object):
             flat_blank_ft, [-1, self.data_cfg.n_obj_bf, L_DIM])
 
         v_linear_l = modules.fc_layer(
-            pooled_V_ft, L_DIM * 2, use_bias=True, use_bn=False, use_ln=True,
+            pooled_V_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='pooled_linear_l')
-        v_linear_l = tf.nn.dropout(v_linear_l, 0.5)
 
         l_linear_l = modules.fc_layer(
-            blank_ft, L_DIM * 2, use_bias=True, use_bn=False, use_ln=True,
+            blank_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='q_linear_l')
-        l_linear_l = tf.nn.dropout(l_linear_l, 0.5)
+
+        v_joint = modules.fc_layer(
+            v_linear_l, L_DIM * 2,
+            use_bias=True, use_bn=False, use_ln=True,
+            activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_v')
+        v_joint = tf.nn.dropout(v_joint, 0.5)
+
+        l_joint = modules.fc_layer(
+            l_linear_l, L_DIM * 2,
+            use_bias=True, use_bn=False, use_ln=True,
+            activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_l')
+        l_joint = tf.nn.dropout(l_joint, 0.5)
 
         v_logit = modules.fc_layer(
-            v_linear_l, self.num_answer,
+            v_joint, self.num_answer,
             use_bias=True, use_bn=False, use_ln=False,
             activation_fn=None, is_training=self.is_train, scope='classifier_v')
 
         l_logit = modules.fc_layer(
-            l_linear_l, self.num_answer,
+            l_joint, self.num_answer,
             use_bias=True, use_bn=False, use_ln=False,
             activation_fn=None, is_training=self.is_train, scope='classifier_l')
 
@@ -588,24 +391,34 @@ class Model(object):
             flat_blank_ft, [-1, self.data_cfg.n_attr_bf, L_DIM])
 
         v_linear_l = modules.fc_layer(
-            pooled_V_ft, L_DIM * 2, use_bias=True, use_bn=False, use_ln=True,
+            pooled_V_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='pooled_linear_l')
-        v_linear_l = tf.nn.dropout(v_linear_l, 0.5)
 
         l_linear_l = modules.fc_layer(
-            blank_ft, L_DIM * 2, use_bias=True, use_bn=False, use_ln=True,
+            blank_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='q_linear_l')
-        l_linear_l = tf.nn.dropout(l_linear_l, 0.5)
+
+        v_joint = modules.fc_layer(
+            v_linear_l, L_DIM * 2,
+            use_bias=True, use_bn=False, use_ln=True,
+            activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_v')
+        v_joint = tf.nn.dropout(v_joint, 0.5)
+
+        l_joint = modules.fc_layer(
+            l_linear_l, L_DIM * 2,
+            use_bias=True, use_bn=False, use_ln=True,
+            activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_l')
+        l_joint = tf.nn.dropout(l_joint, 0.5)
 
         v_logit = modules.fc_layer(
-            v_linear_l, self.num_answer,
+            v_joint, self.num_answer,
             use_bias=True, use_bn=False, use_ln=False,
             activation_fn=None, is_training=self.is_train, scope='classifier_v')
 
         l_logit = modules.fc_layer(
-            l_linear_l, self.num_answer,
+            l_joint, self.num_answer,
             use_bias=True, use_bn=False, use_ln=False,
             activation_fn=None, is_training=self.is_train, scope='classifier_l')
 
