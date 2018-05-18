@@ -6,6 +6,7 @@ def get_model_types():
         'vlmap_answer_vqa_all',
         'vlmap_answer2',
         'vlmap_answer_noc',
+        'vlmap_answer_nocarch',
         'vlmap_answer_adapt', 'vlmap_answer_ent',
         'vlmap_answer_full', 'vlmap_answer_no_noise'
     ]
@@ -33,6 +34,8 @@ def get_model_class(model_type='vqa'):
         from vqa.model_vlmap_answer2 import Model
     elif model_type == 'vlmap_answer_noc':
         from vqa.model_vlmap_answer_noc import Model
+    elif model_type == 'vlmap_answer_nocarch':
+        from vqa.model_vlmap_answer_nocarch import Model
     elif model_type == 'vlmap_answer_ent':
         from vqa.model_vlmap_answer_ent import Model
     elif model_type == 'vlmap_answer_adapt':
