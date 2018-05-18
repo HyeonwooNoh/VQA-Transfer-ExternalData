@@ -236,7 +236,7 @@ class Model(object):
             train_loss = tf.reduce_mean(tf.reduce_sum(
                 loss * self.train_answer_mask, axis=-1))
             report_loss = tf.reduce_mean(tf.reduce_sum(loss, axis=-1))
-            pred = tf.cast(tf.argmax(logit, axis=-1), dtype=tf.int32)
+            pred = tf.cast(tf.argmax(logit + tuned_logit, axis=-1), dtype=tf.int32)
             one_hot_pred = tf.one_hot(pred, depth=self.num_answer,
                                       dtype=tf.float32)
             self.output['pred'] = pred
