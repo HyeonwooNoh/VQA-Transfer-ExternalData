@@ -21,7 +21,8 @@ def parse_checkpoint(config):
     config.ckpt_name = config.checkpoint.split('/')[-1]
 
     dirname = config.checkpoint.split('/')[-2]
-    config.model_type = dirname.split('vqa_')[1].split('_d_')[0]
+    #config.model_type = dirname.split('vqa_')[1].split('_d_')[0]
+    config.model_type = dirname[4:].split('_d_')[0]
 
     qa_split_name = dirname.split('_d_')[1].split('_tf_record_memft')[0]
     config.tf_record_dir = os.path.join(

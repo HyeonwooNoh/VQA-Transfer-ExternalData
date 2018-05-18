@@ -4,6 +4,7 @@ def get_model_types():
         'standard', 'standard_testmask', 'standard_word2vec',
         'vlmap_only', 'vlmap_finetune', 'vlmap_answer',
         'vlmap_answer_vqa_all',
+        'vlmap_answer_vqa_all2',
         'vlmap_answer2',
         'vlmap_answer_noc',
         'vlmap_answer_nocarch',
@@ -30,6 +31,8 @@ def get_model_class(model_type='vqa'):
         from vqa.model_vlmap_answer import Model
     elif model_type == 'vlmap_answer_vqa_all':
         from vqa.model_vlmap_answer_vqa_all import Model
+    elif model_type == 'vlmap_answer_vqa_all2':
+        from vqa.model_vlmap_answer_vqa_all2 import Model
     elif model_type == 'vlmap_answer2':
         from vqa.model_vlmap_answer2 import Model
     elif model_type == 'vlmap_answer_noc':
@@ -45,5 +48,5 @@ def get_model_class(model_type='vqa'):
     elif model_type == 'vlmap_answer_no_noise':
         from vqa.model_vlmap_answer_no_noise import Model
     else:
-        raise ValueError('Unknown model_type')
+        raise ValueError('Unknown model_type: {}'.format(model_type))
     return Model
