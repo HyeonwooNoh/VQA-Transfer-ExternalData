@@ -375,60 +375,6 @@ class Model(object):
 
         self.mid_result['object_pooled_V_ft'] = pooled_V_ft
 
-    def build_object_wordset(self):
-        """
-        object_wordset
-        """
-        pooled_V_ft = self.mid_result['object_pooled_V_ft']
-
-        wordset_embed = tf.tanh(tf.nn.embedding_lookup(  # [bs, #obj, W_DIM]
-            self.wordset_map, self.batch['obj_blank_fill/wordsets']))
-        wordset_ft = modules.fc_layer(  # [bs, #obj, L_DIM]
-            wordset_embed, L_DIM, use_bias=True, use_bn=False, use_ln=True,
-            activation_fn=tf.tanh, is_training=self.is_train, scope='wordset_ft')
-
-        v_linear_l = modules.fc_layer(
-            pooled_V_ft, L_DIM * 2, use_bias=True, use_bn=False, use_ln=True,
-            activation_fn=tf.nn.relu, is_training=self.is_train,
-            scope='pooled_linear_l')
-        v_linear_l = tf.nn.dropout(v_linear_l, 0.5)
-
-        l_linear_l = modules.fc_layer(
-            wordset_ft, L_DIM * 2, use_bias=True, use_bn=False, use_ln=True,
-            activation_fn=tf.nn.relu, is_training=self.is_train,
-            scope='q_linear_l')
-        l_linear_l = tf.nn.dropout(l_linear_l, 0.5)
-
-        v_logit = modules.fc_layer(
-            v_linear_l, self.num_answer,
-            use_bias=True, use_bn=False, use_ln=False,
-            activation_fn=None, is_training=self.is_train, scope='classifier_v')
-
-        l_logit = modules.fc_layer(
-            l_linear_l, self.num_answer,
-            use_bias=True, use_bn=False, use_ln=False,
-            activation_fn=None, is_training=self.is_train, scope='classifier_l')
-
-        with tf.name_scope('loss/obj_wordset'):
-            onehot_gt = tf.one_hot(self.batch['obj_blank_fill/fills'],
-                                   depth=self.num_answer)
-            num_valid_entry = self.batch['obj_blank_fill/num']
-            valid_mask = tf.sequence_mask(
-                num_valid_entry, maxlen=self.data_cfg.n_obj_bf,
-                dtype=tf.float32)
-            v_loss, v_acc, v_top_k_acc = \
-                self.n_way_classification_loss(v_logit, onehot_gt, valid_mask)
-            l_loss, l_acc, l_top_k_acc = \
-                self.n_way_classification_loss(l_logit, onehot_gt, valid_mask)
-            self.losses['obj_wordset_v'] = v_loss
-            self.losses['obj_wordset_l'] = l_loss
-            self.report['obj_wordset_v_loss'] = v_loss
-            self.report['obj_wordset_l_loss'] = l_loss
-            self.report['obj_wordset_v_acc'] = v_acc
-            self.report['obj_wordset_l_acc'] = l_acc
-            self.report['obj_wordset_v_top_{}_acc'.format(TOP_K)] = v_top_k_acc
-            self.report['obj_wordset_l_top_{}_acc'.format(TOP_K)] = l_top_k_acc
-
     def build_attribute_V_ft(self):
         V_ft = self.batch['image_ft']  # [bs,  #proposal, #feat_dim]
         V_ft = tf.expand_dims(V_ft, axis=1)  # [bs, 1, #proposal, #feat_dim]
@@ -472,60 +418,6 @@ class Model(object):
 
         self.mid_result['attribute_pooled_V_ft'] = pooled_V_ft
 
-    def build_attribute_wordset(self):
-        """
-        attribute_wordset
-        """
-        pooled_V_ft = self.mid_result['attribute_pooled_V_ft']
-
-        wordset_embed = tf.tanh(tf.nn.embedding_lookup(
-            self.wordset_map, self.batch['attr_blank_fill/wordsets']))
-        wordset_ft = modules.fc_layer(
-            wordset_embed, L_DIM, use_bias=True, use_bn=False, use_ln=True,
-            activation_fn=tf.tanh, is_training=self.is_train, scope='wordset_ft')
-
-        v_linear_l = modules.fc_layer(
-            pooled_V_ft, L_DIM * 2, use_bias=True, use_bn=False, use_ln=True,
-            activation_fn=tf.nn.relu, is_training=self.is_train,
-            scope='pooled_linear_l')
-        v_linear_l = tf.nn.dropout(v_linear_l, 0.5)
-
-        l_linear_l = modules.fc_layer(
-            wordset_ft, L_DIM * 2, use_bias=True, use_bn=False, use_ln=True,
-            activation_fn=tf.nn.relu, is_training=self.is_train,
-            scope='q_linear_l')
-        l_linear_l = tf.nn.dropout(l_linear_l, 0.5)
-
-        v_logit = modules.fc_layer(
-            v_linear_l, self.num_answer,
-            use_bias=True, use_bn=False, use_ln=False,
-            activation_fn=None, is_training=self.is_train, scope='classifier_v')
-
-        l_logit = modules.fc_layer(
-            l_linear_l, self.num_answer,
-            use_bias=True, use_bn=False, use_ln=False,
-            activation_fn=None, is_training=self.is_train, scope='classifier_l')
-
-        with tf.name_scope('loss/attr_wordset'):
-            onehot_gt = tf.one_hot(self.batch['attr_blank_fill/fills'],
-                                   depth=self.num_answer)
-            num_valid_entry = self.batch['attr_blank_fill/num']
-            valid_mask = tf.sequence_mask(
-                num_valid_entry, maxlen=self.data_cfg.n_attr_bf,
-                dtype=tf.float32)
-            v_loss, v_acc, v_top_k_acc = \
-                self.n_way_classification_loss(v_logit, onehot_gt, valid_mask)
-            l_loss, l_acc, l_top_k_acc = \
-                self.n_way_classification_loss(l_logit, onehot_gt, valid_mask)
-            self.losses['attr_wordset_v'] = v_loss
-            self.losses['attr_wordset_l'] = l_loss
-            self.report['attr_wordset_v_loss'] = v_loss
-            self.report['attr_wordset_l_loss'] = l_loss
-            self.report['attr_wordset_v_acc'] = v_acc
-            self.report['attr_wordset_l_acc'] = l_acc
-            self.report['attr_wordset_v_top_{}_acc'.format(TOP_K)] = v_top_k_acc
-            self.report['attr_wordset_l_top_{}_acc'.format(TOP_K)] = l_top_k_acc
-
     def build_object_blank_fill(self):
         """
         object_blank_fill
@@ -544,24 +436,34 @@ class Model(object):
             flat_blank_ft, [-1, self.data_cfg.n_obj_bf, L_DIM])
 
         v_linear_l = modules.fc_layer(
-            pooled_V_ft, L_DIM * 2, use_bias=True, use_bn=False, use_ln=True,
+            pooled_V_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='pooled_linear_l')
-        v_linear_l = tf.nn.dropout(v_linear_l, 0.5)
 
         l_linear_l = modules.fc_layer(
-            blank_ft, L_DIM * 2, use_bias=True, use_bn=False, use_ln=True,
+            blank_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='q_linear_l')
-        l_linear_l = tf.nn.dropout(l_linear_l, 0.5)
+
+        v_joint = modules.fc_layer(
+            v_linear_l, L_DIM * 2,
+            use_bias=True, use_bn=False, use_ln=True,
+            activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_v')
+        v_joint = tf.nn.dropout(v_joint, 0.5)
+
+        l_joint = modules.fc_layer(
+            l_linear_l, L_DIM * 2,
+            use_bias=True, use_bn=False, use_ln=True,
+            activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_l')
+        l_joint = tf.nn.dropout(l_joint, 0.5)
 
         v_logit = modules.fc_layer(
-            v_linear_l, self.num_answer,
+            v_joint, self.num_answer,
             use_bias=True, use_bn=False, use_ln=False,
             activation_fn=None, is_training=self.is_train, scope='classifier_v')
 
         l_logit = modules.fc_layer(
-            l_linear_l, self.num_answer,
+            l_joint, self.num_answer,
             use_bias=True, use_bn=False, use_ln=False,
             activation_fn=None, is_training=self.is_train, scope='classifier_l')
 
@@ -600,24 +502,34 @@ class Model(object):
             flat_blank_ft, [-1, self.data_cfg.n_attr_bf, L_DIM])
 
         v_linear_l = modules.fc_layer(
-            pooled_V_ft, L_DIM * 2, use_bias=True, use_bn=False, use_ln=True,
+            pooled_V_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='pooled_linear_l')
-        v_linear_l = tf.nn.dropout(v_linear_l, 0.5)
 
         l_linear_l = modules.fc_layer(
-            blank_ft, L_DIM * 2, use_bias=True, use_bn=False, use_ln=True,
+            blank_ft, L_DIM, use_bias=True, use_bn=False, use_ln=True,
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='q_linear_l')
-        l_linear_l = tf.nn.dropout(l_linear_l, 0.5)
+
+        v_joint = modules.fc_layer(
+            v_linear_l, L_DIM * 2,
+            use_bias=True, use_bn=False, use_ln=True,
+            activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_v')
+        v_joint = tf.nn.dropout(v_joint, 0.5)
+
+        l_joint = modules.fc_layer(
+            l_linear_l, L_DIM * 2,
+            use_bias=True, use_bn=False, use_ln=True,
+            activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_l')
+        l_joint = tf.nn.dropout(l_joint, 0.5)
 
         v_logit = modules.fc_layer(
-            v_linear_l, self.num_answer,
+            v_joint, self.num_answer,
             use_bias=True, use_bn=False, use_ln=False,
             activation_fn=None, is_training=self.is_train, scope='classifier_v')
 
         l_logit = modules.fc_layer(
-            l_linear_l, self.num_answer,
+            l_joint, self.num_answer,
             use_bias=True, use_bn=False, use_ln=False,
             activation_fn=None, is_training=self.is_train, scope='classifier_l')
 
@@ -832,23 +744,27 @@ class Model(object):
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='q_linear_l')
 
-        joint = modules.fc_layer(
-            v_linear_l * l_linear_l, L_DIM * 2,
+        v_joint = modules.fc_layer(
+            v_linear_l, L_DIM * 2,
             use_bias=True, use_bn=False, use_ln=True,
-            activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_fc')
-        joint = tf.nn.dropout(joint, 0.5)
+            activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_v')
+        v_joint = tf.nn.dropout(v_joint, 0.5)
+
+        l_joint = modules.fc_layer(
+            l_linear_l, L_DIM * 2,
+            use_bias=True, use_bn=False, use_ln=True,
+            activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_l')
+        l_joint = tf.nn.dropout(l_joint, 0.5)
 
         v_logit = modules.fc_layer(
-            joint, self.num_answer,
+            v_joint, self.num_answer,
             use_bias=True, use_bn=False, use_ln=False,
-            activation_fn=None, is_training=self.is_train, scope='l_classifier')
-        self.mid_result['attr_enwiki/v_logit'] = v_logit  # [bs, #attr, #answer]
+            activation_fn=None, is_training=self.is_train, scope='classifier_v')
 
         l_logit = modules.fc_layer(
-            joint, self.num_answer,
+            l_joint, self.num_answer,
             use_bias=True, use_bn=False, use_ln=False,
-            activation_fn=None, is_training=self.is_train, scope='v_classifier')
-        self.mid_result['attr_enwiki/l_logit'] = l_logit  # [bs, #attr, #answer]
+            activation_fn=None, is_training=self.is_train, scope='classifier_l')
 
         with tf.name_scope('loss/obj_enwiki'):
             onehot_gt = tf.one_hot(self.batch['obj_blank_fill/fills'],
@@ -858,18 +774,18 @@ class Model(object):
                 num_valid_entry, maxlen=self.data_cfg.n_obj_bf,
                 dtype=tf.float32)
 
-            #loss, acc, top_k_acc = \
-            #    self.n_way_classification_loss(logit, onehot_gt, valid_mask)
             v_loss, v_acc, v_top_k_acc = \
                 self.n_way_classification_loss(v_logit, onehot_gt, valid_mask)
             l_loss, l_acc, l_top_k_acc = \
                 self.n_way_classification_loss(l_logit, onehot_gt, valid_mask)
-            loss = v_loss + l_loss
-
-            self.losses['obj_enwiki'] = loss
-            self.report['obj_enwiki_loss'] = loss
-            self.report['obj_enwiki_acc'] = acc
-            self.report['obj_enwiki_top_{}_acc'.format(TOP_K)] = top_k_acc
+            self.losses['obj_enwiki_v'] = v_loss
+            self.losses['obj_enwiki_l'] = l_loss
+            self.report['obj_enwiki_v_loss'] = v_loss
+            self.report['obj_enwiki_l_loss'] = l_loss
+            self.report['obj_enwiki_v_acc'] = v_acc
+            self.report['obj_enwiki_l_acc'] = l_acc
+            self.report['obj_enwiki_v_top_{}_acc'.format(TOP_K)] = v_top_k_acc
+            self.report['obj_enwiki_l_top_{}_acc'.format(TOP_K)] = l_top_k_acc
 
     def build_attribute_enwiki(self):
         """
@@ -898,23 +814,27 @@ class Model(object):
             activation_fn=tf.nn.relu, is_training=self.is_train,
             scope='q_linear_l')
 
-        joint = modules.fc_layer(
-            v_linear_l * l_linear_l, L_DIM * 2,
+        v_joint = modules.fc_layer(
+            v_linear_l, L_DIM * 2,
             use_bias=True, use_bn=False, use_ln=True,
-            activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_fc')
-        joint = tf.nn.dropout(joint, 0.5)
+            activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_v')
+        v_joint = tf.nn.dropout(v_joint, 0.5)
+
+        l_joint = modules.fc_layer(
+            l_linear_l, L_DIM * 2,
+            use_bias=True, use_bn=False, use_ln=True,
+            activation_fn=tf.nn.relu, is_training=self.is_train, scope='joint_l')
+        l_joint = tf.nn.dropout(l_joint, 0.5)
 
         v_logit = modules.fc_layer(
-            joint, self.num_answer,
+            v_joint, self.num_answer,
             use_bias=True, use_bn=False, use_ln=False,
-            activation_fn=None, is_training=self.is_train, scope='l_classifier')
-        self.mid_result['attr_enwiki/v_logit'] = v_logit  # [bs, #attr, #answer]
+            activation_fn=None, is_training=self.is_train, scope='classifier_v')
 
         l_logit = modules.fc_layer(
-            joint, self.num_answer,
+            l_joint, self.num_answer,
             use_bias=True, use_bn=False, use_ln=False,
-            activation_fn=None, is_training=self.is_train, scope='v_classifier')
-        self.mid_result['attr_enwiki/l_logit'] = l_logit  # [bs, #attr, #answer]
+            activation_fn=None, is_training=self.is_train, scope='classifier_l')
 
         with tf.name_scope('loss/attr_enwiki'):
             onehot_gt = tf.one_hot(self.batch['attr_blank_fill/fills'],
@@ -924,16 +844,15 @@ class Model(object):
                 num_valid_entry, maxlen=self.data_cfg.n_attr_bf,
                 dtype=tf.float32)
 
-            #loss, acc, top_k_acc = \
-            #    self.n_way_classification_loss(logit, onehot_gt, valid_mask)
             v_loss, v_acc, v_top_k_acc = \
                 self.n_way_classification_loss(v_logit, onehot_gt, valid_mask)
             l_loss, l_acc, l_top_k_acc = \
                 self.n_way_classification_loss(l_logit, onehot_gt, valid_mask)
-            loss = v_loss + l_loss
-
-            self.losses['attr_enwiki'] = loss
-            self.report['attr_enwiki_loss'] = loss
-            self.report['attr_enwiki_acc'] = acc
-            self.report['attr_enwiki_top_{}_acc'.format(TOP_K)] = top_k_acc
-
+            self.losses['attr_enwiki_v'] = v_loss
+            self.losses['attr_enwiki_l'] = l_loss
+            self.report['attr_enwiki_v_loss'] = v_loss
+            self.report['attr_enwiki_l_loss'] = l_loss
+            self.report['attr_enwiki_v_acc'] = v_acc
+            self.report['attr_enwiki_l_acc'] = l_acc
+            self.report['attr_enwiki_v_top_{}_acc'.format(TOP_K)] = v_top_k_acc
+            self.report['attr_enwiki_l_top_{}_acc'.format(TOP_K)] = l_top_k_acc
