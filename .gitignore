@@ -25,6 +25,7 @@ data/BookCorpus
 data/COCO
 
 # Training results
+vlmap_bf*
 *train_dir*
 experiments
 
