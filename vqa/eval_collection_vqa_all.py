@@ -17,7 +17,8 @@ parser.add_argument('--split', type=str, default='test', help=' ',
                     choices=['train', 'val', 'testval', 'test'])
 parser.add_argument('--qa_split_dir', type=str, default='data/preprocessed/vqa_v2'
                     '/qa_split_objattr_answer_3div4_genome_memft_check_all'
-                    '_answer_thres1_50000_thres2_-1', help=' ')
+                    '_answer_thres1_50000_thres2_-1_with_seen_answer_in_test',
+                    help=' ')
 config = parser.parse_args()
 
 if config.root_train_dir is None and len(config.train_dirs) == 0:
@@ -31,8 +32,13 @@ else:
     all_train_dirs = glob.glob(os.path.join(config.root_train_dir, 'vqa_*'))
 all_train_dirs = sorted(all_train_dirs)
 
-pure_test_qid2anno_path = os.path.join(config.qa_split_dir, 'pure_test_qid2anno.pkl')
-pure_test_qid2anno = cPickle.load(open(pure_test_qid2anno_path, 'rb'))
+log.warn('loading target data ..')
+test_qid2anno_path = os.path.join(config.qa_split_dir, 'test_qid2anno.pkl')
+test_qid2anno = cPickle.load(open(test_qid2anno_path, 'rb'))
+
+test_detail_split_path = os.path.join(config.qa_split_dir, 'test_detail_split.pkl')
+test_detail_split = cPickle.load(open(test_detail_split_path, 'rb'))
+log.warn('loading target data is done')
 
 log.warn('all_train_dirs:')
 for i, train_dir in enumerate(all_train_dirs):
@@ -57,22 +63,26 @@ for i_train_dir, train_dir in enumerate(all_train_dirs):
         avg = results['avg_eval_report']
         res = results['qid2result']
         collect_results['iter'].append(i)
-        new_testonly_score = np.array(
-            [anno['answer_score'].get(res[qid]['pred'], 0)
-             for qid, anno in pure_test_qid2anno.items()]).mean()
-        new_test_obj_only_score = np.array(
-            [anno['answer_score'].get(res[qid]['pred'], 0)
-             for qid, anno in pure_test_qid2anno.items()
-             if res[qid]['test_attr_max_score'] <= 0]).mean()
-        new_test_attr_only_score = np.array(
-            [anno['answer_score'].get(res[qid]['pred'], 0)
-             for qid, anno in pure_test_qid2anno.items()
-             if res[qid]['test_obj_max_score'] <= 0]).mean()
+        for split_key, qid_list in test_detail_split.items():
+            new_testonly_score = np.array(
+                [test_qid2anno[qid]['answer_score'].get(res[qid]['pred'], 0)
+                 for qid in qid_list]).mean()
+            new_test_obj_only_score = np.array(
+                [test_qid2anno[qid]['answer_score'].get(res[qid]['pred'], 0)
+                 for qid in qid_list
+                 if res[qid]['test_attr_max_score'] <= 0]).mean()
+            new_test_attr_only_score = np.array(
+                [test_qid2anno[qid]['answer_score'].get(res[qid]['pred'], 0)
+                 for qid in qid_list
+                 if res[qid]['test_obj_max_score'] <= 0]).mean()
+            collect_results['new_{}_total_score'.format(split_key)].append(
+                new_testonly_score)
+            collect_results['new_{}_obj_only_score'.format(split_key)].append(
+                new_test_obj_only_score)
+            collect_results['new_{}_attr_only_score'.format(split_key)].append(
+                new_test_attr_only_score)
 
         collect_results['testonly_score'].append(avg['testonly_score'])
-        collect_results['new_testonly_score'].append(new_testonly_score)
-        collect_results['new_test_obj_only_score'].append(new_test_obj_only_score)
-        collect_results['new_test_attr_only_score'].append(new_test_attr_only_score)
         collect_results['testonly_score_num_point'].append(avg['testonly_score_num_point'])
         collect_results['test_obj_only_score'].append(
             avg['test_obj_only_score'])
