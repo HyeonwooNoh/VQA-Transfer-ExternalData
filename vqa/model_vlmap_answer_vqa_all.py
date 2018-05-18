@@ -50,6 +50,7 @@ class Model(object):
         self.glove_map = modules.LearnGloVe(self.vocab)
         self.answer_exist_mask = modules.AnswerExistMask(
             self.answer_dict, self.word_weight_dir)
+        self.answer_non_exist_mask = 1.0 - self.answer_exist_mask
 
         if self.config.debug:
             self.features, self.spatials, self.normal_boxes, self.num_boxes, \
@@ -188,6 +189,9 @@ class Model(object):
             joint, self.answer_dict, self.word_weight_dir,
             use_bias=True, is_training=self.is_train,
             default_bias=-100.0, scope='WordWeightAnswer')
+        min_logit = tf.tile(
+            tf.reduce_min(logit, axis=1, keepdims=True), [1, self.num_answer])
+        logit = logit * self.answer_exist_mask + min_logit * self.answer_non_exist_mask
 
         ##########################
         # 2. Fine tuned vlmap
@@ -208,10 +212,11 @@ class Model(object):
         tuned_joint = tf.nn.dropout(tuned_joint, 0.5)
         self.mid_result['tuned_joint'] = tuned_joint
 
-        tuned_logit = modules.WordWeightAnswer(
-            tuned_joint, self.answer_dict, self.word_weight_dir,
-            use_bias=True, is_training=self.is_train,
-            default_bias=0, scope='TunedWordWeightAnswer')
+        tuned_logit = modules.fc_layer(
+            joint, self.num_answer,
+            use_bias=True, use_bn=False, use_ln=False,
+            activation_fn=None, is_training=self.is_train,
+            scope='TunedWordWeightAnswer')
 
         ##########################
         # 3. Combine logits
@@ -236,7 +241,7 @@ class Model(object):
             train_loss = tf.reduce_mean(tf.reduce_sum(
                 loss * self.train_answer_mask, axis=-1))
             report_loss = tf.reduce_mean(tf.reduce_sum(loss, axis=-1))
-            pred = tf.cast(tf.argmax(logit, axis=-1), dtype=tf.int32)
+            pred = tf.cast(tf.argmax(logit + tuned_logit, axis=-1), dtype=tf.int32)
             one_hot_pred = tf.one_hot(pred, depth=self.num_answer,
                                       dtype=tf.float32)
             self.output['pred'] = pred
