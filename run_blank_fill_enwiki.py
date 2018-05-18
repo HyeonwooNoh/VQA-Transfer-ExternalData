@@ -29,6 +29,9 @@ def parallel_run(commands, config):
         procs = []
 
         for num, cmd in enumerate(cmds):
+            if num > 0:
+                time.sleep(60*3)
+
             print(" [*] Group {}/{}, Thread {}/{}". \
                 format(idx, len(groups), num, len(cmds)))
 
@@ -89,8 +92,9 @@ if __name__ == '__main__':
     VLMAP_BASE = "{vlmap_model}_d_memft_all_new_vocab50_obj3000_attr1000_maxlen10_" \
                  "{vlmap_prefix}_bs512_lr0.001_dp{depth}_seed{seed}_*"
 
-    VLMAP_SEEDS = [234, 345, 456]
-    VQA_SEEDS = [123, 234, 345]
+    VLMAP_SEEDS = [234]
+    #VQA_SEEDS = [123, 234, 345, 456]
+    VQA_SEEDS = [123, 456]
     #VLMAP_SEEDS = [345, 456]
     #VQA_SEEDS = [234, 345]
     #VLMAP_SEEDS = [234]
@@ -98,9 +102,12 @@ if __name__ == '__main__':
 
     ENWIKI_PREPROCESSING = int(False)
     DEPTHS = ['False']
-    VLMAP_MODELS = ['vlmap_noc_bf_or_enwiki_withatt_sp']
+    VLMAP_MODELS = [
+            #'vlmap_noc_bf_or_enwiki_withatt_sp'
+            'vlmap_noc_bf_or_wordset_withatt_sp'
+    ]
     # standard_word2vec: 3, vlmap_answer: 6
-    MODEL_TYPES = ['vlmap_answer']
+    MODEL_TYPES = ['vlmap_answer_noc']
     #MODEL_TYPES = ['standard_word2vec', 'vlmap_answer']
     
     #########################
@@ -204,7 +211,7 @@ if __name__ == '__main__':
             important_sub_dirs.append(dst_path)
     
     #########################################
-    # 4. vlmap_memft/export_word_weights.py
+    # 4. vlmap_memft/export_noc_word_weights.py
     #########################################
 
     cmds = []
@@ -229,7 +236,7 @@ if __name__ == '__main__':
             continue
         checkpoint = os.path.join(directory, "model-{}".format(steps[directory]))
 
-        cmd = "python vlmap_memft/export_word_weights.py --checkpoint={}".format(checkpoint)
+        cmd = "python vlmap_memft/export_noc_word_weights.py --checkpoint={}".format(checkpoint)
         cmds.append(cmd)
 
     parallel_run(cmds, config)
@@ -262,7 +269,7 @@ if __name__ == '__main__':
                         if 'vlmap_bf_or_wordset_withatt_sp' not in directory:
                             continue
                         cmd = base_cmd
-                    elif model_type == 'vlmap_answer':
+                    elif model_type.startswith('vlmap_answer'):
                         if 'vlmap_bf_or_wordset_withatt_sp' in directory:
                             continue
                         cmd = base_cmd + " --pretrained_param_path {directory}/model-{step}". \
@@ -273,7 +280,7 @@ if __name__ == '__main__':
                     vlmap_prefix = "{}_{}".format(
                         config.vlmap_prefix, directory.split(config.vlmap_prefix)[1])
 
-                    cmd += " --prefix {vlmap_prefix}_md{model_type}_vqasd{vqa_seed}". \
+                    cmd += " --prefix md{model_type}_vqasd{vqa_seed}". \
                         format(directory=directory, vlmap_prefix=vlmap_prefix,
                                vqa_seed=vqa_seed, model_type=model_type)
 
