@@ -89,10 +89,10 @@ if __name__ == '__main__':
     VLMAP_BASE = "{vlmap_model}_d_memft_all_new_vocab50_obj3000_attr1000_maxlen10_" \
                  "{vlmap_prefix}_bs512_lr0.001_dp{depth}_seed{seed}_*"
 
-    VQA_SEEDS = [123, 234, 345]
+    VQA_SEEDS = [123]
 
     DEPTHS = ['False']
-    MODEL_TYPES = ['vlmap_answer_vqa_all']
+    MODEL_TYPES = ['vlmap_answer_vqa_all2']
                    #'standard',
                    #'standard_word2vec']
     # standard_word2vec: 3, vlmap_answer: 6
