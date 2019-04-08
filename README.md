@@ -1,5 +1,6 @@
 # VQA-Transfer-ExternalData
-**Transfer Learning via Unsupervised Task Discovery for Visual Question Answering**
+This is not an official repository for the paper **Transfer Learning via Unsupervised Task Discovery for Visual Question Answering**.
+Official repository for the paper is [https://github.com/HyeonwooNoh/vqa_task_discovery/](https://github.com/HyeonwooNoh/vqa_task_discovery/)
 
 
 ## All in 1
